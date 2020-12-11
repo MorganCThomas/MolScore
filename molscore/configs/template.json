@@ -1,0 +1,125 @@
+{
+  "logging": {
+    "model": {
+      "name": "REINVENT",
+      "comments": {
+        "prior": "MOSES with charge, no DRD2",
+        "optimizer": "augmented likelihood",
+        "sigma": 60
+      }
+    },
+    "task": {
+      "name": "DRD2 Glide docking score",
+      "comments": {
+        "pdb": "6CM4",
+        "grid": "default"
+      }
+    }
+  },
+  "output_dir": "./molscore_results",
+  "load_from_previous": false,
+  "previous_dir": "<path to previous molscore results>",
+  "dash_monitor": {
+    "run": true,
+    "pdb_path": null
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "IdenticalMurckoScaffold",
+    "parameters": {
+        "nbmax": 25,
+        "minscore": 0.6,
+        "minsimilarity": 0.6,
+        "radius": 2,
+        "useFeatures": false,
+        "bits": 2048,
+        "outputmode": "binary"
+      }
+  },
+  "scoring_functions": [
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {}
+    },
+    {
+      "name": "SubstructureFilters",
+      "run": false,
+      "parameters": {
+        "prefix": "<Some prefix relevant to the task>",
+        "az_filters": false,
+        "custom_filters": [],
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": false,
+      "parameters": {
+        "prefix": "<Some prefix relevant to the task>",
+        "smarts": [],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    },
+    {
+    "name": "TanimotoSimilarity",
+    "run": false,
+      "parameters": {
+        "prefix": "risp",
+        "k": 0.7,
+        "smi": "Cc1ccc(cc1)c2cc(nn2c3ccc(cc3)S(=O)(=O)N)C(F)(F)F",
+        "smi_file": "file1"
+      }
+    },
+    {
+      "name": "GlideDock",
+      "run": false,
+      "parameters": {
+        "prefix": "DRD2",
+        "glide_template": "<path_to_template>",
+        "cluster": "<dask_scheduler_address>",
+        "timeout": 120
+      }
+    },
+    {
+      "name": "ROCS",
+      "run": false,
+      "parameters": {
+        "prefix": "DRD2",
+        "ref_file": "<path_to_file(.pdb)>"
+      }
+    },
+    {
+      "name": "GlideDockFromRocs",
+      "run": false,
+      "parameters": {
+        "prefix": "DRD2",
+        "glide_template": "<path_to_file(.in)>",
+        "ref_file": "<path_to_file>",
+        "cluster": "scheduler address",
+        "timeout": 120.0
+      }
+    },
+    {
+      "name": "FRED",
+      "run": false,
+      "parameters": {
+        "prefix":  "DRD2",
+        "receptor_file": "<path_to_file>"
+      }
+    }
+  ],
+  "scoring": {
+    "method": "<gmean/amean/wsum>",
+    "metrics": [{
+      "name": "<prefix_returnKey>",
+      "weight": 0.2,
+      "modifier": "<step/gauss/lin_thresh/norm",
+      "parameters": {
+        "objective": "<minimize/maximize/range>"
+      }
+    }
+    ]
+  }
+}
