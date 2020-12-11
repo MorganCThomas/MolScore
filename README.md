@@ -19,7 +19,7 @@ Contributions and/or ideas for added functionality is welcomed! In an ideal worl
 ## MolScore functionality
 
 Some functionality has been adapted from other sources, so special mentions to:
-* [GaucaMol](https://github.com/BenevolentAI/guacamol)
+* [GuacaMol](https://github.com/BenevolentAI/guacamol)
 * [MOSES](https://github.com/molecularsets/moses)
 * [REINVENT v2.0](https://github.com/MolecularAI/Reinvent)
 * [reinvent-memory](https://github.com/tblaschke/reinvent-memory)
