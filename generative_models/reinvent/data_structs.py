@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 
 from utils import Variable
 
+
 class Vocabulary(object):
     """A class for handling encoding/decoding from SMILES to an array of indices"""
     def __init__(self, init_from_file=None, max_length=140):
@@ -77,6 +78,7 @@ class Vocabulary(object):
     def __str__(self):
         return "Vocabulary containing {} tokens: {}".format(len(self), self.chars)
 
+
 class MolData(Dataset):
     """Custom PyTorch Dataset that takes a file containing SMILES.
 
@@ -114,6 +116,7 @@ class MolData(Dataset):
         for i, seq in enumerate(arr):
             collated_arr[i, :seq.size(0)] = seq
         return collated_arr
+
 
 class Experience(object):
     """Class for prioritized experience replay that remembers the highest scored sequences
@@ -191,6 +194,7 @@ class Experience(object):
     def __len__(self):
         return len(self.memory)
 
+
 def replace_halogen(string):
     """Regex to replace Br and Cl with single letters"""
     br = re.compile('Br')
@@ -199,6 +203,7 @@ def replace_halogen(string):
     string = cl.sub('L', string)
 
     return string
+
 
 def tokenize(smiles):
     """Takes a SMILES string and returns a list of tokens.
@@ -216,6 +221,7 @@ def tokenize(smiles):
             [tokenized.append(unit) for unit in chars]
     tokenized.append('EOS')
     return tokenized
+
 
 def canonicalize_smiles_from_file(fname, n_jobs):  ####
     """Reads a SMILES file and returns a list of RDKIT SMILES"""
@@ -236,6 +242,7 @@ def canonicalize_smiles_from_file(fname, n_jobs):  ####
     print(f"{len(set(filtered_smiles))} unique SMILES retrieved")
     return list(set(filtered_smiles))  # Ensure smiles are unique
 
+
 def filter_mol(smi, max_heavy_atoms=50, min_heavy_atoms=10, element_list=[6,7,8,9,16,17,35]):
     """Filters molecules on number of heavy atoms and atom types"""
     mol = Chem.MolFromSmiles(smi) #
@@ -247,11 +254,13 @@ def filter_mol(smi, max_heavy_atoms=50, min_heavy_atoms=10, element_list=[6,7,8,
         else:
             return None #
 
+
 def write_smiles_to_file(smiles_list, fname):
     """Write a list of SMILES to a file."""
     with open(fname, 'w') as f:
         for smiles in smiles_list:
             f.write(smiles + "\n")
+
 
 def filter_on_chars(smiles_list, chars):
     """Filters SMILES on the characters they contain.
@@ -263,6 +272,7 @@ def filter_on_chars(smiles_list, chars):
         if all([char in chars for char in tokenized][:-1]):
             smiles_list_valid.append(smiles)
     return smiles_list_valid
+
 
 def filter_file_on_chars(smiles_fname, voc_fname):
     """Filters a SMILES file using a vocabulary file.
@@ -283,6 +293,7 @@ def filter_file_on_chars(smiles_fname, voc_fname):
         for smiles in valid_smiles:
             f.write(smiles + "\n")
 
+
 def combine_voc_from_files(fnames):
     """Combine two vocabularies"""
     chars = set()
@@ -293,6 +304,7 @@ def combine_voc_from_files(fnames):
     with open("_".join(fnames) + '_combined', 'w') as f:
         for char in chars:
             f.write(char + "\n")
+
 
 def construct_vocabulary(smiles_list, output_dir, suffix):
     """Returns all the characters present in a SMILES file.
@@ -314,6 +326,7 @@ def construct_vocabulary(smiles_list, output_dir, suffix):
         for char in add_chars:
             f.write(char + "\n")
     return add_chars
+
 
 def get_args():
     parser = argparse.ArgumentParser()
