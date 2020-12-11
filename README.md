@@ -1,4 +1,4 @@
 # MolScore
-Standardizated and automated scoring of molecules, for use in deep generative models.
+A framework for standardized and automated scoring of molecules, for use in deep generative models.
 
-comming soon ...
+Coming soon ... (12/12/20)
