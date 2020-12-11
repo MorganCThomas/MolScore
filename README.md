@@ -111,3 +111,27 @@ Briefly, the configuration file is structured as follows:
       * objective: str # One of \[maximize, minimize, range]
       * other: any specific parameters required from score modifiers e.g. sigma, mu etc.
 
+## Usage
+
+For a toy demonstration, after installation of `molscore` and activation of the environment with `conda activate molscore`, open the python console (`python` or `ipython`). In the python console, run the following code:
+
+```
+from molscore.test import MockGenerator
+from molsore.manager import MolScore
+
+# Here we setup a mock generator that simply samples molecules from a smiles file.
+mg = MockGenerator()
+
+# Now we setup MolScore passing in the configuration file
+ms = MolScore(config='molscore/test/configs/test_qed.json')
+
+# Now to simulate the scoring of a generative model, we'll pass in 100 molecules 10 times (e.g. batch size 100, iterations 10)
+for i in range(10):
+    ms(mg.sample(100))
+    
+# Finished mock generative model, wrap things up
+ms.write_scores()
+ms.kill_dash_monitor()
+```
+
+**Important** the MolScore class doesn't save the final dataframe until told to do so with ms.write_scores(). This saves crucial time (which really does make a difference) reading and writing from a .csv each iteration. During development, other formats were explored such as an SQL database and parallelised dask dataframes, however, it was found pandas was much quicker and parallelisation unnecessary, the dataframe shouldn't get so large it's a problem for memory. If it does - the generative model should be more efficient! Neither does the class close the dash monitor without calling ms.kill_dash_monitor() (as it is run as a subprocess so will still run after closing everything down!).
