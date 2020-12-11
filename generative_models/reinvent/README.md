@@ -1,50 +1,38 @@
 
 # REINVENT
-## Molecular De Novo design using Recurrent Neural Networks and Reinforcement Learning
+## This is a fork of the original code for use with the MolScore framework
+See "Molecular De Novo design using Recurrent Neural Networks and Reinforcement Learning" and [Release v1.0.1](https://github.com/MarcusOlivecrona/REINVENT/releases/tag/v1.0.1) for reference.
 
-Searching chemical space as described in:
+## Installation
 
-[Molecular De Novo Design through Deep Reinforcement Learning](https://arxiv.org/abs/1704.07555)
+After installing `molscore`, extra requirements can be satisfied by running
 
-![Video demonstrating an Agent trained to generate analogues to Celecoxib](https://github.com/MarcusOlivecrona/REINVENT/blob/master/images/celecoxib_analogues.gif "Training an Agent to generate analogues of Celecoxib")
+`sh requirements.sh`
 
+Unfortunately this is a rather hacky way to satisfy old dependencies including a hot fix for scikit-learn (version required to run the SVM model found in `data`) and downloading of previous pytorch versions (relies on `wget`).
 
-## Notes
-The current version is a PyTorch implementation that differs in several ways from the original implementation described in the paper. This version works better in most situations and is better documented, but for the purpose of reproducing results from the paper refer to [Release v1.0.1](https://github.com/MarcusOlivecrona/REINVENT/releases/tag/v1.0.1)
+All other requirements should be satisfied by the molscore environment setup previously.
 
-Differences from implmentation in the paper:
-* Written in PyTorch/Python3.6 rather than TF/Python2.7
-* SMILES are encoded with token index rather than as a onehot of the index. An embedding matrix is then used to transform the token index to a feature vector.
-* Scores are in the range (0,1).
-* A regularizer that penalizes high values of total episodic likelihood is included.
-* Sequences are only considered once, ie if the same sequence is generated twice in a batch only the first instance contributes to the loss.
-* These changes makes the algorithm more robust towards local minima, means much higher values of sigma can be used if needed.
+## Modifications
 
-## Requirements
+The only modifications to the original code is adding argparse options for more user friendly runnning from the command line for the `train_agent.py`, `train_prior.py` and `data_structs.py` files, and addition of `sample.py` for sampling from a trained model. `train_agent.py` has been modified to accept a molscore config file to control the scoring function. 
 
-This package requires:
-* Python 3.6
-* PyTorch 0.1.12 
-* [RDkit](http://www.rdkit.org/docs/Install.html)
-* Scikit-Learn (for QSAR scoring function)
-* tqdm (for training Prior)
+The minimum requirements to integrate the `molscore` scoring function framework with this generative model was 3 lines of code:
+
+* `from molscore.manager import MolScore`
+* `scoring_function = MolScore(config=<path to config>)`
+* Remove previous definition of scoring function.
 
 ## Usage
 
-To train a Prior starting with a SMILES file called mols.smi:
+To train a Prior starting with a SMILES file (text file of smiles seperated by new lines \[no headers, or other fields\]):
 
-* First filter the SMILES and construct a vocabulary from the remaining sequences. `./data_structs.py mols.smi`   - Will generate data/mols_filtered.smi and data/Voc. A filtered file containing around 1.1 million SMILES and the corresponding Voc is contained in "data".
+* First filter the SMILES and construct a vocabulary from the remaining sequences (run `data_structs.py --help`).
 
-* Then use `./train_prior.py` to train the Prior. A pretrained Prior is included.
+* Then use `train_prior.py` to train the Prior on the filtered smiles and Vocabulary returned by `data_structs.py`.
 
-To train an Agent using our Prior, use the main.py script. For example:
+To train an Agent using our Prior, don't use the `main.py` script! Instead, use the `train_agent.py` script which accepts a molscore config files as input.
 
-* `./main.py --scoring-function activity_model --num-steps 1000`
-
-Training can be visualized using the Vizard bokeh app. The vizard_logger.py is used to log information (by default to data/logs) such as structures generated, average score, and network weights.
-
-* `cd Vizard`
-* `./run.sh ../data/logs`
-* Open the browser at http://localhost:5006/Vizard
+Training can be visualized using either via molscore with a dash monitor, that should automatically provide a link if choosen in the `molscore` config.
 
 
