@@ -97,7 +97,7 @@ Briefly, the configuration file is structured as follows:
   * name: str # Must match class name of desired filter, list found in `./molscore/scaffold_memory/__init__.py`
   * parameters: dict # Set of parameters to be passed to diversity filter
 * scoring_functions (list)
-  * name: str # Must mactch class name of scoring function, list found in `./molscore/scoring_functions/__init__.py`
+  * name: str # Must match class name of scoring function, list found in `./molscore/scoring_functions/__init__.py`
   * run: bool # Whether to run the scoring function or not can equally omit from list
   * parameters: dict # Parameters passed to initialize scoring function
     * prefix: str # This parameter should be required by all scoring functions classes to label metrics, enabling distinguishment of multiple scoring functions of the same type.
