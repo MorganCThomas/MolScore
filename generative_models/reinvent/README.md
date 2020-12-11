@@ -5,7 +5,7 @@ See "Molecular De Novo design using Recurrent Neural Networks and Reinforcement 
 
 ## Installation
 
-After installing `molscore`, extra requirements can be satisfied by running
+After installing `molscore`, extra requirements can be satisfied by running:
 
 `sh requirements.sh`
 
@@ -33,6 +33,6 @@ To train a Prior starting with a SMILES file (text file of smiles seperated by n
 
 To train an Agent using our Prior, don't use the `main.py` script! Instead, use the `train_agent.py` script which accepts a molscore config files as input.
 
-Training can be visualized using either via molscore with a dash monitor, that should automatically provide a link if choosen in the `molscore` config.
+Training can be visualized via molscore with the dash monitor, that should automatically provide a link (if set to true in the `molscore` config).
 
 
