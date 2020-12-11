@@ -1,0 +1,30 @@
+name: molscore
+channels:
+  - rdkit
+  - conda-forge
+  - bioconda
+  - defaults
+  - openeye
+  - omnia
+dependencies:
+  - python=3.6
+  - ipython
+  - rdkit
+  - dash
+  - dask
+  - numpy
+  - pandas
+  - matplotlib
+  - openeye-toolkits
+  - pip
+  - scipy
+  - seaborn
+  - setuptools
+  - tqdm
+  - wheel
+  - parmed
+  - openbabel
+  - mgltools
+  - smina
+  - pip:
+      - importlib-resources
