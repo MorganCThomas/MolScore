@@ -12,7 +12,7 @@ The aim of this codebase is to be integrable into the majority of goal-directed 
 * Live monitoring of intermediate molecules sampled during training to track the progress with respect to chemistry and score. 
 * Standardized output format, facilitating automated evaluation of results with `moleval`.
 
-The central `molscore` class only requires one parameter for setup and iniatilisation in the form of a config (.json) file. This allows for **sharing of configuratins for reproducible scoring functions** with respect to the functions themselves, score modifiers and aggregation methods for multi-parameter optimization. The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
+The central `molscore` class only requires one parameter for setup and iniatilisation in the form of a config (.json) file. This allows for **sharing of configurations for reproducible scoring functions** with respect to the functions themselves, score modifiers and aggregation methods for multi-parameter optimization. The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
 
 Contributions and/or ideas for added functionality is welcomed! In an ideal world, authors of new publications could integrate `molscore` to save time in scoring function setup and aid in their evaluation, but could likewise contribute new scoring functions and share the config files as benchmark/reproducible tasks. With the aim to build more complex benchmarking tasks for goal directed generative models. 
 
