@@ -313,3 +313,28 @@ def mol_passes_filters(mol,
     if Chem.MolFromSmiles(smiles) is None:
         return False
     return True
+
+
+def neutralize_atoms(mol, isomericSmiles=False):
+    mol = get_mol(mol)
+    if mol:
+        pattern = Chem.MolFromSmarts("[+1!h0!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]")
+        at_matches = mol.GetSubstructMatches(pattern)
+        at_matches_list = [y[0] for y in at_matches]
+        if len(at_matches_list) > 0:
+            try:
+                for at_idx in at_matches_list:
+                    atom = mol.GetAtomWithIdx(at_idx)
+                    chg = atom.GetFormalCharge()
+                    hcount = atom.GetTotalNumHs()
+                    atom.SetFormalCharge(0)
+                    atom.SetNumExplicitHs(hcount - chg)
+                    atom.UpdatePropertyCache()
+                smiles = Chem.MolToSmiles(mol, isomericSmiles=isomericSmiles)
+                return smiles
+            except:
+                return None
+        else:
+            return Chem.MolToSmiles(mol, isomericSmiles=isomericSmiles)
+    else:
+        return None
