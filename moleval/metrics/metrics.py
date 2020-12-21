@@ -245,7 +245,7 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
 
 
 def se_diversity(gen, n_jobs=1, fp_type='morgan',
-                 dist_threshold=0.65):
+                 dist_threshold=0.65, normalize=True):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
      Tanimoto distance.
@@ -256,6 +256,7 @@ def se_diversity(gen, n_jobs=1, fp_type='morgan',
     :param fp_type:
     :param gen_fps:
     :param dist_threshold:
+    :param normalize:
     :return:
     """
     assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray)
@@ -267,7 +268,10 @@ def se_diversity(gen, n_jobs=1, fp_type='morgan',
 
     bvs = numpy_fps_to_bitvectors(gen_fps, n_jobs=n_jobs)
     no_diverse = sphere_exclusion(fps=bvs, dist_thresh=dist_threshold)
-    return no_diverse / len(gen)
+    if normalize:
+        return no_diverse / len(gen)
+    else:
+        return no_diverse
 
 
 def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
