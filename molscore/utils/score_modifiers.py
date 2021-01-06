@@ -151,7 +151,7 @@ def plot_mod(mod, func_kwargs: dict):
     return
 
 
-def plot_mode_objectives(mod, non_objective_kwargs: dict):
+def plot_mod_objectives(mod, non_objective_kwargs: dict):
     objectives = ['maximize', 'minimize']
     if mod.__name__ != 'norm':
         objectives.append('range')
