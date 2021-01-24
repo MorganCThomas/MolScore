@@ -12,7 +12,7 @@ The aim of this codebase is to be integrable into the majority of goal-directed 
 * Live monitoring of intermediate molecules sampled during training to track the progress with respect to chemistry and score. 
 * Standardized output format, facilitating automated evaluation of results with `moleval`.
 
-The central `molscore` class only requires one parameter for setup and iniatilisation in the form of a config (.json) file. This allows for **sharing of configurations for reproducible scoring functions** with respect to the functions themselves, score modifiers and aggregation methods for multi-parameter optimization. The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
+The central `molscore` class only requires one parameter for setup and iniatilisation in the form of a config (.json) file. This allows for **sharing of configurations for reproducible scoring functions** with respect to the functions themselves (e.g. QSAR model), score modifiers (e.g. linear transformation) and aggregation methods for multi-parameter optimization (e.g. weighted sum). The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
 
 Contributions and/or ideas for added functionality are welcomed! In an ideal world, authors of new publications could integrate `molscore` to save time in scoring function setup and aid in their evaluation, but could likewise contribute new scoring functions and share the config files as benchmark/reproducible tasks. With the aim to build more complex benchmarking tasks for goal directed generative models. 
 
@@ -27,10 +27,10 @@ Some functionality has been adapted from other sources, so special mentions to:
 
 The current functionality included in this codebase includes:
 * Scoring functions
-  * Glide docking
-  * ROCS shape overlay
-  * Glide from ROCS best conformer overlay
-  * Openeye (FRED) docking (not tested)
+  * Glide docking \[requires Schrodinger and licence]
+  * ROCS shape overlay \[requires OpenEye and licence]
+  * Glide from ROCS best conformer overlay \[requires OpenEye and licence]
+  * Openeye (FRED) docking (not tested) \[requires OpenEye and licence]
   * Smina docking (coming soon ...)
   * Substructure matches
   * Substructure filters
@@ -49,7 +49,7 @@ The current functionality included in this codebase includes:
   * Weighted sum
   * Pareto pairs ([coming soon ...](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00517))
   
-* Diversity filters
+* [Diversity filters](https://github.com/tblaschke/reinvent-memory)
   * IdenticalTopologicalScaffold
   * CompoundSimilarity
   * IdenticalMurckoScaffold
