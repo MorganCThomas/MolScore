@@ -115,7 +115,7 @@ Briefly, the configuration file is structured as follows:
 
 For a toy demonstration, after installation of `molscore` and activation of the environment with `conda activate molscore`, open the python console (`python` or `ipython`). In the python console, run the following code:
 
-```
+```python
 from molscore.test import MockGenerator
 from molscore.manager import MolScore
 
