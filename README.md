@@ -14,7 +14,7 @@ The aim of this codebase is to be integrable into the majority of goal-directed 
 
 The central `molscore` class only requires one parameter for setup and iniatilisation in the form of a config (.json) file. This allows for **sharing of configurations for reproducible scoring functions** with respect to the functions themselves, score modifiers and aggregation methods for multi-parameter optimization. The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
 
-Contributions and/or ideas for added functionality is welcomed! In an ideal world, authors of new publications could integrate `molscore` to save time in scoring function setup and aid in their evaluation, but could likewise contribute new scoring functions and share the config files as benchmark/reproducible tasks. With the aim to build more complex benchmarking tasks for goal directed generative models. 
+Contributions and/or ideas for added functionality are welcomed! In an ideal world, authors of new publications could integrate `molscore` to save time in scoring function setup and aid in their evaluation, but could likewise contribute new scoring functions and share the config files as benchmark/reproducible tasks. With the aim to build more complex benchmarking tasks for goal directed generative models. 
 
 ## MolScore functionality
 
@@ -117,7 +117,7 @@ For a toy demonstration, after installation of `molscore` and activation of the 
 
 ```
 from molscore.test import MockGenerator
-from molsore.manager import MolScore
+from molscore.manager import MolScore
 
 # Here we setup a mock generator that simply samples molecules from a smiles file.
 mg = MockGenerator()
