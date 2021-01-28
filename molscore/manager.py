@@ -347,8 +347,9 @@ class MolScore:
         """
         Kill dash_utils monitor
         """
-        os.killpg(os.getpgid(self.dash_monitor.pid), signal.SIGTERM)
-        _, _ = self.dash_monitor.communicate()
+        if self.dash_monitor is not False:
+            os.killpg(os.getpgid(self.dash_monitor.pid), signal.SIGTERM)
+            _, _ = self.dash_monitor.communicate()
         return self
 
     def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
