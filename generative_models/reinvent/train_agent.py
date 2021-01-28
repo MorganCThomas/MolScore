@@ -23,6 +23,9 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
 
     start_time = time.time()
 
+    # Scoring_function
+    scoring_function = MolScore(molscore_config)
+
     print("Building RNNs")
 
     Prior = RNN(voc)
@@ -45,9 +48,6 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
         param.requires_grad = False
 
     optimizer = torch.optim.Adam(Agent.rnn.parameters(), lr=learning_rate)
-
-    # Scoring_function
-    scoring_function = MolScore(molscore_config)
 
     # For logging purposes let's save some training parameters not captured by molscore
     with open(os.path.join(scoring_function.save_dir, 'reinvent_parameters.txt'), 'wt') as f:
