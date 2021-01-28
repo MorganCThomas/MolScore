@@ -16,11 +16,17 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
                 molscore_config=None,
                 learning_rate=0.0005,
                 batch_size=64, n_steps=3000, sigma=60,
-                experience_replay=0):
+                experience_replay=0,
+                mode='reinvent'):
 
     voc = Vocabulary(init_from_file=voc_file)
 
     start_time = time.time()
+
+    # Scoring_function
+    scoring_function = MolScore(molscore_config)
+
+    print("Building RNNs")
 
     Prior = RNN(voc)
     Agent = RNN(voc)
@@ -29,9 +35,11 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
     # Saved models are partially on the GPU, but if we dont have cuda enabled we can remap these
     # to the CPU.
     if torch.cuda.is_available():
+        print("Cuda available, loading prior & agent")
         Prior.rnn.load_state_dict(torch.load(restore_prior_from))
         Agent.rnn.load_state_dict(torch.load(restore_agent_from))
     else:
+        print("Cuda not available, remapping to cpu")
         Prior.rnn.load_state_dict(torch.load(restore_prior_from, map_location=lambda storage, loc: storage))
         Agent.rnn.load_state_dict(torch.load(restore_agent_from, map_location=lambda storage, loc: storage))
 
@@ -40,9 +48,6 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
         param.requires_grad = False
 
     optimizer = torch.optim.Adam(Agent.rnn.parameters(), lr=learning_rate)
-
-    # Scoring_function
-    scoring_function = MolScore(molscore_config)
 
     # For logging purposes let's save some training parameters not captured by molscore
     with open(os.path.join(scoring_function.save_dir, 'reinvent_parameters.txt'), 'wt') as f:
@@ -81,9 +86,24 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
                        os.path.join(scoring_function.save_dir, f'Agent_{step}.ckpt'))
             scoring_function.kill_dash_monitor()
 
-        # Calculate augmented likelihood
         augmented_likelihood = prior_likelihood + sigma * Variable(score)
-        loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
+        if mode == 'reinvent':
+            # Calculate augmented likelihood
+            loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
+        elif mode == 'HC':
+            # Hill-climb loss (But top half batch size)
+            sscore, sscore_idxs = Variable(score).sort(descending=True)
+            hc_agent_likelihood = agent_likelihood[sscore_idxs.data[:int(batch_size//2)]]
+            loss = - hc_agent_likelihood.mean()
+        elif mode == 'augHC':
+            # Augmented Hill-climb (Use augmented likelihood but take top half)
+            sscore, sscore_idxs = Variable(score).sort(descending=True)
+            hc_augmented_likelihood = augmented_likelihood[sscore_idxs.data[:int(batch_size // 2)]]
+            hc_agent_likelihood = agent_likelihood[sscore_idxs.data[:int(batch_size//2)]]
+            loss = torch.pow((hc_augmented_likelihood - hc_agent_likelihood), 2)
+        else:
+            print('Unknown optimizer')
+            raise
 
         # Experience Replay
         # First sample
@@ -181,6 +201,13 @@ def get_args():
         default=60,
         help='Sigma value used to calculate augmented likelihood (default is 60)'
     )
+    optional.add_argument(
+        '--mode',
+        type=str,
+        default='reinvent',
+        choices=['reinvent', 'HC', 'augHC'],
+        help='Which optimizer to use (default is reinvent)'
+    )
 
     return parser.parse_args()
 
@@ -189,4 +216,4 @@ if __name__ == "__main__":
     args = get_args()
     train_agent(restore_prior_from=args.prior, restore_agent_from=args.agent, voc_file=args.voc,
                 molscore_config=args.molscore_config, batch_size=args.batch_size, n_steps=args.n_steps,
-                sigma=args.sigma)
+                sigma=args.sigma, mode=args.mode)

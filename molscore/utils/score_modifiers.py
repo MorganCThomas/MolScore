@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def raw(x: float):
+def raw(x: float, **kwargs):
     """
     Dummy function to return raw values or 'as is'.
     :param x:
@@ -150,7 +150,8 @@ def plot_mod(mod, func_kwargs: dict):
     plt.show()
     return
 
-def plot_mode_objectives(mod, non_objective_kwargs: dict):
+
+def plot_mod_objectives(mod, non_objective_kwargs: dict):
     objectives = ['maximize', 'minimize']
     if mod.__name__ != 'norm':
         objectives.append('range')
