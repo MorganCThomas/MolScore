@@ -347,7 +347,10 @@ class MolScore:
         """
         Kill dash_utils monitor
         """
-        if self.dash_monitor is not False:
+        if self.dash_monitor is None:
+            logger.info('No dash monitor to kill')
+            return self
+        else:
             os.killpg(os.getpgid(self.dash_monitor.pid), signal.SIGTERM)
             _, _ = self.dash_monitor.communicate()
         return self
