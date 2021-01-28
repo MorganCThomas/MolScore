@@ -16,7 +16,8 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
                 molscore_config=None,
                 learning_rate=0.0005,
                 batch_size=64, n_steps=3000, sigma=60,
-                experience_replay=0):
+                experience_replay=0,
+                optimizer='reinvent'):
 
     voc = Vocabulary(init_from_file=voc_file)
 
@@ -81,9 +82,26 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
                        os.path.join(scoring_function.save_dir, f'Agent_{step}.ckpt'))
             scoring_function.kill_dash_monitor()
 
-        # Calculate augmented likelihood
-        augmented_likelihood = prior_likelihood + sigma * Variable(score)
-        loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
+        if optimizer == 'reinvent':
+            # Calculate augmented likelihood
+            augmented_likelihood = prior_likelihood + sigma * Variable(score)
+            loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
+        elif optimizer == 'HC':
+            # HillClimb loss (Take half batch size)
+            sscore, sscore_idxs = Variable(score).sort(descending=True)
+            hc_agent_likelihood = agent_likelihood[sscore_idxs.data[:int(batch_size//2)]]
+            loss = - hc_agent_likelihood.mean()
+        elif optimizer == 'augHC':
+            # Augmented Hillclimb (Use augmented likelihood but take top half)
+            augmented_likelihood = prior_likelihood + sigma * Variable(score)
+
+            sscore, sscore_idxs = Variable(score).sort(descending=True)
+            hc_augmented_likelihood = augmented_likelihood[sscore_idxs.data[:int(batch_size // 2)]]
+            hc_agent_likelihood = agent_likelihood[sscore_idxs.data[:int(batch_size//2)]]
+            loss = torch.pow((hc_augmented_likelihood - hc_agent_likelihood), 2)
+        else:
+            print('Unknown optimizer')
+            raise
 
         # Experience Replay
         # First sample
@@ -180,6 +198,13 @@ def get_args():
         type=int,
         default=60,
         help='Sigma value used to calculate augmented likelihood (default is 60)'
+    )
+    optional.add_argument(
+        '--optimizer',
+        type=str,
+        default='reinvent',
+        choices=['reinvent', 'HC', 'augHC'],
+        help='Which optimizer to use (default is reinvent)'
     )
 
     return parser.parse_args()
