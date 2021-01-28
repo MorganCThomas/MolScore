@@ -152,10 +152,10 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
 
     # If the entire training finishes, write out MolScore dataframe, kill dash_utils monitor and
     # save the final Agent.ckpt
+    torch.save(Agent.rnn.state_dict(), os.path.join(scoring_function.save_dir, f'Agent_{n_steps}.ckpt'))
     scoring_function.write_scores()
     scoring_function.kill_dash_monitor()
-    torch.save(Agent.rnn.state_dict(), os.path.join(scoring_function.save_dir, f'Agent_{n_steps}.ckpt'))
-
+    
     return
 
 def get_args():
