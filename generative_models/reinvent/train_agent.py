@@ -30,9 +30,11 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
     # Saved models are partially on the GPU, but if we dont have cuda enabled we can remap these
     # to the CPU.
     if torch.cuda.is_available():
+        print("Cuda available, loading prior & agent")
         Prior.rnn.load_state_dict(torch.load(restore_prior_from))
         Agent.rnn.load_state_dict(torch.load(restore_agent_from))
     else:
+        print("Cuda not available, remapping to cpu")
         Prior.rnn.load_state_dict(torch.load(restore_prior_from, map_location=lambda storage, loc: storage))
         Agent.rnn.load_state_dict(torch.load(restore_agent_from, map_location=lambda storage, loc: storage))
 
@@ -87,12 +89,12 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
             augmented_likelihood = prior_likelihood + sigma * Variable(score)
             loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
         elif optimizer == 'HC':
-            # HillClimb loss (Take half batch size)
+            # Hill-climb loss (But top half batch size)
             sscore, sscore_idxs = Variable(score).sort(descending=True)
             hc_agent_likelihood = agent_likelihood[sscore_idxs.data[:int(batch_size//2)]]
             loss = - hc_agent_likelihood.mean()
         elif optimizer == 'augHC':
-            # Augmented Hillclimb (Use augmented likelihood but take top half)
+            # Augmented Hill-climb (Use augmented likelihood but take top half)
             augmented_likelihood = prior_likelihood + sigma * Variable(score)
 
             sscore, sscore_idxs = Variable(score).sort(descending=True)
