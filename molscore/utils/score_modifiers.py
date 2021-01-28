@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def raw(x: float):
+def raw(x: float, **kwargs):
     """
     Dummy function to return raw values or 'as is'.
     :param x:
