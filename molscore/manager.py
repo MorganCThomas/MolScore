@@ -103,8 +103,8 @@ class MolScore:
             for filt in scaffold_memory.all_scaffold_filters:
                 if self.configs['diversity_filter']['name'] == filt.__name__:
                     self.diversity_filter = filt(**self.configs['diversity_filter']['parameters'])
-            if all([fclass.__name__ != self.configs['diversity_filter']['name']
-                    for fclass in scoring_functions.all_scoring_functions]):
+            if all([filt.__name__ != self.configs['diversity_filter']['name']
+                    for filt in scaffold_memory.all_scaffold_filters]):
                 logger.warning(f'Not found associated diversity filter for {self.configs["diversity_filter"]["name"]}')
 
         # Load from previous
@@ -202,7 +202,6 @@ class MolScore:
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
-        assert len(set(smiles)) == len(smiles), "Duplicate smiles passed to scoring function"
         for function in self.scoring_functions:
             results = function(smiles=smiles, directory=self.save_dir, file_names=file_names)
             results_df = pd.DataFrame(results)
@@ -235,8 +234,13 @@ class MolScore:
         if len(self.exists_df) > 1:
             self.exists_df = self.exists_df.drop_duplicates(subset='smiles')
             self.exists_df = self.exists_df.loc[:, self.results_df.columns]
-            # Append to results
+            # Check no duplicated values in exists and results df
+            dup_idx = self.exists_df.loc[self.exists_df.smiles.isin(self.results_df.smiles), :].index.tolist()
+            if len(dup_idx) > 0:
+                self.exists_df.drop(index=dup_idx, inplace=True)
+            # Append to results, assuming no duplicates in results_df...
             self.results_df = self.results_df.append(self.exists_df, ignore_index=True, sort=False)
+            self.results_df = self.results_df.drop_duplicates(subset='smiles')
 
         # Merge with batch_df
         logger.debug('    Merging results to batch df')
@@ -318,6 +322,7 @@ class MolScore:
             filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
                                                           scores_dict=scores_dict)
             df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
+            df.fillna(1e-6)
 
         return df
 
@@ -347,8 +352,12 @@ class MolScore:
         """
         Kill dash_utils monitor
         """
-        os.killpg(os.getpgid(self.dash_monitor.pid), signal.SIGTERM)
-        _, _ = self.dash_monitor.communicate()
+        if self.dash_monitor is None:
+            logger.info('No dash monitor to kill')
+            return self
+        else:
+            os.killpg(os.getpgid(self.dash_monitor.pid), signal.SIGTERM)
+            _, _ = self.dash_monitor.communicate()
         return self
 
     def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
@@ -360,7 +369,7 @@ class MolScore:
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
-        :param recalculate: Whether to recalculate scores for duplicates values,
+        :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
         :param score_only: Whether to log molecule data or simply score and return
@@ -428,31 +437,25 @@ class MolScore:
                                                       (self.batch_df.unique == 'true'), 'smiles'].tolist()
                 smiles_to_process_index = self.batch_df.loc[(self.batch_df.valid.isin(['true', 'sanitized'])) &
                                                             (self.batch_df.unique == 'true'), 'batch_idx'].tolist()
+            if len(smiles_to_process) == 0:
+                # If no smiles to process then instead submit all (scoring function should handle invalid)
+                logger.info(f'    No smiles to score so submitting first 10 SMILES')
+                smiles_to_process = self.batch_df.loc[:9, 'smiles'].tolist()
+                smiles_to_process_index = self.batch_df.loc[:9, 'batch_idx'].tolist()
+
             assert len(smiles_to_process) == len(smiles_to_process_index)
             file_names = [f'{self.step}_{i}' for i in smiles_to_process_index]
             logger.info(f'    Scoring: {len(smiles_to_process)} SMILES')
 
             # Run scoring function
             scoring_start = time.time()
-            if len(smiles_to_process) > 0:
-                self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names)
-                logger.info(f'    Returned score for {len(self.results_df)} SMILES')
-                logger.info(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
-            else:
-                # If no smiles to process may through an error with subsetting exist_df, therefore,
-                # submit a few dummy invalid molecules relying on scoring functions to return zero values
-                smiles_to_process = self.batch_df.loc[:5, 'smiles'].tolist()
-                smiles_to_process_index = self.batch_df.loc[:5, 'batch_idx'].tolist()
-                file_names = [f'{self.step}_{i}' for i in smiles_to_process_index]
-                self.run_scoring_functions(smiles=self.batch_df.loc[0:5, 'smiles'].tolist(),
-                                           file_names=file_names)
+            self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names)
+            logger.info(f'    Returned score for {len(self.results_df)} SMILES')
+            logger.info(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
 
             # Append scoring results
-            if isinstance(self.main_df, pd.core.frame.DataFrame):
-                if recalculate:
-                    self.first_update()
-                else:
-                    self.concurrent_update()
+            if isinstance(self.main_df, pd.core.frame.DataFrame) and not recalculate:
+                self.concurrent_update()
             else:
                 self.first_update()
             logger.info(f'    Scores updated: {len(self.batch_df)} SMILES')
