@@ -202,7 +202,6 @@ class MolScore:
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
-        #assert len(set(smiles)) == len(smiles), "Duplicate smiles passed to scoring function"
         for function in self.scoring_functions:
             results = function(smiles=smiles, directory=self.save_dir, file_names=file_names)
             results_df = pd.DataFrame(results)
