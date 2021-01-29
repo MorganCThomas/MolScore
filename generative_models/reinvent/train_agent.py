@@ -80,13 +80,18 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
         # Using molscore instead here
         try:
             score = scoring_function(smiles, step=step)
+            augmented_likelihood = prior_likelihood + sigma * Variable(score)
         except:  # If anything goes wrong with molscore, write scores and save .ckpt and kill monitor
-            scoring_function.write_scores()
+            with open(os.path.join(scoring_function.save_dir,
+                                 f'failed_smiles_{scoring_function.step}.smi'), 'wt') as f:
+                [f.write(f'{smi}\n') for smi in smiles]
             torch.save(Agent.rnn.state_dict(),
                        os.path.join(scoring_function.save_dir, f'Agent_{step}.ckpt'))
+            scoring_function.write_scores()
             scoring_function.kill_dash_monitor()
+            raise
 
-        augmented_likelihood = prior_likelihood + sigma * Variable(score)
+        # Calculate loss
         if mode == 'reinvent':
             # Calculate augmented likelihood
             loss = torch.pow((augmented_likelihood - agent_likelihood), 2)
@@ -124,8 +129,9 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
         loss = loss.mean()
 
         # Add regularizer that penalizes high likelihood for the entire sequence
-        loss_p = - (1 / agent_likelihood).mean()
-        loss += 5 * 1e3 * loss_p
+        if mode == 'reinvent':
+            loss_p = - (1 / agent_likelihood).mean()
+            loss += 5 * 1e3 * loss_p
 
         # Calculate gradients and make an update to the network weights
         optimizer.zero_grad()
