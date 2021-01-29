@@ -202,7 +202,7 @@ class MolScore:
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
-        assert len(set(smiles)) == len(smiles), "Duplicate smiles passed to scoring function"
+        #assert len(set(smiles)) == len(smiles), "Duplicate smiles passed to scoring function"
         for function in self.scoring_functions:
             results = function(smiles=smiles, directory=self.save_dir, file_names=file_names)
             results_df = pd.DataFrame(results)
@@ -364,7 +364,7 @@ class MolScore:
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
-        :param recalculate: Whether to recalculate scores for duplicates values,
+        :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
         :param score_only: Whether to log molecule data or simply score and return
@@ -452,11 +452,8 @@ class MolScore:
                                            file_names=file_names)
 
             # Append scoring results
-            if isinstance(self.main_df, pd.core.frame.DataFrame):
-                if recalculate:
-                    self.first_update()
-                else:
-                    self.concurrent_update()
+            if isinstance(self.main_df, pd.core.frame.DataFrame) and not recalculate:
+                self.concurrent_update()
             else:
                 self.first_update()
             logger.info(f'    Scores updated: {len(self.batch_df)} SMILES')
