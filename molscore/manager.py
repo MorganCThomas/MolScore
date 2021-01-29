@@ -103,8 +103,8 @@ class MolScore:
             for filt in scaffold_memory.all_scaffold_filters:
                 if self.configs['diversity_filter']['name'] == filt.__name__:
                     self.diversity_filter = filt(**self.configs['diversity_filter']['parameters'])
-            if all([fclass.__name__ != self.configs['diversity_filter']['name']
-                    for fclass in scoring_functions.all_scoring_functions]):
+            if all([filt.__name__ != self.configs['diversity_filter']['name']
+                    for filt in scaffold_memory.all_scaffold_filters]):
                 logger.warning(f'Not found associated diversity filter for {self.configs["diversity_filter"]["name"]}')
 
         # Load from previous
