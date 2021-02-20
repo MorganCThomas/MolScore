@@ -21,15 +21,15 @@
     "pdb_path": null
   },
   "diversity_filter": {
-    "run": false,
-    "name": "IdenticalMurckoScaffold",
+    "run": true,
+    "name": "ScaffoldSimilarity",
     "parameters": {
         "nbmax": 25,
-        "minscore": 0.6,
-        "minsimilarity": 0.6,
+        "minscore": 0.8,
+        "minsimilarity": 0.8,
         "radius": 2,
         "useFeatures": false,
-        "bits": 2048,
+        "bits": 1024,
         "outputmode": "binary"
       }
   },

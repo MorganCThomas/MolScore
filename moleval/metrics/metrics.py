@@ -64,7 +64,7 @@ class GetMosesMetrics(object):
     #  + most common scaff, unique_fg, unique_rs? train_fg_recoverd, test_fg_recovered, test etc.
 
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
-                 test=None, test_scaffolds=None, ptest=None, train=None, ptrain=None,
+                 test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
                  target=None, ptarget=None):
         self.n_jobs = n_jobs
         self.device = device
@@ -76,6 +76,7 @@ class GetMosesMetrics(object):
         self.train = train
         self.target = target
         self.ptest = ptest
+        self.ptest_scaffolds = ptest_scaffolds
         self.ptrain = ptrain
         self.ptarget = ptarget
         # Later defined
@@ -114,7 +115,7 @@ class GetMosesMetrics(object):
                                                               device=self.device, batch_size=self.batch_size,
                                                               pool=self.pool)
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, k=None):
         metrics = {}
 
         # Calculate validity
@@ -127,8 +128,8 @@ class GetMosesMetrics(object):
         # Calculate Uniqueness
         if calc_unique:
             metrics['Uniqueness'] = fraction_unique(gen=gen, k=None, n_jobs=self.pool)
-            if unique_k is not None:
-                metrics[f'Unique@{unique_k}k'] = fraction_unique(gen=gen, k=unique_k, n_jobs=self.pool)
+            if k is not None:
+                metrics[f'Unique@{k}k'] = fraction_unique(gen=gen, k=k, n_jobs=self.pool)
 
         # Now subset only unique molecules
         gen = list(set(gen))
@@ -142,12 +143,14 @@ class GetMosesMetrics(object):
         # Calculate diversity related metrics
         if self.train is not None:
             metrics['Novelty'] = novelty(gen, self.train, self.pool)
-        metrics['IntDiv'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
+        metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
-        metrics['SEDiversity'] = se_diversity(gen=mols, n_jobs=self.pool)
+        metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
+        if k is not None:
+            metrics[f'SECov@{k}k'] = se_diversity(gen=mols, k=k, n_jobs=self.pool, normalize=False)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
-        metrics['ScaffNo'] = len(scaff_gen)
+        metrics['Scaff uniqueness'] = len(scaff_gen)/len(gen)
         # Calculate % pass filters
         metrics['Filters'] = fraction_passes_filters(mols, self.pool)
 
@@ -157,6 +160,8 @@ class GetMosesMetrics(object):
             metrics['FCD_train'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptrain)
         if self.ptest:
             metrics['FCD_test'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest)
+        if self.ptest_scaffolds:
+            metrics['FCD_testSF'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds)
         if self.ptarget:
             metrics['FCD_target'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget)
         # Test metrics
@@ -244,12 +249,13 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
                                      agg='mean', device=device, p=p)).mean()
 
 
-def se_diversity(gen, n_jobs=1, fp_type='morgan',
+def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
                  dist_threshold=0.65, normalize=True):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
      Tanimoto distance.
 
+    :param k:
     :param gen:
     :param n_jobs:
     :param device:
@@ -260,6 +266,14 @@ def se_diversity(gen, n_jobs=1, fp_type='morgan',
     :return:
     """
     assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray)
+
+    if k is not None:
+        if len(gen) < k:
+            warnings.warn(
+                "Can't compute SECov@{}.".format(k) +
+                "gen contains only {} molecules".format(len(gen))
+            )
+        gen = gen[:k]
 
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)

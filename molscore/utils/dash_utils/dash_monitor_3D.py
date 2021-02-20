@@ -192,7 +192,7 @@ def update_graph_live(y='valid', *args):
      Input('y-column', 'value')])
 def display_selected_data(selectedData, y):
     max_structs = 12
-    structs_per_row = 6
+    structs_per_row = 3
     empty_plot = "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA="
     if selectedData:
         if len(selectedData['points']) == 0:
@@ -200,9 +200,12 @@ def display_selected_data(selectedData, y):
         match_idx = [x['pointIndex'] for x in selectedData['points']]
         smiles_list = [Chem.MolFromSmiles(x) for x in list(main_df.iloc[match_idx].smiles)]
         name_list = list(main_df.iloc[match_idx][y])
+        batch_list = [f"{step}_{batch_idx}" for step, batch_idx in main_df.loc[match_idx, ['step', 'batch_idx']].values]
+        name_list = [f"{x:.02f}" if isinstance(x, float) else f"{x}" for x in name_list]
         #active_list = list(main_df.iloc[match_idx].is_active)
-        name_list = [f"{x}" for x in name_list]
-        img = MolsToGridImage(smiles_list[0:max_structs], molsPerRow=structs_per_row, legends=name_list)
+        legends = [f"{idx}\n{y}: {name}" for idx, name in zip(batch_list, name_list)]
+        img = MolsToGridImage(smiles_list[0:max_structs], molsPerRow=structs_per_row, legends=legends,
+                              subImgSize=(300, 300))
         buffered = BytesIO()
         img.save(buffered, format="JPEG")
         encoded_image = base64.b64encode(buffered.getvalue())

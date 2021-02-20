@@ -42,11 +42,14 @@ class MolScore:
         self.exists_df = None
         self.main_df = None
         self.dash_monitor = None
-        self.dash_monitor_path = dash_utils.dash_monitor_path
 
         # Setup dash_utils monitor
         if self.configs['dash_monitor']['run']:
             self.dash_monitor = True
+            if self.configs['dash_monitor']['pdb_path'] is not None:
+                self.dash_monitor_path = dash_utils.dash_monitor3D_path
+            else:
+                self.dash_monitor_path = dash_utils.dash_monitor_path
 
         # Setup save directory
         self.run_name = "_".join([time.strftime("%Y_%m_%d", time.localtime()),
@@ -321,6 +324,10 @@ class MolScore:
                            "step": [self.step] * len(df)}
             filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
                                                           scores_dict=scores_dict)
+            df[f"{self.configs['diversity_filter']['name']}_filter"] = [0 if a == b else 1
+                                                                        for b, a in
+                                                                        zip(df[self.configs['scoring']['method']],
+                                                                            filtered_scores)]
             df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
             df.fillna(1e-6)
 
@@ -333,7 +340,10 @@ class MolScore:
         :return:
         """
         self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
+        if self.diversity_filter is not None:
+            self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
         self.fh.close()
+
         return self
 
     def run_dash_monitor(self):
