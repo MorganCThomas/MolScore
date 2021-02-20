@@ -220,7 +220,7 @@ class GlideDock:
                                 # If molecule doesn't have a score yet append it and the variant
                                 if best_score[name] is None:
                                     best_score[name] = dscore
-                                    best_variants[i] = f'{name}_{variant}'
+                                    best_variants[i] = f'{name}-{variant}'
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.score_metrics})
@@ -229,7 +229,7 @@ class GlideDock:
                                 # If docking score is better change it...
                                 elif dscore < best_score[name]:
                                     best_score[name] = dscore
-                                    best_variants[i] = f'{name}_{variant}'
+                                    best_variants[i] = f'{name}-{variant}'
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.score_metrics})
@@ -243,7 +243,7 @@ class GlideDock:
                     except:
                         logger.debug(f'Error processing {name}-{variant}_lib.sdfgz file')
                         if best_score[name] is None:  # Only if no other score for prefix
-                            best_variants[i] = f'{name}_{variant}'
+                            best_variants[i] = f'{name}-{variant}'
                             docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.score_metrics})
                             logger.debug(f'Returning 0.0 unless a successful variant is found')
 
@@ -251,7 +251,7 @@ class GlideDock:
                 else:
                     logger.debug(f'{name}-{variant}_lib.sdfgz does not exist')
                     if best_score[name] is None:  # Only if no other score for prefix
-                        best_variants[i] = f'{name}_{variant}'
+                        best_variants[i] = f'{name}-{variant}'
                         docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.score_metrics})
                         logger.debug(f'Returning 0.0 unless a successful variant is found')
 
@@ -259,8 +259,9 @@ class GlideDock:
             docking_result.update({f'{self.prefix}_best_variant': best_variants[i]})
             self.docking_results.append(docking_result)
 
-        logger.debug(best_score)
+        logger.debug(f'Best scores: {best_score}')
         if return_best_variant:
+            logger.debug(f'Returning best variants: {best_variants}')
             return best_variants
 
         return self
@@ -276,6 +277,7 @@ class GlideDock:
             parallel = False
 
         keep_poses = [f'{k}_lib.sdfgz' for k in keep]
+        logger.debug(f'Keeping pose files: {keep_poses}')
         del_files = []
         for name in self.file_names:
             # Grab files
@@ -285,7 +287,7 @@ class GlideDock:
             if len(files) > 0:
                 try:
                     files = [file for file in files
-                             if not ("log.txt" in file) or any([p in file for p in keep_poses])]
+                             if not ("log.txt" in file) and not any([p in file for p in keep_poses])]
 
                     if parallel:
                         [del_files.append(file) for file in files]

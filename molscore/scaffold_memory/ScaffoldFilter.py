@@ -191,8 +191,8 @@ class CompoundSimilarity(ScaffoldFilter):
             return smiles, fp, True
 
 
-class ScaffoldSimilarity(CompoundSimilarity):
-    """Penalizes compounds based on atompair Tanimoto similarity to previously generated Murcko Scaffolds."""
+class ScaffoldSimilarityAP(CompoundSimilarity):
+    """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
 
     def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, outputmode="binary", **kwargs):
         super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
@@ -233,9 +233,75 @@ class ScaffoldSimilarity(CompoundSimilarity):
         else:
             return "", "", False
 
-        fp = Pairs.GetAtomPairFingerprint(scaffold)
+        fp = Pairs.GetAtomPairFingerprint(scaffold)  # Change to Tanimoto?
         if cluster in self.getFingerprints():
             return cluster, fp, False
+
+        fps = list(self.getFingerprints().values())
+        sims = DataStructs.BulkTanimotoSimilarity(fp, fps)
+        if len(sims) == 0:
+            return cluster, fp, True
+        closest = np.argmax(sims)
+        if sims[closest] >= self.minsimilarity:
+            return list(self.getFingerprints().keys())[closest], fp, False
+        else:
+            return cluster, fp, True
+
+
+class ScaffoldSimilarityT(CompoundSimilarity):
+    """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
+
+    def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, radius=2, useFeatures=False,
+                 bits=2048, outputmode="binary", **kwargs):
+        super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
+        self.radius = radius
+        self.useFeatures = useFeatures
+        self.bits = bits
+
+    def score(self, smiles, scores_dict: dict) -> np.array:
+        scores = scores_dict.pop("total_score")
+        if not self.validScores(smiles, scores): return scores
+
+        for i, smile in enumerate(smiles):
+            score = scores[i]
+            if score >= self.minscore:
+                cluster, fingerprint, isnewcluster = self.findCluster(smile)
+                if self.has(cluster, smile):
+                    scores[i] = 0
+                    continue
+                save_score = {"total_score": float(score)}
+                for k in scores_dict:
+                    save_score[k] = float(scores_dict[k][i])
+                if isnewcluster:
+                    self._update_memory([smile], [cluster], [save_score], [fingerprint])
+                else:
+                    self._update_memory([smile], [cluster], [save_score])
+                scores[i] = scores[i] * self.calculate_output(len(self[cluster]))
+
+        return scores
+
+    def findCluster(self, smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            try:
+                scaffold = MurckoScaffold.GetScaffoldForMol(mol)
+            except:
+                return "", "", False
+            if scaffold:
+                cluster = Chem.MolToSmiles(scaffold, isomericSmiles=False)
+            else:
+                return "", "", False
+        else:
+            return "", "", False
+
+        if self.bits > 0:
+            fp = AllChem.GetMorganFingerprintAsBitVect(scaffold, self.radius, nBits=self.bits,
+                                                       useFeatures=self.useFeatures)
+        else:
+            fp = AllChem.GetMorganFingerprint(scaffold, self.radius, useFeatures=self.useFeatures)
+
+        if smiles in self.getFingerprints():
+            return smiles, fp, False
 
         fps = list(self.getFingerprints().values())
         sims = DataStructs.BulkTanimotoSimilarity(fp, fps)

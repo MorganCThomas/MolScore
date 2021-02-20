@@ -10,6 +10,7 @@ import tempfile
 import gzip
 from shutil import copy2
 import numpy as np
+import matplotlib as mpl
 
 import parmed as pmd
 from rdkit import Chem
@@ -173,7 +174,7 @@ def write_style_dict(model_dict):
     :return:
     """
     def get_color(atom_dict, carbon=0):
-        carbon_colors = ['#696969', '#7CFC00']
+        carbon_colors = ['#696969'] + [mpl.colors.to_hex(c) for c in mpl.pyplot.get_cmap('Set3').colors]
         colors = {'H': '#F0F8FF', 'N': '#00008B', 'C': carbon_colors[carbon], 'O': '#B22222', 'S': '#FFD700',
                   'F': '#7FFFD4', 'Cl': '#006400', 'Br': '#B8860B'}
         return colors[atom_dict['element']]
@@ -182,10 +183,23 @@ def write_style_dict(model_dict):
         dist = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2 + (pos1[2]-pos2[2])**2)
         return dist
 
+    def find_bonding_atoms(model_dict, atom_index):
+        allbonds = model_dict['bonds']
+        bonding_bonds = [b for b in allbonds if atom_index in b.values()]
+        bonding_atom_indexes = []
+        for bond in bonding_bonds:
+            bonding_atoms = list(bond.values())
+            bonding_atoms.remove(atom_index)
+            bonding_atom_indexes += bonding_atoms
+        bonding_atoms = [model_dict['atoms'][bi] for bi in bonding_atom_indexes]
+        return bonding_atoms
+
     ligand_positions = [atom['positions'] for atom in model_dict['atoms'] if atom['chain'] == 'L']
     ligands = set()
 
     style_dict = {}
+    carbon = 0
+    residue_name = None
     for i, atom in enumerate(model_dict['atoms']):
         key = str(i)
         if atom['chain'] != 'L':
@@ -198,8 +212,23 @@ def write_style_dict(model_dict):
                 style_dict[key] = {'color': get_color(atom, carbon=0),
                                    'visualization_type': 'cartoon'}
         else:
-            style_dict[key] = {'color': get_color(atom, carbon=1),
-                               'visualization_type': 'stick'}
+            # Cycle through carbon colours based on residue names
+            if atom['residue_name'] != residue_name: carbon += 1
+            if carbon == 13: carbon = 1
+
+            if atom['element'] == 'H':
+                bonding_atoms = find_bonding_atoms(model_dict, i)
+                if any([a['element'] in ['O', 'N', 'S'] for a in bonding_atoms]):
+                    style_dict[key] = {'color': get_color(atom, carbon=carbon),
+                                       'visualization_type': 'stick'}
+                else:
+                    style_dict[key] = {'color': get_color(atom, carbon=carbon),
+                                       'visualization_type': 'cartoon'}
+            else:
+                style_dict[key] = {'color': get_color(atom, carbon=carbon),
+                                   'visualization_type': 'stick'}
+        # Save most recent residue name
+        residue_name = atom['residue_name']
 
     return style_dict
 
