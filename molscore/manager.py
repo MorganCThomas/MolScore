@@ -107,6 +107,7 @@ class MolScore:
             for filt in scaffold_memory.all_scaffold_filters:
                 if self.configs['diversity_filter']['name'] == filt.__name__:
                     self.diversity_filter = filt(**self.configs['diversity_filter']['parameters'])
+                    self.log_parameters({'diversity_filter': self.configs['diversity_filter']['name']})
             if all([filt.__name__ != self.configs['diversity_filter']['name']
                     for filt in scaffold_memory.all_scaffold_filters]):
                 logger.warning(f'Not found associated diversity filter for {self.configs["diversity_filter"]["name"]}')
@@ -325,10 +326,10 @@ class MolScore:
                            "step": [self.step] * len(df)}
             filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
                                                           scores_dict=scores_dict)
-            df[f"{self.configs['diversity_filter']['name']}_filter"] = [0 if a == b else 1
-                                                                        for b, a in
-                                                                        zip(df[self.configs['scoring']['method']],
-                                                                            filtered_scores)]
+            df["passes_diversity_filter"] = ['true' if a == b else 'false'
+                                             for b, a in
+                                             zip(df[self.configs['scoring']['method']],
+                                                 filtered_scores)]
             df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
             df.fillna(1e-6)
 

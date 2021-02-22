@@ -142,7 +142,7 @@ def update_graph_live(y='valid', *args):
     global main_df
 
     # Plotly go
-    if (y == 'valid') or (y == 'unique'):
+    if (y == 'valid') or (y == 'unique') or (y == 'passes_diversity_filter'):
         steps = main_df.step.unique().tolist()
         ratios = main_df.groupby('step')[y].apply(lambda x: (x == 'true').mean()).tolist()
         fig = go.Figure()
