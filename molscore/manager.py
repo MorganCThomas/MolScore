@@ -42,6 +42,7 @@ class MolScore:
         self.exists_df = None
         self.main_df = None
         self.dash_monitor = None
+        self.logged_parameters = {}
 
         # Setup dash_utils monitor
         if self.configs['dash_monitor']['run']:
@@ -312,7 +313,7 @@ class MolScore:
             lambda x: [1e-6 if y < 1e-6 else y for y in x]
         )
 
-        # Compute final score
+        # Compute final score (df not used by mpo_method except for Pareto pair [not implemented])
         df[self.configs['scoring']['method']] = df.loc[:, mpo_columns['names']].apply(
             lambda x: self.mpo_method(X=x, W=mpo_columns['weights'], df=self.main_df), axis=1
         )
@@ -333,15 +334,27 @@ class MolScore:
 
         return df
 
+    def log_parameters(self, parameters: dict):
+        self.logged_parameters.update(parameters)
+        return self
+
     def write_scores(self):
         """
         Function to write final dataframe to file.
 
         :return:
         """
-        self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
+        if len(self.logged_parameters) > 0:
+            temp = self.main_df.copy()
+            for p, v in self.logged_parameters.items():
+                temp[p] = [v]*len(temp)
+            temp.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
+        else:
+            self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
+
         if self.diversity_filter is not None:
             self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
+
         self.fh.close()
 
         return self

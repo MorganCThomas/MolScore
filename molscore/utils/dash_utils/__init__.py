@@ -10,6 +10,7 @@ from molscore.utils.dash_utils.utils import pdb_to_dict, sdf_to_dict, write_styl
 from molscore.utils.dash_utils.dash_Molecule3DViewer import Molecule3dViewer
 
 dash_monitor_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'dash_monitor.py')
+dash_monitor3D_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'dash_monitor_3D.py')
 
 if not hasattr(_dash, 'development'):
     print('Dash was not successfully imported. '
