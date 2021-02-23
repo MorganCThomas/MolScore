@@ -174,7 +174,7 @@ def write_style_dict(model_dict):
     :return:
     """
     def get_color(atom_dict, carbon=0):
-        carbon_colors = ['#696969'] + [mpl.colors.to_hex(c) for c in mpl.pyplot.get_cmap('Set3').colors]
+        carbon_colors = ['#44546A'] + [mpl.colors.to_hex(c) for c in mpl.pyplot.get_cmap('Set3').colors]
         colors = {'H': '#F0F8FF', 'N': '#00008B', 'C': carbon_colors[carbon], 'O': '#B22222', 'S': '#FFD700',
                   'F': '#7FFFD4', 'Cl': '#006400', 'Br': '#B8860B'}
         return colors[atom_dict['element']]
