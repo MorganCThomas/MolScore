@@ -115,8 +115,9 @@ class GetMosesMetrics(object):
                                                               device=self.device, batch_size=self.batch_size,
                                                               pool=self.pool)
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, k=None):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=None):
         metrics = {}
+        metrics['#'] = len(gen)
 
         # Calculate validity
         if calc_valid:
@@ -124,12 +125,13 @@ class GetMosesMetrics(object):
 
         gen = remove_invalid(gen, canonize=True)
         mols = mapper(self.pool)(get_mol, gen)
+        metrics['# valid'] = len(gen)
 
         # Calculate Uniqueness
         if calc_unique:
             metrics['Uniqueness'] = fraction_unique(gen=gen, k=None, n_jobs=self.pool)
-            if k is not None:
-                metrics[f'Unique@{k}k'] = fraction_unique(gen=gen, k=k, n_jobs=self.pool)
+            if unique_k is not None:
+                metrics[f'Unique@{unique_k/1000:.0f}k'] = fraction_unique(gen=gen, k=unique_k, n_jobs=self.pool)
 
         # Now subset only unique molecules
         gen = list(set(gen))
@@ -139,6 +141,7 @@ class GetMosesMetrics(object):
         scaffs = compute_scaffolds(mols, n_jobs=self.n_jobs)
         scaff_gen = list(scaffs.keys())
         scaff_mols = mapper(self.pool)(get_mol, scaff_gen)
+        metrics['# valid & unique'] = len(gen)
 
         # Calculate diversity related metrics
         if self.train is not None:
@@ -146,8 +149,8 @@ class GetMosesMetrics(object):
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
         metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
-        if k is not None:
-            metrics[f'SECov@{k}k'] = se_diversity(gen=mols, k=k, n_jobs=self.pool, normalize=False)
+        if se_k is not None:
+            metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
         metrics['Scaff uniqueness'] = len(scaff_gen)/len(gen)
@@ -270,7 +273,7 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     if k is not None:
         if len(gen) < k:
             warnings.warn(
-                "Can't compute SECov@{}.".format(k) +
+                "Can't compute SEDiv@{}.".format(k) +
                 "gen contains only {} molecules".format(len(gen))
             )
         gen = gen[:k]
