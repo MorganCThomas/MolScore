@@ -8,7 +8,8 @@ from rdkit import rdBase
 import joblib
 rdBase.DisableLog('rdApp.error')
 
-class sklearn_model:
+
+class SKLearnModel:
     """
     This class loads a defined sklearn model and returns the predicted values
     """
