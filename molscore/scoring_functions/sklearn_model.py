@@ -1,11 +1,11 @@
 from multiprocessing import Pool
+from functools import partial
 import rdkit
 import numpy as np
 from rdkit.Chem import rdMolDescriptors
 from rdkit import Chem
 from rdkit import rdBase
-from rdkit.Chem import AllChem
-from sklearn.externals import joblib
+import joblib
 rdBase.DisableLog('rdApp.error')
 
 class sklearn_model:
@@ -25,7 +25,7 @@ class sklearn_model:
 
     @staticmethod
     def calculate_fp(smi: str, fp_type: str):
-        '''Calculates fp based on fp_type and smiles'''
+        """Calculates fp based on fp_type and smiles"""
         
         mol = Chem.MolFromSmiles(smi)
         if mol:
@@ -71,17 +71,32 @@ class sklearn_model:
         # with Pool(self.n_jobs) as pool:
         #     results = [{'smiles': smi, f'{self.prefix}_{self.model_name}': Tc}
         #                for smi, Tc in pool.imap(parallel_FPs, smiles)]
-        results = []
-        for smi in smiles:
-            result = {'smiles': smi}
-            fp = sklearn_model.calculate_fp(smi, self.fp_type)
-            if fp is None:
-                result.update({f'{self.prefix}_pred_proba': 0.0})
-                results.append(result)
-                continue
-            else:
-                probability = self.model.predict_proba(fp)
-                result.update({f'{self.prefix}_pred_proba': probability[:, 1][0]})
-                results.append(result)
-                
+
+        # Version one
+        #results = []
+        #for smi in smiles:
+        #    result = {'smiles': smi}
+        #    fp = sklearn_model.calculate_fp(smi, self.fp_type)
+        #    if fp is None:
+        #        result.update({f'{self.prefix}_pred_proba': 0.0})
+        #        results.append(result)
+        #        continue
+        #    else:
+        #        probability = self.model.predict_proba(fp)
+        #        result.update({f'{self.prefix}_pred_proba': probability[:, 1][0]})
+        #        results.append(result)
+
+        # Version two
+        results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
+        valid = []
+        fps = []
+        with Pool(self.n_jobs) as pool:
+            pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type)
+            [(valid.append(i), fps.append(fp))
+             for i, fp in enumerate(pool.imap(pcalulate_fp, smiles))
+             if fp is not None]
+        probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
+        for i, prob in zip(valid, probs):
+            results[i].update({f'{self.prefix}_pred_proba': prob})
+
         return results
