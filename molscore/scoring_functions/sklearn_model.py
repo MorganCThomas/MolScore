@@ -69,25 +69,7 @@ class SKLearnModel:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        # with Pool(self.n_jobs) as pool:
-        #     results = [{'smiles': smi, f'{self.prefix}_{self.model_name}': Tc}
-        #                for smi, Tc in pool.imap(parallel_FPs, smiles)]
 
-        # Version one
-        #results = []
-        #for smi in smiles:
-        #    result = {'smiles': smi}
-        #    fp = sklearn_model.calculate_fp(smi, self.fp_type)
-        #    if fp is None:
-        #        result.update({f'{self.prefix}_pred_proba': 0.0})
-        #        results.append(result)
-        #        continue
-        #    else:
-        #        probability = self.model.predict_proba(fp)
-        #        result.update({f'{self.prefix}_pred_proba': probability[:, 1][0]})
-        #        results.append(result)
-
-        # Version two
         results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
         valid = []
         fps = []
