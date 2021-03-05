@@ -29,4 +29,3 @@ dependencies:
   - smina
   - pip:
       - importlib-resources
-#      - dash-dangerously-set-inner-html
