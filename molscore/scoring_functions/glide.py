@@ -137,16 +137,19 @@ class GlideDock:
                                                             sanitize=False, removeHs=False)
 
                 for mol in supp:
-                    variant = mol.GetPropsAsDict()['s_lp_Variant']
-                    if ':' in variant:
-                        variant = variant.split(':')[1]
-                    variant = variant.split('-')[1]
-                    self.variants[name].append(variant)
-                    w = Chem.rdmolfiles.SDWriter(os.path.join(self.directory, f'{name}-{variant}_ligprep.sdf'))
-                    w.write(mol)
-                    w.flush()
-                    w.close()
-                    logger.debug(f'Split {name} -> {name}-{variant}')
+                    if mol:
+                        variant = mol.GetPropsAsDict()['s_lp_Variant']
+                        if ':' in variant:
+                            variant = variant.split(':')[1]
+                        variant = variant.split('-')[1]
+                        self.variants[name].append(variant)
+                        w = Chem.rdmolfiles.SDWriter(os.path.join(self.directory, f'{name}-{variant}_ligprep.sdf'))
+                        w.write(mol)
+                        w.flush()
+                        w.close()
+                        logger.debug(f'Split {name} -> {name}-{variant}')
+                    else:
+                        continue
 
         return self
 
