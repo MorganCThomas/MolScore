@@ -403,15 +403,10 @@ class MolScore:
             batch_start = time.time()
             if step is not None:
                 self.step = step
-            else:
-                self.step += 1
-            logger.info(f'   Received: {len(smiles)}')
             logger.info(f'   Scoring: {len(smiles)} SMILES')
-            file_names = [f'{step}_{i}' for i, smi in enumerate(smiles)]
+            file_names = [f'tmp_{i}' for i, smi in enumerate(smiles)]
             self.run_scoring_functions(smiles=smiles, file_names=file_names)
-            logger.info(f'    Returned score for {len(self.results_df)} SMILES')
-            logger.info(f'    Scoring elapsed time: {time.time() - batch_start:.02f}s')
-            logger.info(f'    Computing score')
+            logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
             self.update_maxmin(self.results_df)
             self.results_df = self.compute_score(self.results_df)
             # Fetch score
@@ -421,8 +416,7 @@ class MolScore:
                 scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
             if not flt:
                 scores = np.array(scores, dtype=np.float32)
-            logger.info(f'    Returning {len(scores)} scores')
-            logger.info(f'    MolScore elapsed time: {time.time() - batch_start:.02f}s')
+            logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
 
             # Clean up class
             self.batch_df = None
