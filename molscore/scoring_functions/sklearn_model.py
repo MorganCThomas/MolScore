@@ -1,5 +1,7 @@
 from multiprocessing import Pool
 from functools import partial
+import glob
+from sys import modules
 import rdkit
 import numpy as np
 from rdkit.Chem import rdMolDescriptors
@@ -80,6 +82,49 @@ class SKLearnModel:
              if fp is not None]
         probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
         for i, prob in zip(valid, probs):
+            results[i].update({f'{self.prefix}_pred_proba': prob})
+
+        return results
+
+class EnsembleSKLearnModel(SKLearnModel):
+    """
+    This class loads different random seeds of a defined sklearn
+    model and returns the average of the predicted values.
+    """
+    def __init__(self, prefix: str, model_path: str,
+                 fp_type: str, n_jobs: int, **kwargs):
+        super().__init__(prefix, model_path, 
+                        fp_type, n_jobs, **kwargs)
+        changing = self.model_path.split('_')
+        del changing[len(changing)-1]
+        changing = '_'.join(changing)
+        self.replicates = sorted(glob.glob(str(changing) + '*.joblib'))
+
+        # Load in model and assign to attribute
+        self.models = []
+        for f in self.replicates:
+            self.models.append(joblib.load(f))
+    
+    def __call__(self, smiles: list, **kwargs):
+        results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
+        valid = []
+        fps = []
+        predictions = []
+        averages = []
+        with Pool(self.n_jobs) as pool:
+            pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type)
+            [(valid.append(i), fps.append(fp))
+             for i, fp in enumerate(pool.imap(pcalulate_fp, smiles))
+             if fp is not None]
+        
+        # Predicting the probabilies and appending them to a list.
+        for m in self.models:
+            prediction = m.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
+            predictions.append(prediction)
+        predictions = np.asarray(predictions)
+        averages = predictions.mean(axis=0)
+
+        for i, prob in zip(valid, averages):
             results[i].update({f'{self.prefix}_pred_proba': prob})
 
         return results
