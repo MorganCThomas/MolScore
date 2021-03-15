@@ -1,12 +1,8 @@
 {
   "logging": {
     "model": {
-      "name": "REINVENT",
-      "comments": {
-        "prior": "MOSES with charge, no DRD2",
-        "optimizer": "augmented likelihood",
-        "sigma": 60
-      }
+      "name": "GraphGA",
+      "comments": {}
     },
     "task": {
       "name": "QED",
@@ -21,7 +17,7 @@
     "pdb_path": null
   },
   "diversity_filter": {
-    "run": true,
+    "run": false,
     "name": "ScaffoldSimilarity",
     "parameters": {
         "nbmax": 25,
@@ -110,11 +106,11 @@
   "scoring": {
     "method": "single",
     "metrics": [{
-      "name": "desc_QED",
+      "name": "DRD2_docking_score",
       "weight": 0.2,
-      "modifier": "raw",
+      "modifier": "norm",
       "parameters": {
-        "objective": "maximize"
+        "objective": "minimize"
       }
     }
     ]

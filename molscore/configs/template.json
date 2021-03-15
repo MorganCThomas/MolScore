@@ -2,18 +2,11 @@
   "logging": {
     "model": {
       "name": "REINVENT",
-      "comments": {
-        "prior": "MOSES with charge, no DRD2",
-        "optimizer": "augmented likelihood",
-        "sigma": 60
-      }
+      "comments": {}
     },
     "task": {
-      "name": "DRD2 Glide docking score",
-      "comments": {
-        "pdb": "6CM4",
-        "grid": "default"
-      }
+      "name": "QED",
+      "comments": {}
     }
   },
   "output_dir": "./molscore_results",
@@ -78,6 +71,18 @@
       "parameters": {
         "prefix": "DRD2",
         "glide_template": "<path_to_template>",
+        "cluster": "<dask_scheduler_address>",
+        "timeout": 120
+      }
+    },
+    {
+      "name": "SminaDock",
+      "run": false,
+      "parameters": {
+        "prefix": "DRD2",
+        "receptor": "<path_to_receptor (.pdbqt)",
+        "ref_ligand": "<path_to_reference_ligand> (.sdf/.pdb)",
+        "cpus": 1,
         "cluster": "<dask_scheduler_address>",
         "timeout": 120
       }

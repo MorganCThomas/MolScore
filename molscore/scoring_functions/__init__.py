@@ -1,4 +1,5 @@
 from molscore.scoring_functions.glide import GlideDock, GlideDockFromROCS
+from molscore.scoring_functions.smina import SminaDock
 from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.oedock import FRED
 from molscore.scoring_functions.tanimoto import TanimotoSimilarity
@@ -11,6 +12,7 @@ all_scoring_functions = [
     ROCS,
     GlideDock,
     GlideDockFromROCS,
+    SminaDock,
     FRED,
     RDKitDescriptors,
     TanimotoSimilarity,
