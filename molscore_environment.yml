@@ -11,7 +11,7 @@ dependencies:
   - ipython
   - rdkit
   - dash
-#  - dash-bio
+  - dash-bio
   - dask
   - numpy
   - pandas
@@ -25,7 +25,8 @@ dependencies:
   - wheel
   - parmed
   - openbabel
-  - mgltools
+#  - mgltools
   - smina
+  - qvina
   - pip:
       - importlib-resources

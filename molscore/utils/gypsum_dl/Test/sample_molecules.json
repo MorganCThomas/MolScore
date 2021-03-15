@@ -1,0 +1,13 @@
+{
+    "source": "sample_molecules.smi",
+    "separate_output_files": true,
+    "job_manager": "mpi",
+    "output_folder": "./gypsum_dl_test_output/",
+    "add_pdb_output": true,
+    "max_variants_per_compound": 10,
+    "thoroughness": 2,
+    "num_processors": 4,
+    "min_ph": 4,
+    "max_ph": 10,
+    "pka_precision": 1
+}

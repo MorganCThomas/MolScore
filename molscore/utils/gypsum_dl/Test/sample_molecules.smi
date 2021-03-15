@@ -1,0 +1,14 @@
+c1ccccc1O.[Na]                       salt_and_ionization
+CCC=O                                tautomer_and_cis_trans
+ClC(C[C@@](Cl)(C)F)(F)C(C(C)C)=O     two_chiral_one_unspecified_and_tautomer
+FC(C(I)=C(CC(I)(Cl)C)CC)=C(Cl)C      two_double_bonds_one_chiral_center
+CC(CC)=C(C/C(I)=C(C)/F)Cl            two_double_bonds_one_unspecified
+CC([C@@H]1CC[C@H](C(C)(C)C)CC1)(C)C  non_aromatic_ring
+CC(N)=O                              no_=[N-]
+C/[N+](C)=C\NC(C)=O                  no_[N-]C=[N+]
+C1=CN=CN1                            no_[nH+]c[n-]
+C1=CC=NN=C1                          no_[#7+]~[#7+]
+O=C(C)NNC(C)=O                       no_[#7-]~[#7-]
+C1=CC=NN1                            no_[!#7]~[#7+]~[#7-]~[!#7]
+[N-]=[N+]=NC                         azide_ok
+N#[N+][N-]C                          azide_ok2
