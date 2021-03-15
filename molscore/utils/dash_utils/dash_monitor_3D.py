@@ -41,7 +41,9 @@ else:
     pdb_styles_dict = None
 
 # Setup docked files if present
-docked_path = os.path.join(os.path.abspath(sys.argv[1]), 'GlideDock')
+subdirectories = [x for x in os.walk(os.path.abspath(sys.argv[1]))][0][1]
+dock_sub = [d for d in subdirectories if 'Dock' in d][0]
+dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
 
 
 def update_files(path, files, df):
@@ -224,9 +226,9 @@ def display_selected_sdf(selectedData):
     global pdb_dict
     global pdb_styles_dict
     global main_df
-    global docked_path
+    global dock_path
 
-    if not os.path.exists(docked_path):
+    if not os.path.exists(dock_path):
         return pdb_dict, pdb_styles_dict
 
     if selectedData:
@@ -236,7 +238,7 @@ def display_selected_sdf(selectedData):
         idxs = [point['pointIndex'] for point in selectedData['points']]
         steps_batches = [(main_df.loc[idx, 'step'], main_df.loc[idx, 'batch_idx']) for idx in idxs]
         # Grab sdf's for respective molecules
-        query_sdfs = [os.path.join(docked_path, f'{step}', f'{step}_{batch_idx}-*') for step, batch_idx in steps_batches]
+        query_sdfs = [os.path.join(dock_path, f'{step}', f'{step}_{batch_idx}-*') for step, batch_idx in steps_batches]
         glob_sdfs = [glob(sdf) for sdf in query_sdfs]
         # Unpack list of lists
         return_sdfs = [item for sublist in glob_sdfs for item in sublist]
