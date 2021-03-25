@@ -23,7 +23,7 @@ def train_agent(restore_prior_from='data/Prior.ckpt',
     start_time = time.time()
 
     # Scoring_function
-    scoring_function = MolScore(molscore_config)
+    scoring_function = MolScore(model_name='reinvent', task_config=molscore_config)
     scoring_function.log_parameters({'batch_size': batch_size, 'sigma': sigma})
 
     print("Building RNNs")
