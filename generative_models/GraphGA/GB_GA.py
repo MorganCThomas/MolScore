@@ -197,7 +197,7 @@ class GB_GA:
 
 
 def main(args):
-    ms = MolScore(args.molscore_config)
+    ms = MolScore(model_name='graphGA', task_config=args.molscore_config)
     generator = GB_GA(smi_file=args.smiles_file,
                       population_size=args.population_size,
                       offspring_size=args.offspring_size,

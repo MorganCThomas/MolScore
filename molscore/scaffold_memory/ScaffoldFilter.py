@@ -124,14 +124,26 @@ class ScaffoldMatcher(ScaffoldFilter):
 class IdenticalMurckoScaffold(ScaffoldMatcher):
     """Penalizes compounds based on exact Murcko Scaffolds previously generated. 'minsimilarity' is ignored."""
 
-    def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, outputmode="binary", **kwargs):
+    def __init__(self, nbmax=25, minscore=0.6, outputmode="binary", **kwargs):
+        """
+        :param nbmax: Maximum number of molecules per memory bin (cluster)
+        :param minscore: Minimum molecule score required to consider for memory binning
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param kwargs:
+        """
         super().__init__(nbmax=nbmax, minscore=minscore, generic=False, outputmode=outputmode)
 
 
 class IdenticalTopologicalScaffold(ScaffoldMatcher):
     """Penalizes compounds based on exact Topological Scaffolds previously generated. 'minsimilarity' is ignored."""
 
-    def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, outputmode="binary", **kwargs):
+    def __init__(self, nbmax=25, minscore=0.6, outputmode="binary", **kwargs):
+        """
+        :param nbmax: Maximum number of molecules per memory bin (cluster)
+        :param minscore: Minimum molecule score required to consider for memory binning
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param kwargs:
+        """
         super().__init__(nbmax=nbmax, minscore=minscore, generic=True, outputmode=outputmode)
 
 
@@ -140,6 +152,16 @@ class CompoundSimilarity(ScaffoldFilter):
 
     def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, radius=2, useFeatures=False,
                  bits=2048, outputmode="binary", **kwargs):
+        """
+        :param nbmax: Maximum number of molecules per memory bin (cluster)
+        :param minscore: Minimum molecule score required to consider for memory binning
+        :param minsimilarity: Minimum similarity to centroid molecule in bin
+        :param radius: Morgan fingerprint radius (e.g., 2 = ECFP4)
+        :param useFeatures: Include feature information in fingerprint
+        :param bits: Length of fingerprint (i.e., number of folded bits)
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param kwargs:
+        """
         super().__init__(nbmax=nbmax, minscore=minscore, generic=False, outputmode=outputmode)
         self.minsimilarity = minsimilarity
         self.radius = radius
@@ -191,10 +213,17 @@ class CompoundSimilarity(ScaffoldFilter):
             return smiles, fp, True
 
 
-class ScaffoldSimilarityAP(CompoundSimilarity):
+class ScaffoldSimilarityAtomPair(CompoundSimilarity):
     """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
 
     def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, outputmode="binary", **kwargs):
+        """
+        :param nbmax: Maximum number of molecules per memory bin (cluster)
+        :param minscore: Minimum molecule score required to consider for memory binning
+        :param minsimilarity: Minimum similarity to centroid molecule in bin
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param kwargs:
+        """
         super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
 
     def score(self, smiles, scores_dict: dict) -> np.array:
@@ -248,11 +277,21 @@ class ScaffoldSimilarityAP(CompoundSimilarity):
             return cluster, fp, True
 
 
-class ScaffoldSimilarityT(CompoundSimilarity):
+class ScaffoldSimilarityECFP(CompoundSimilarity):
     """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
 
-    def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, radius=2, useFeatures=False,
-                 bits=2048, outputmode="binary", **kwargs):
+    def __init__(self, nbmax=25, minscore=0.8, minsimilarity=0.8, radius=2, useFeatures=False,
+                 bits=1024, outputmode="binary", **kwargs):
+        """
+        :param nbmax: Maximum number of molecules per memory bin (cluster)
+        :param minscore: Minimum molecule score required to consider for memory binning
+        :param minsimilarity: Minimum similarity to centroid molecule in bin
+        :param radius: Morgan fingerprint radius (e.g., 2 = ECFP4)
+        :param useFeatures: Include feature information in fingerprint
+        :param bits: Length of fingerprint (i.e., number of folded bits)
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param kwargs:
+        """
         super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
         self.radius = radius
         self.useFeatures = useFeatures

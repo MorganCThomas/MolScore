@@ -5,6 +5,7 @@ import signal
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
 
+
 class timedThread(object):
     """
     Subprocess wrapped into a thread to add a more well defined timeout, use os to send a signal to all PID in
@@ -54,6 +55,7 @@ class timedSubprocess(object):
             print('Process timed out...')
             os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
         return
+
 
 def disable_rdkit_logging():
     """

@@ -21,17 +21,22 @@ logger.addHandler(ch)
 
 class GlideDock:
     """
-    A scoring function class to conduct ligand preparation with Glide, parallelised with Dask.
+    Score structures using Glide docking score, including ligand preparation with LigPrep
     """
-    def __init__(self, prefix: str, glide_template: str, cluster: str = None,
+    return_metrics = ['r_i_docking_score', 'r_i_glide_ligand_efficiency', 'r_i_glide_ligand_efficiency_sa',
+                      'r_i_glide_ligand_efficiency_ln', 'r_i_glide_gscore', 'r_i_glide_lipo',
+                      'r_i_glide_hbond', 'r_i_glide_metal', 'r_i_glide_rewards', 'r_i_glide_evdw',
+                      'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
+                      'r_i_glide_energy', 'r_i_glide_rmsd_to_input']
+
+    def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
                  timeout: float = 120.0, **kwargs):
         """
-        A scoring function class to conduct ligand preparation with Glide, parallelised with Dask.
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
-        :param cluster: Dask scheduler address
-        :param timeout: Timeout before kill a docking process and returning a score of 0.0
-        :param kwargs: Ignored
+        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param kwargs:
         """
         # Read in glide template (.in)
         with open(glide_template, 'r') as gfile:
@@ -41,12 +46,7 @@ class GlideDock:
 
         # Specify class attributes
         self.prefix = prefix.replace(" ", "_")
-        # Explicitly specify metrics
-        self.score_metrics = ['r_i_docking_score', 'r_i_glide_ligand_efficiency', 'r_i_glide_ligand_efficiency_sa',
-                                'r_i_glide_ligand_efficiency_ln', 'r_i_glide_gscore', 'r_i_glide_lipo',
-                                'r_i_glide_hbond', 'r_i_glide_metal', 'r_i_glide_rewards', 'r_i_glide_evdw',
-                                'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
-                                'r_i_glide_energy', 'r_i_glide_rmsd_to_input']
+        self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
         self.ligprep_env = os.path.join(os.environ['SCHRODINGER'], 'ligprep')
         self.timeout = float(timeout)
@@ -226,7 +226,7 @@ class GlideDock:
                                     best_variants[i] = f'{name}-{variant}'
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
-                                                           if k in self.score_metrics})
+                                                           if k in self.glide_metrics})
                                     logger.debug(f'Docking score for {name}-{variant}: {dscore}')
 
                                 # If docking score is better change it...
@@ -235,7 +235,7 @@ class GlideDock:
                                     best_variants[i] = f'{name}-{variant}'
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
-                                                           if k in self.score_metrics})
+                                                           if k in self.glide_metrics})
                                     logger.debug(f'Found better {name}-{variant}: {dscore}')
 
                                 # Otherwise ignore
@@ -247,7 +247,7 @@ class GlideDock:
                         logger.debug(f'Error processing {name}-{variant}_lib.sdfgz file')
                         if best_score[name] is None:  # Only if no other score for prefix
                             best_variants[i] = f'{name}-{variant}'
-                            docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.score_metrics})
+                            docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.glide_metrics})
                             logger.debug(f'Returning 0.0 unless a successful variant is found')
 
                 # If path doesn't exist and nothing store, append 0
@@ -255,7 +255,7 @@ class GlideDock:
                     logger.debug(f'{name}-{variant}_lib.sdfgz does not exist')
                     if best_score[name] is None:  # Only if no other score for prefix
                         best_variants[i] = f'{name}-{variant}'
-                        docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.score_metrics})
+                        docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.glide_metrics})
                         logger.debug(f'Returning 0.0 unless a successful variant is found')
 
             # Add best variant information to docking result
@@ -359,18 +359,20 @@ class GlideDock:
 
 class GlideDockFromROCS(GlideDock, ROCS):
     """
-    A Scoring function class that uses ROCS to align molecules to ligand (co-crystallised), and score in place.
+    Score structures based on Glide docking score with LigPrep ligand preparation,
+     but using ROCS to align to a reference molecule and score in place
     """
-    def __init__(self, prefix: str, glide_template: str, ref_file: str, cluster: str = None,
+    return_metrics = GlideDock.return_metrics + ROCS.return_metrics
+
+    def __init__(self, prefix: str, glide_template: os.PathLike, ref_file: os.PathLike, cluster: str = None,
                  timeout: float = 120.0, **kwargs):
         """
-        A Scoring function class that uses ROCS to align molecules to ligand (co-crystallised), and score in place.
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
         :param ref_file: Path to reference file to overlay query to (.pdb)
-        :param cluster: Dask scheduler address
-        :param timeout: Timeout before kill a docking process and returning a score of 0.0
-        :param kwargs: Ignored
+        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param kwargs:
         """
         GlideDock.__init__(self, prefix=prefix, glide_template=glide_template, cluster=cluster, timeout=timeout)
         ROCS.__init__(self, prefix=prefix, ref_file=ref_file)

@@ -13,7 +13,7 @@ def single(X, **kwargs):
 
 def wsum(X, W, **kwargs):
     """
-
+    Weighted sum
     :param X:
     :param W:
     :return:
@@ -25,11 +25,23 @@ def wsum(X, W, **kwargs):
 
 
 def gmean(X, **kwargs):
+    """
+    Geometric mean
+    :param X:
+    :param kwargs:
+    :return:
+    """
     y = geometricmean(X)
     return y
 
 
 def amean(X, **kwargs):
+    """
+    Arithmetic mean
+    :param X:
+    :param kwargs:
+    :return:
+    """
     y = stats.mean(X)
     return y
 

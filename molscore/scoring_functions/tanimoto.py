@@ -1,8 +1,10 @@
+import os
 import logging
 import numpy as np
 from functools import partial
 from multiprocessing import Pool
 from rdkit.Chem import AllChem as Chem
+from typing import Union
 
 logger = logging.getLogger('tanimoto')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -13,26 +15,27 @@ logger.addHandler(ch)
 
 
 class TanimotoSimilarity:
-    """Scoring function class to score structures based on Tanimoto similarity to reference structures."""
-    def __init__(self, prefix: str, ref_smiles: [list, str],
+    """
+    Score structures based on Tanimoto similarity of Morgan fingerprints to reference structures
+    """
+    return_metrics = ['Tc']
+
+    def __init__(self, prefix: str, ref_smiles: Union[list, os.PathLike],
                  radius: int = 2, bits: int = 1024, features: str = False,
                  method: str = 'mean', n_jobs: int = 1, **kwargs):
         """
-        Scoring function class to score structures based on Tanimoto similarity to reference structures.
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
-        :param ref_smiles: List of SMILES strings for reference structures
-        :param radius: Radius of Morgan fingerprints (default 2)
-        :param bits: Number of Morgan fingerprint bits (default 1024)
-        :param features: Whether to include feature information (FCFP) (default False)
-        :param method: Either calculate the 'mean' Tanimoto similarity to ref structures or 'max' Tanimoto similarity
-         of ref structures. (default mean)
-        :param n_jobs: Number of jobs for multiprocessing
-        :param kwargs: Ignored
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param ref_smiles: List of SMILES or path to SMILES file with no header (.smi)
+        :param radius: Radius of Morgan fingerprints
+        :param bits: Number of Morgan fingerprint bits
+        :param features: Whether to include feature information (equiv. FCFP)
+        :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour)
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
+        :param kwargs:
         """
         self.prefix = prefix.replace(" ", "_")
         assert method in ['max', 'mean']
         self.method = method
-        self.score_metrics = [f'{method}_Tc']
         self.radius = radius
         self.bits = bits
         self.features = features
@@ -43,7 +46,7 @@ class TanimotoSimilarity:
             with open(ref_smiles, 'r') as f:
                 self.ref_smiles = f.read().splitlines()
         else:
-            assert isinstance(ref_smiles, list) and (len(ref_smiles) > 0), "Non list or empty list provided"
+            assert isinstance(ref_smiles, list) and (len(ref_smiles) > 0), "None list or empty list provided"
             self.ref_smiles = ref_smiles
 
         # Convert ref smiles to mols
@@ -104,6 +107,6 @@ class TanimotoSimilarity:
         with Pool(self.n_jobs) as pool:
             calculate_Tc_p = partial(self.calculate_Tc, ref_fps=np.asarray(self.ref_fps), radius=self.radius,
                                      nBits=self.bits, useFeatures=self.features, method=self.method)
-            results = [{'smiles': smi, f'{self.prefix}_{self.method}_Tc': Tc}
+            results = [{'smiles': smi, f'{self.prefix}_Tc': Tc}
                        for smi, Tc in pool.imap(calculate_Tc_p, smiles)]
         return results

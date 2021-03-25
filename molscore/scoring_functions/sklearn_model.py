@@ -1,7 +1,7 @@
 from multiprocessing import Pool
 from functools import partial
 import glob
-from sys import modules
+import os
 import rdkit
 import numpy as np
 from rdkit.Chem import rdMolDescriptors
@@ -13,10 +13,19 @@ rdBase.DisableLog('rdApp.error')
 
 class SKLearnModel:
     """
-    This class loads a defined sklearn model and returns the predicted values
+    Score structures by loading a pre-trained sklearn model and return the predicted values
     """
-    def __init__(self, prefix: str, model_path: str,
-                 fp_type: str, n_jobs: int, **kwargs):
+    return_metrics = ['pred_proba']
+
+    def __init__(self, prefix: str, model_path: os.PathLike,
+                 fp_type: str, n_jobs: int = 1, **kwargs):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param model_path: Path to pre-trained model (saved using joblib)
+        :param fp_type: 'ECFP4', 'ECFP6', 'Avalon', 'MACCSkeys', 'hashAP', 'hashTT', 'RDK5', 'RDK6', 'RDK7'
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
+        :param kwargs:
+        """
         self.prefix = prefix
         self.prefix = prefix.replace(" ", "_")
         self.model_path = model_path
@@ -60,7 +69,6 @@ class SKLearnModel:
 
         else:
             return None
-            
 
     def __call__(self, smiles: list, **kwargs):
         """

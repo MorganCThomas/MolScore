@@ -29,8 +29,21 @@ logger.addHandler(ch)
 
 
 class SminaDock:
+    """
+    Score structures based on their Smina docking score, using Gypsum-DL for ligand preparation
+    """
+    return_metrics = ['docking_score']
 
-    def __init__(self, prefix: str, receptor: str, ref_ligand: str, cpus: int = 1, cluster=None, timeout=120.0):
+    def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cpus: int = 1,
+                 cluster: str = None, timeout: float = 120.0):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param receptor: Path to receptor file (.pdbqt)
+        :param ref_ligand: Path to ligand file for autobox generation (.sdf/.pdb)
+        :param cpus: Number of Smina CPUs to use per simulation
+        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param timeout: Timeout (seconds) before killing an individual docking simulation
+        """
         self.prefix = prefix.replace(" ", "_")
         self.receptor = os.path.abspath(receptor)
         self.ref = os.path.abspath(ref_ligand)
