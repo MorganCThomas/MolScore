@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 
 def raw(x: float, **kwargs):
     """
-    Dummy function to return raw values or 'as is'.
-    :param x:
+    Dummy function to return metric 'as is'.
+    :param x: Input value
     :return:
     """
     y = x
@@ -14,11 +14,11 @@ def raw(x: float, **kwargs):
 
 def norm(x: float, objective: str, max: float, min: float, **kwargs):
     """
-
-    :param x:
-    :param objective:
-    :param max:
-    :param min:
+    Normalize between maximum and minimum
+    :param x: Input value
+    :param objective: 'maximize' or 'minimize'
+    :param max: Maximum value for normalizing to (optional)
+    :param min: Minimum value for normalizing to (optional)
     :param kwargs:
     :return:
     """
@@ -31,18 +31,17 @@ def norm(x: float, objective: str, max: float, min: float, **kwargs):
     else:
         print("Normalization objective must be either \'minimize\' or \'maximize\'")
         raise
-
     return y
 
 
-def lin_thresh(x: float, objective: str, lower: float, upper: float, buffer: float, **kwargs):
+def lin_thresh(x: float, objective: str, upper: float, lower: float, buffer: float, **kwargs):
     """
-
-    :param x:
-    :param objective:
-    :param lower:
-    :param upper:
-    :param buffer:
+    Transform values using a linear threshold
+    :param x: Input valid
+    :param objective: 'maximize', 'minimize' or 'range'
+    :param upper: Upper bound for transforming values ('range' and 'maximize' only)
+    :param lower: Lower bound for transforming values ('range' and 'minimize' only)
+    :param buffer: Buffer between thresholds which will be on a linear scale
     :param kwargs:
     :return:
     """
@@ -78,11 +77,19 @@ def lin_thresh(x: float, objective: str, lower: float, upper: float, buffer: flo
     else:
         print("linThresh objective must be either \'minimize\' or \'maximize\' or \'range\'")
         raise
-
     return y
 
 
-def step(x: float, objective: str, lower: float, upper: float, **kwargs):
+def step(x: float, objective: str, upper: float, lower: float, **kwargs):
+    """
+    Transform values using a step transformer (threshold)
+    :param x: Input value
+    :param objective: 'maximize', 'minimize' or 'range'
+    :param upper: Upper bound for transforming values ('range' and 'maximize' only)
+    :param lower: Lower bound for transforming values ('range' and 'minimize' only)
+    :param kwargs:
+    :return:
+    """
     if objective == 'maximize':
         if x >= upper:
             y = 1.0
@@ -104,18 +111,16 @@ def step(x: float, objective: str, lower: float, upper: float, **kwargs):
     else:
         print("linThresh objective must be either \'minimize\' or \'maximize\' or \'range\'")
         raise
-
     return y
 
 
 def gauss(x: float, objective: str, mu: float, sigma: float, **kwargs):
     """
-
-    :param x:
-    :param objective:
-    :param mu:
-    :param sigma:
-    :param std:
+    Transform values using a Gaussian transformer
+    :param x: Input value
+    :param objective: 'maximize', 'minimize' or 'range'
+    :param mu: Mean
+    :param sigma: Standard deviation
     :param kwargs:
     :return:
     """
@@ -135,20 +140,25 @@ def gauss(x: float, objective: str, mu: float, sigma: float, **kwargs):
     else:
         print("linThresh objective must be either \'minimize\' or \'maximize\' or \'range\'")
         raise
-
     return y
 
 
 def plot_mod(mod, func_kwargs: dict):
+    """
+    Plot transformation functions
+    :param mod: Modifier object
+    :param func_kwargs: Keyword arguments for the modifier object
+    :return:
+    """
+    fig = plt.figure(figsize=(3, 3))
     X = np.linspace(0, 1, 101)
     Y = [mod(x, **func_kwargs) for x in X]
     plt.plot(X, Y, label=func_kwargs)
-    plt.xlabel('x')
-    plt.ylabel('modified x')
+    plt.xlabel('E.g input (0-1)')
+    plt.ylabel('E.g transformation')
     plt.title(mod.__name__)
-    plt.legend()
-    plt.show()
-    return
+    #plt.legend()
+    return fig
 
 
 def plot_mod_objectives(mod, non_objective_kwargs: dict):

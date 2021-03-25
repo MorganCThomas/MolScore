@@ -191,7 +191,7 @@ class CompoundSimilarity(ScaffoldFilter):
             return smiles, fp, True
 
 
-class ScaffoldSimilarityAP(CompoundSimilarity):
+class ScaffoldSimilarityAtomPair(CompoundSimilarity):
     """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
 
     def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, outputmode="binary", **kwargs):
@@ -248,11 +248,22 @@ class ScaffoldSimilarityAP(CompoundSimilarity):
             return cluster, fp, True
 
 
-class ScaffoldSimilarityT(CompoundSimilarity):
+class ScaffoldSimilarityECFP(CompoundSimilarity):
     """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
 
     def __init__(self, nbmax=25, minscore=0.6, minsimilarity=0.6, radius=2, useFeatures=False,
                  bits=2048, outputmode="binary", **kwargs):
+        """
+        Test dock
+        :param nbmax: Bin size
+        :param minscore: Minimum objective score before applying diversity filter
+        :param minsimilarity:
+        :param radius:
+        :param useFeatures:
+        :param bits:
+        :param outputmode:
+        :param kwargs:
+        """
         super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
         self.radius = radius
         self.useFeatures = useFeatures
