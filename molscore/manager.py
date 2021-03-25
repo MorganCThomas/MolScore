@@ -22,19 +22,22 @@ logger.addHandler(ch)
 
 
 class MolScore:
+    """
+    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
+    """
 
-    def __init__(self, config: str):
+    def __init__(self, model_name: str, task_config: os.PathLike):
         """
-        Central manager class that, when called, takes in a list of SMILES and returns respective scores.
-
-        :param config: File containing parameters (.json), see external documentation.
+        :param model_name: Name of generative model, used for file naming and documentation
+        :param task_config: Path to task config file
         """
         # Load in json file
-        with open(config, "r") as f:
+        with open(task_config, "r") as f:
             configs = f.read().replace('\r', '').replace('\n', '').replace('\t', '')
         self.configs = json.loads(configs)
 
         # Initialize some attributes
+        self.model_name = model_name
         self.step = 0
         self.init_time = time.time()
         self.results_df = None
@@ -54,8 +57,8 @@ class MolScore:
 
         # Setup save directory
         self.run_name = "_".join([time.strftime("%Y_%m_%d", time.localtime()),
-                                  self.configs['logging']['model']['name'].replace(" ", "_"),
-                                  self.configs['logging']['task']['name'].replace(" ", "_")])
+                                  self.model_name,
+                                  self.configs['task'].replace(" ", "_")])
         self.save_dir = os.path.join(os.path.abspath(self.configs['output_dir']), self.run_name)
         # Check to see if we're loading from previous results
         if self.configs['load_from_previous']:
@@ -159,8 +162,8 @@ class MolScore:
                     valid.append('false')
             batch_idx.append(i)
 
-        self.batch_df['model'] = self.configs['logging']['model']['name'].replace(" ", "_")
-        self.batch_df['task'] = self.configs['logging']['task']['name'].replace(" ", "_")
+        self.batch_df['model'] = self.model_name.replace(" ", "_")
+        self.batch_df['task'] = self.configs['task'].replace(" ", "_")
         self.batch_df['step'] = step
         self.batch_df['batch_idx'] = batch_idx
         self.batch_df['absolute_time'] = time.time() - self.init_time
