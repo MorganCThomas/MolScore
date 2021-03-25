@@ -2,36 +2,42 @@
 
 WARNING: This codebase is still a work in progress and has not been robustly tested. (There's a long TODO list and writing tests is on it!)
 
-## Aim
+## Overview
 
-This codebase is born out of frustration with the rapid pace, yet often brief evaluation (w.r.t chemistry) of generative models for de novo molecule design. It is designed to aid the comparison of generative models w.r.t scoring functions, model hyperparameters or different goal-directed generative model algorithms.
+The aim of this codebase is to simply and flexibly 
+automate the scoring of de novo compounds in generative models.
+In doing so, also track and record de novo compounds for automated evaluation downstream.
 
-The aim of this codebase is to be integrable into the majority of goal-directed generative models that require an external scoring function. Thus the idea is conceptually simple, a central `molscore` class that when called, accepts a list of SMILES and returns a list of scores. In doing so, the `molscore` class also acts as a data manager, by storing all molecules sampled and scores generated. This allows for a number of benefits including:
+- A central `molscore` class that is instantiated with a 
+configuration file defining the scoring function parameters 
+  (static configuration files enables reproducible tasks).
+- When called, the instance 
+accepts a list of SMILES and returns a list of scores. 
+- The `molscore` class saves compounds into a dataframe for live monitoring with a dashboard
+- A standardized dataframe allows automated downstream evaluation with `moleval/scripts/moses_n_statistics.py`
 
-* Data lookup so that duplicated SMILES don't require recalculation by a scoring function (assuming the score is static), saving time for expensive scoring functions.
-* Live monitoring of intermediate molecules sampled during training to track the progress with respect to chemistry and score. 
-* Standardized output format, facilitating automated evaluation of results with `moleval`.
+This requires only 3 lines of code to integrate into generative models.
 
-The central `molscore` class only requires one parameter for setup and iniatilisation in the form of a config (.json) file. This allows for **sharing of configurations for reproducible scoring functions** with respect to the functions themselves (e.g. QSAR model), score modifiers (e.g. linear transformation) and aggregation methods for multi-parameter optimization (e.g. weighted sum). The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
+The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
 
-Contributions and/or ideas for added functionality are welcomed! In an ideal world, authors of new publications could integrate `molscore` to save time in scoring function setup and aid in their evaluation, but could likewise contribute new scoring functions and share the config files as benchmark/reproducible tasks. With the aim to build more complex benchmarking tasks for goal directed generative models. 
+Contributions and/or ideas for added functionality are welcomed! 
 
-## MolScore functionality
+## Functionality
 
 Some functionality has been adapted from other sources, so special mentions to:
 * [GuacaMol](https://github.com/BenevolentAI/guacamol)
 * [MOSES](https://github.com/molecularsets/moses)
 * [REINVENT v2.0](https://github.com/MolecularAI/Reinvent)
 * [reinvent-memory](https://github.com/tblaschke/reinvent-memory)
-* [smina-docking-benchmark](https://github.com/cieplinski-tobiasz/smina-docking-benchmark) (coming soon ...)
 
 The current functionality included in this codebase includes:
 * Scoring functions
   * Glide docking \[requires Schrodinger and licence]
+  * Smina docking
   * ROCS shape overlay \[requires OpenEye and licence]
-  * Glide from ROCS best conformer overlay \[requires OpenEye and licence]
+  * Glide docking from a ROCS overlay \[requires OpenEye and licence]
   * Openeye (FRED) docking (not tested) \[requires OpenEye and licence]
-  * Smina docking (coming soon ...)
+  * Scikit-learn QSAR models 
   * Substructure matches
   * Substructure filters
   * Tanimoto similarity
@@ -61,6 +67,10 @@ Conda is recommended to install this codebase, first clone this repo:
 
 `git clone https://github.com/MorganCThomas/MolScore.git`
 
+Move inside the directory:
+
+`cd MolScore`
+
 Now create a new conda environment using the .yml file:
 
 `conda env create -f molscore_environment.yml`
@@ -69,47 +79,15 @@ Activate the new conda environment:
 
 `conda activate molscore`
 
-Next install the `molscore` package (if you plan on modification, I'd recommend `develop` instead of `install`):
+Next install the `molscore` package (I'd recommend `develop` instead of `install`):
 
-`python setup_molscore.py install`
+`python setup_molscore.py develop`
 
 ## Configuration
 
-A template configuration file can be found `./molscore/configs/template.json`, which displays the majority of options. (A script to check or help write configuration files is also on the TODO list).
+An app can be used to help write the configuration file.
 
-Briefly, the configuration file is structured as follows:
-
-* logging (dict)
-  * model
-    * name: str # This is saved in the output .csv under column name 'model'
-    * comments: # This is purely for self-reference, the config file gets saved with every use for logging purposes. E.g. {"batch_size": 64, "n_epoch": 12}
-  * task
-    * name: str # This is saved in the output .csv under column name 'task'
-    * comments: # This is purely for self-reference e.g. "Optimization of DRD2 docking, using this pdb file... etc."
-* output_dir: str # Path to output directory for saving files
-* load_from_previous: bool # Wether to continue a previous run
-* previous_dir: str # Only relevent if load 
-* dash_monitor (dict)
-  * run: bool (true/false)
-  * pdb_path: \[null, str] # This is only for use with dash_monitor_3D, depends on dash_bio and scikit-learn which is not install by default*
-* diversity_filter (dict)
-  * run: bool
-  * name: str # Must match class name of desired filter, list found in `./molscore/scaffold_memory/__init__.py`
-  * parameters: dict # Set of parameters to be passed to diversity filter
-* scoring_functions (list)
-  * name: str # Must match class name of scoring function, list found in `./molscore/scoring_functions/__init__.py`
-  * run: bool # Whether to run the scoring function or not can equally omit from list
-  * parameters: dict # Parameters passed to initialize scoring function
-    * prefix: str # This parameter should be required by all scoring functions classes to label metrics, enabling distinguishment of multiple scoring functions of the same type.
-* scoring (dict)
-  * method: str # Must match function name (e.g. wsum) found in `./molscore/utils/score_methods.py`
-  * metrics (list)
-    * name: str # Must match <{prefix}_{metric}> where prefix was used in the scoring function parameter and metric must be a known metric returned by the scoring function before hand
-    * weight: float # A number between 0 and 1, only relevent when using wsum scoring method.
-    * modifier: str # Must match name of modifier functions found in `./molscore/utils/score_modifiers.py`
-    * parameters (dict)
-      * objective: str # One of \[maximize, minimize, range]
-      * other: any specific parameters required from score modifiers e.g. sigma, mu etc.
+`streamlit run molscore/config_generator.py`
 
 ## Usage
 
@@ -123,7 +101,8 @@ from molscore.manager import MolScore
 mg = MockGenerator()
 
 # Now we setup MolScore passing in the configuration file
-ms = MolScore(config='molscore/test/configs/test_qed.json')
+ms = MolScore(model_name='test',
+              task_config='molscore/test/configs/test_qed.json')
 
 # Now to simulate the scoring of a generative model, we'll pass in 100 molecules 10 times (e.g. batch size 100, iterations 10)
 for i in range(10):
@@ -134,4 +113,11 @@ ms.write_scores()
 ms.kill_dash_monitor()
 ```
 
-**Important** the MolScore class doesn't save the final dataframe until told to do so with ms.write_scores(). This saves crucial time (which really does make a difference) reading and writing from a .csv each iteration. During development, other formats were explored such as an SQL database and parallelised dask dataframes, however, it was found pandas was much quicker and parallelisation unnecessary, the dataframe shouldn't get so large it's a problem for memory. If it does - the generative model should be more efficient! Neither does the class close the dash monitor without calling ms.kill_dash_monitor() (as it is run as a subprocess so will still run after closing everything down!).
+**Important** the MolScore class doesn't save the final dataframe until told to do so
+with ms.write_scores(). This saves crucial time (which really does make a difference)
+reading and writing from a .csv each iteration. During development, other formats were
+explored such as an SQL database and parallelised dask dataframes, however, it was found
+pandas was much quicker and parallelisation unnecessary, the dataframe shouldn't get so
+large it's a problem for memory. If it does - the generative model should be more efficient!
+Neither does the class close the dash monitor without calling ms.kill_dash_monitor()
+(as it is run as a subprocess).
