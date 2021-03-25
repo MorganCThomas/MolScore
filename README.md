@@ -104,7 +104,7 @@ mg = MockGenerator()
 
 # Now we setup MolScore passing in the configuration file
 ms = MolScore(model_name='test',
-              task_config='molscore/test/configs/test_qed.json')
+              task_config='molscore/configs/QED.json')
 
 # Now to simulate the scoring of a generative model, we'll pass in 100 molecules 10 times (e.g. batch size 100, iterations 10)
 for i in range(10):
