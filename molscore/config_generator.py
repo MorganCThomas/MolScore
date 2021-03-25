@@ -356,6 +356,9 @@ st.write(f"Selected: {out_file}")
 col1, col2 = st.beta_columns(2)
 with col1:
     if st.button(label='Save'):
+        if not os.path.exists(os.path.dirname(out_file)):
+            os.makedirs(os.path.dirname(out_file))
+            st.write('Creating directory')
         with open(out_file, 'w') as f:
             json.dump(config, f)
             st.write('File saved')
