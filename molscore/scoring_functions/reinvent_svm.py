@@ -3,6 +3,7 @@ Adapted from
 https://github.com/MarcusOlivecrona/REINVENT
 """
 from __future__ import print_function, division
+import os
 import numpy as np
 from rdkit import Chem
 from rdkit import rdBase
@@ -16,20 +17,17 @@ class ActivityModel:
      refactors code used for fingerprint generation.
      https://github.com/MarcusOlivecrona/REINVENT
     """
+    return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str, cpath: str, **kwargs):
+    def __init__(self, prefix: str, model_path: os.PathLike, **kwargs):
         """
-        This particular class uses the SVM taken from the REINVENT publication and
-             refactors code used for fingerprint generation.
-                  https://github.com/MarcusOlivecrona/REINVENT
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
-        :param cpath: File path to scikit-learn model (probably only works with reinvent clf.pkl)
-        :param kwargs: Ignored
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param model_path: Path to pre-trained model (specifically clf.pkl in REINVENT publication)
+        :param kwargs:
         """
-        self.clf_path = cpath
+        self.clf_path = model_path
         self.prefix = prefix.replace(" ", "_")
         self.clf = joblib.load(self.clf_path)
-        self.score_metrics = ['pred_prob']
 
     def __call__(self, smiles, **kwargs):
         """
@@ -46,9 +44,9 @@ class ActivityModel:
             if mol:
                 fp = ActivityModel.fingerprints_from_mol(mol)
                 score = self.clf.predict_proba(fp)[:, 1]
-                results.update({f'{self.prefix}_pred_prob': float(score[0])})
+                results.update({f'{self.prefix}_pred_proba': float(score[0])})
             else:
-                results.update({f'{self.prefix}_pred_prob': 0.0})
+                results.update({f'{self.prefix}_pred_proba': 0.0})
             return results
 
         elif isinstance(smiles, list):
@@ -65,13 +63,13 @@ class ActivityModel:
                     fps.append(fp.reshape(-1))
                     valid.append(i)
                 else:
-                    result.update({f'{self.prefix}_pred_prob': 0.0})
+                    result.update({f'{self.prefix}_pred_proba': 0.0})
                 results.append(result)
 
             # Grab prediction
             y_prob = self.clf.predict_proba(np.asarray(fps))[:, 1]
             for i, prob in zip(valid, y_prob):
-                results[i].update({f'{self.prefix}_pred_prob': prob})
+                results[i].update({f'{self.prefix}_pred_proba': prob})
 
             return results
 

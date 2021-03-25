@@ -1,17 +1,20 @@
 # Defining scoring functions
 
-In order to define your own scoring function to work with MolScore it must adhere to the following:
-- Be a python class
+In order to define your own scoring function to work with MolScore it must adhere to the following format:
 
-- Parameters definable in the config file are designed to be passed to \__init\__
-    - \__init\__ must have the following parameters:
-        - prefix: str
-        
-- The \__call\__ method must calculate the score for a list of smiles
-    - \__call\__ must have the following parameters:
-        - smiles: A unique list of smiles
-        - **kwargs:
-    - \__call\__ must return the following:
-        - return: A dictionary of the results including 'smiles' e.g.
-        {'smiles': 'c1ccccc1', '\<prefix>_docking_score': -10.4}. 
-        It must populate smiles that error'd with 0.0 as metric vlaues. 
+``` python
+class SomeClass:
+    SomeClass.return_metrics = <list>  # List of metrics returned
+    
+    def __init__(self, prefix: str, **kwargs):
+        self.prefix = prefix.strip().replace(' ', '_')
+    
+    def __call__(self, smiles: list, **kwargs) -> list[dict]:
+        return results  
+        # results should have a 'smiles' key and every other key should be '<prefix>_<metric>'
+        # e.g. [{'smiles': 'c1ccccc1', 'test_docking_score': -7.8},
+        #       {'smiles': 'c1ccccc1C(=O)O', 'test_docking_score': -9.0]
+```
+
+Furthermore, the class should handle invalid smiles/molecules and/or errors.
+In this case, the corresponding dictionary should set all values to 0.0 (except for 'smiles').

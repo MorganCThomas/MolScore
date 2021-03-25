@@ -3,6 +3,7 @@ This code is adapted from reinvent-memory
 https://github.com/tblaschke/reinvent-memory
 """
 
+import os
 import logging
 import openeye.oechem as oechem
 import openeye.oedocking as oedocking
@@ -18,13 +19,14 @@ logger.addHandler(ch)
 
 class FRED:
     """
-    Scoring function class to perform OpenEye docking (FRED)
+    Score structures using OpenEye docking (FRED)
     """
-    def __init__(self, prefix: str, receptor_file: str):
+    return_metrics = ['FRED_energy']
+
+    def __init__(self, prefix: str, receptor_file: os.PathLike):
         """
-        Scoring function class to perform OpenEye docking (FRED)
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
-        :param receptor_file: Path to oe receptor file.
+        :param prefix: Prefix to identify scoring function instance (e.g., Risperidone)
+        :param receptor_file: Path to receptor file (.oeb).
         """
         logger.warning("This code has not been tested (at all!)")
         self.prefix = prefix
@@ -54,11 +56,11 @@ class FRED:
             result = {'smiles': smi}
             mol = oechem.OEMol()
             if not oechem.OESmilesToMol(mol, smi):
-                results.append({'smiles': smi, f'{self.prefix}_fred_energy': 0.0})
+                results.append({'smiles': smi, f'{self.prefix}_FRED_energy': 0.0})
                 continue
             if self.omega(mol):
                 dockedMol = oechem.OEGraphMol()
                 self.oedock.DockMultiConformerMolecule(dockedMol, mol)
                 score = dockedMol.GetEnergy()
-                results.append({'smiles': smi, f'{self.prefix}_fred_energy': score})
+                results.append({'smiles': smi, f'{self.prefix}_FRED_energy': score})
         return results

@@ -10,19 +10,19 @@ from multiprocessing import Pool
 
 class SubstructureFilters:
     """
-    Scoring function class to penalise undesirable substructures in a molecule.
+    Score structures to penalise undesirable substructures in a molecule (0 returned for a match)
     """
+    return_metrics = ['substruct_filt']
+
     def __init__(self, prefix: str, az_filters: bool = False, custom_filters: list = [],
                  n_jobs: int = 1, **kwargs):
         """
-        Scoring function class to check for undesirable substructures in a molecule.
-
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
+        :param prefix: Prefix to identify scoring function instance (e.g., PAINS)
         :param az_filters: Run filters specified by AstraZeneca in REINVENT publication
         (https://github.com/MolecularAI/Reinvent)
-        :param custom_filters: A list of smarts to define custom substructure filters.
-        :param n_jobs: Number of jobs for multiprocessing
-        :param kwargs: Ignored
+        :param custom_filters: A list of SMARTS to define custom substructure filters.
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
+        :param kwargs:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
@@ -93,6 +93,6 @@ class SubstructureFilters:
         """
         with Pool(self.n_jobs) as pool:
             match_substructure_p = partial(self.match_substructure, smarts_filters=self.smarts)
-            results = [{'smiles': smi, f'{self.prefix}_substructure_filters': match}
+            results = [{'smiles': smi, f'{self.prefix}_substruct_filt': match}
                        for smi, match in pool.imap(match_substructure_p, smiles)]
         return results

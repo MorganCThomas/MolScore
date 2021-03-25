@@ -5,30 +5,39 @@ from molscore.scoring_functions.SA_Score import sascorer
 
 class RDKitDescriptors:
     """
-    Scoring function class to grab a variety of descriptors from rdkit.
+    Score structures based rdkit descriptors
     """
-    def __init__(self, **kwargs):
+
+    return_metrics = ['QED', 'SAscore', 'CLogP', 'MolWt', 'HeavyAtomCount', 'HeavyAtomMolWt',
+                      'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms', 'NumRotatableBonds',
+                      'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP', 'FormalCharge']
+
+    def __init__(self, prefix: str = 'desc', **kwargs):
         """
-        Scoring function class to grab a variety of descriptors from rdkit.
-        :param kwargs: Ignored
+        :param prefix: Prefix to identify scoring function instance (e.g., desc)
+        :param kwargs:
         """
+        self.prefix = prefix.strip().replace(' ', '_')
         self.results = None
-        self.descriptors = {'desc_QED': QED.qed,
-                            'desc_SAscore': sascorer.calculateScore,
-                            'desc_CLogP': Crippen.MolLogP,
-                            'desc_MolWt': Descriptors.MolWt,
-                            'desc_HeavyAtomCount': Descriptors.HeavyAtomCount,
-                            'desc_HeavyAtomMolWt': Descriptors.HeavyAtomMolWt,
-                            'desc_NumHAcceptors': Descriptors.NumHAcceptors,
-                            'desc_NumHDonors': Descriptors.NumHDonors,
-                            'desc_NumHeteroatoms': Descriptors.NumHeteroatoms,
-                            'desc_NumRotatableBonds': Descriptors.NumRotatableBonds,
-                            'desc_NumAromaticRings': Descriptors.NumAromaticRings,
-                            'desc_NumAliphaticRings': Descriptors.NumAliphaticRings,
-                            'desc_RingCount': Descriptors.RingCount,
-                            'desc_TPSA': Descriptors.TPSA,
-                            'desc_PenLogP': self.penalized_logp,
-                            'desc_FormalCharge': Chem.GetFormalCharge}
+        self.descriptors = {'QED': QED.qed,
+                            'SAscore': sascorer.calculateScore,
+                            'CLogP': Crippen.MolLogP,
+                            'MolWt': Descriptors.MolWt,
+                            'HeavyAtomCount': Descriptors.HeavyAtomCount,
+                            'HeavyAtomMolWt': Descriptors.HeavyAtomMolWt,
+                            'NumHAcceptors': Descriptors.NumHAcceptors,
+                            'NumHDonors': Descriptors.NumHDonors,
+                            'NumHeteroatoms': Descriptors.NumHeteroatoms,
+                            'NumRotatableBonds': Descriptors.NumRotatableBonds,
+                            'NumAromaticRings': Descriptors.NumAromaticRings,
+                            'NumAliphaticRings': Descriptors.NumAliphaticRings,
+                            'RingCount': Descriptors.RingCount,
+                            'TPSA': Descriptors.TPSA,
+                            'PenLogP': self.penalized_logp,
+                            'FormalCharge': Chem.GetFormalCharge}
+        # Add prefix
+        self.descriptors = {f'{self.prefix}_{k}': v for k, v in self.descriptors.items()}
+
 
     def get_largest_ring_size(self, mol: Chem.rdchem.Mol):
         """

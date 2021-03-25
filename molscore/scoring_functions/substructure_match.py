@@ -3,30 +3,41 @@ Adapted from
 https://github.com/MolecularAI/Reinvent
 """
 
+import os
 from rdkit import Chem
 from functools import partial
 from multiprocessing import Pool
+from typing import Union
 
 
 class SubstructureMatch:
     """
-    Scoring function class to reward desirable substructures in a molecule.
+    Score structures based on desirable substructures in a molecule (1 returned for a match)
     """
-    def __init__(self, prefix: str, smarts: list = [],
+    return_metrics = ['substruct_match']
+
+    def __init__(self, prefix: str, smarts: Union[list, os.PathLike],
                  n_jobs: int = 1, method: str = 'any', **kwargs):
         """
-        Scoring function class to reward desirable substructures in a molecule.
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
-        :param smarts: List of SMARTS strings that define desirable substructures
-        :param n_jobs: Number of jobs for multiprocessing
-        :param method: To give reward for 'any' match, or only for 'all' matches
-        :param kwargs: Ignored
+        :param prefix: Prefix to identify scoring function instance (e.g., Benzimidazole)
+        :param smarts: List of SMARTS or path to SMARTS file (format of a .smi i.e., txt with one row, no header)
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
+        :param method: 'any' or 'all': Give reward for 'any' match, or only for 'all' matches (reward is 1 or 0)
+        :param kwargs:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
         self.smarts = smarts
         assert method in ['any', 'all']
         self.method = method
+
+        # If file path provided, load smiles.
+        if isinstance(smarts, str):
+            with open(smarts, 'r') as f:
+                self.smarts = f.read().splitlines()
+        else:
+            assert isinstance(smarts, list) and (len(smarts) > 0), "None list or empty list provided"
+            self.smarts = smarts
 
     @staticmethod
     def match_substructure(smi: str, smarts: list, method: str):
@@ -59,6 +70,6 @@ class SubstructureMatch:
         """
         with Pool(self.n_jobs) as pool:
             match_substructure_p = partial(self.match_substructure, smarts=self.smarts, method=self.method)
-            results = [{'smiles': smi, f'{self.prefix}_substructure_match': match}
+            results = [{'smiles': smi, f'{self.prefix}_substruct_match': match}
                        for smi, match in pool.imap(match_substructure_p, smiles)]
         return results

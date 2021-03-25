@@ -1,3 +1,4 @@
+import os
 import logging
 
 from rdkit.Chem import AllChem as Chem
@@ -16,23 +17,23 @@ logger.addHandler(ch)
 
 class ROCS:
     """
-    Shape alignment on generated molecules. 
+    Score structures based on shape alignment to a reference file.
     """
-    def __init__(self, prefix: str, ref_file: str, **kwargs):
+    return_metrics = ['GetColorScore', 'GetColorTanimoto', 'GetColorTversky', 'GetComboScore',
+                      'GetFitColorTversky', 'GetFitSelfColor', 'GetFitSelfOverlap', 'GetFitTversky',
+                      'GetFitTverskyCombo', 'GetOverlap', 'GetRefColorTversky', 'GetRefSelfColor',
+                      'GetRefSelfOverlap', 'GetRefTversky', 'GetRefTverskyCombo', 'GetShapeTanimoto',
+                      'GetTanimoto', 'GetTanimotoCombo', 'GetTversky', 'GetTverskyCombo']
+
+    def __init__(self, prefix: str, ref_file: os.PathLike, **kwargs):
         """
-        Shape alignment on generated molecules to a reference molecule
-        :param prefix: Name (to help keep track metrics, if using a scoring function class more than once)
+        :param prefix: Prefix to identify scoring function instance (e.g., Risperidone)
         :param ref_file: Path to reference file to overlay query to (.pdb)
-        :param return_best_overlay: Whether to also return best overlay (for use with docking)
-        :param kwargs: Ignored
+        :param kwargs:
         """
 
         self.prefix = prefix.replace(" ", "_")
-        self.rocs_metrics = ['GetColorScore', 'GetColorTanimoto', 'GetColorTversky', 'GetComboScore',
-                             'GetFitColorTversky', 'GetFitSelfColor', 'GetFitSelfOverlap', 'GetFitTversky',
-                             'GetFitTverskyCombo', 'GetOverlap', 'GetRefColorTversky', 'GetRefSelfColor',
-                             'GetRefSelfOverlap', 'GetRefTversky', 'GetRefTverskyCombo', 'GetShapeTanimoto',
-                             'GetTanimoto', 'GetTanimotoCombo', 'GetTversky', 'GetTverskyCombo']
+        self.rocs_metrics = ROCS.return_metrics
         self.ref_file = ref_file
         self.refmol = oechem.OEMol()
         ifs = oechem.oemolistream(self.ref_file)  # Set up input file stream
