@@ -34,7 +34,7 @@ def st_file_selector(st_placeholder, key, path='.', label='Please, select a file
     if os.path.isdir(selected_path):
         selected_path = st_file_selector(st_placeholder=st_placeholder,
                                          path=selected_path, label=label, key=key)
-    return selected_path
+    return os.path.abspath(selected_path)
 
 
 def type2widget(ptype, label, key, default=None):
