@@ -89,6 +89,8 @@ An app can be used to help write the configuration file.
 
 `streamlit run molscore/config_generator.py`
 
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/utils/images/config_generator.png?raw=True)
+
 ## Usage
 
 For a toy demonstration, after installation of `molscore` and activation of the environment with `conda activate molscore`, open the python console (`python` or `ipython`). In the python console, run the following code:
