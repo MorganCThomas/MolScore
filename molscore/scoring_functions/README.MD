@@ -18,3 +18,13 @@ class SomeClass:
 
 Furthermore, the class should handle invalid smiles/molecules and/or errors.
 In this case, the corresponding dictionary should set all values to 0.0 (except for 'smiles').
+
+To integrate the new scoring function, just add it to the `__init__.py` file as such.
+
+```python
+from molscore.scoring_functions.some_new_function import SomeNewFunction
+
+all_scoring_functions=[
+    SomeNewFunction
+]
+```
