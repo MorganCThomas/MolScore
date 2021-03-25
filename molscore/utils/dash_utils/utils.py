@@ -35,16 +35,20 @@ def sdf_to_dict(sdf_path, seed_index=0):
         if 'gz' in os.path.basename(sdf_path):
             with gzip.open(sdf_path) as f:
                 supp = Chem.rdmolfiles.ForwardSDMolSupplier(f, removeHs=False)
-                for i, mol in enumerate(supp):
+                mol = None
+                # Just take first mol
+                for i, m in enumerate(supp):
                     if i == 0:
-                        mol = mol
+                        mol = m
                     else:
                         break
         else:
             supp = Chem.rdmolfiles.ForwardSDMolSupplier(sdf_path, removeHs=False)
-            for i, mol in enumerate(supp):
+            mol = None
+            # Just take first mol
+            for i, m in enumerate(supp):
                 if i == 0:
-                    mol = mol
+                    mol = m
                 else:
                     break
         if mol is None:
@@ -86,16 +90,18 @@ def sdf_to_dict(sdf_path, seed_index=0):
             if 'gz' in os.path.basename(p):
                 with gzip.open(p) as f:
                     supp = Chem.rdmolfiles.ForwardSDMolSupplier(f, removeHs=False)
-                    for i, mol in enumerate(supp):
+                    mol = None
+                    for i, m in enumerate(supp):
                         if i == 0:
-                            mol = mol
+                            mol = m
                         else:
                             break
             else:
                 supp = Chem.rdmolfiles.ForwardSDMolSupplier(p, removeHs=False)
-                for i, mol in enumerate(supp):
+                mol = None
+                for i, m in enumerate(supp):
                     if i == 0:
-                        mol = mol
+                        mol = m
                     else:
                         break
             if mol is None:
