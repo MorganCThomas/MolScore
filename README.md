@@ -123,3 +123,9 @@ pandas was much quicker and parallelisation unnecessary, the dataframe shouldn't
 large it's a problem for memory. If it does - the generative model should be more efficient!
 Neither does the class close the dash monitor without calling ms.kill_dash_monitor()
 (as it is run as a subprocess).
+
+## Comparison of Structure- and Ligand-Based Scoring Functions for Deep Generative Models: A GPCR Case Study
+
+The data for this publication can be found [here](https://chemrxiv.org/articles/preprint/Comparison_of_Structure-_and_Ligand-Based_Scoring_Functions_for_Deep_Generative_Models_A_GPCR_Case_Study/14138147).
+
+
