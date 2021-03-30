@@ -322,20 +322,20 @@ class MolScore:
             lambda x: self.mpo_method(X=x, W=mpo_columns['weights'], df=self.main_df), axis=1
         )
 
-        # Run through diversity filter if applicable
-        if self.diversity_filter is not None:
-            scores_dict = {"total_score": np.asarray(df[self.configs['scoring']['method']].tolist(),
-                                                     dtype=np.float32),
-                           "step": [self.step] * len(df)}
-            filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
-                                                          scores_dict=scores_dict)
-            df["passes_diversity_filter"] = ['true' if a == b else 'false'
-                                             for b, a in
-                                             zip(df[self.configs['scoring']['method']],
-                                                 filtered_scores)]
-            df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
-            df.fillna(1e-6)
+        return df
 
+    def run_diversity_filter(self, df):
+        scores_dict = {"total_score": np.asarray(df[self.configs['scoring']['method']].tolist(),
+                                                 dtype=np.float64),
+                       "step": [self.step] * len(df)}
+        filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
+                                                      scores_dict=scores_dict)
+        df["passes_diversity_filter"] = [True if a == b else False
+                                         for b, a in
+                                         zip(df[self.configs['scoring']['method']],
+                                             filtered_scores)]
+        df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
+        df.fillna(1e-6)
         return df
 
     def log_parameters(self, parameters: dict):
@@ -399,7 +399,7 @@ class MolScore:
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
-        :param score_only: Whether to log molecule data or simply score and return
+        :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
         :return: Scores (either float list or np.array)
         """
         if score_only:
@@ -412,11 +412,12 @@ class MolScore:
             logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
             self.update_maxmin(self.results_df)
             self.results_df = self.compute_score(self.results_df)
-            # Fetch score
-            if self.diversity_filter is not None:
-                scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
-            else:
-                scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
+            # Don't run diversity filter for score only...
+            # if self.diversity_filter is not None:
+            #     self.results_df = self.run_diversity_filter(self.results_df)
+            #     scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
+            # else:
+            scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
             if not flt:
                 scores = np.array(scores, dtype=np.float32)
             logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
@@ -485,6 +486,9 @@ class MolScore:
             self.update_maxmin(df=self.batch_df)
             self.batch_df = self.compute_score(df=self.batch_df)
             logger.info(f'    Aggregate score calculated: {len(self.batch_df)} SMILES')
+            if self.diversity_filter is not None:
+                self.batch_df = self.run_diversity_filter(self.batch_df)
+                logger.info(f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} SMILES')
 
             # Add information of scoring time
             self.batch_df['score_time'] = time.time() - scoring_start
