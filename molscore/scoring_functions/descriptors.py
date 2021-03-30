@@ -14,9 +14,10 @@ class RDKitDescriptors:
                       'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms', 'NumRotatableBonds',
                       'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP', 'FormalCharge']
 
-    def __init__(self, prefix: str = 'desc', n_jobs=1, **kwargs):
+    def __init__(self, prefix: str = 'desc', n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., desc)
+        :param n_jobs: Number of cores for multiprocessing
         :param kwargs:
         """
         self.prefix = prefix.strip().replace(' ', '_')
