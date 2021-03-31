@@ -7,6 +7,7 @@ from molscore.scoring_functions.tanimoto import TanimotoSimilarity
 from molscore.scoring_functions.descriptors import RDKitDescriptors
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
 from molscore.scoring_functions.substructure_match import SubstructureMatch
+from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLearnModel
 
 all_scoring_functions = [
     ROCS,
@@ -17,5 +18,7 @@ all_scoring_functions = [
     RDKitDescriptors,
     TanimotoSimilarity,
     SubstructureFilters,
-    SubstructureMatch
+    SubstructureMatch,
+    SKLearnModel,
+    EnsembleSKLearnModel
 ]

@@ -94,6 +94,7 @@ class SKLearnModel:
 
         return results
 
+
 class EnsembleSKLearnModel(SKLearnModel):
     """
     This class loads different random seeds of a defined sklearn
@@ -101,6 +102,13 @@ class EnsembleSKLearnModel(SKLearnModel):
     """
     def __init__(self, prefix: str, model_path: str,
                  fp_type: str, n_jobs: int, **kwargs):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param model_path: Path to pre-trained model (saved using joblib)
+        :param fp_type: 'ECFP4', 'ECFP6', 'Avalon', 'MACCSkeys', 'hashAP', 'hashTT', 'RDK5', 'RDK6', 'RDK7'
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
+        :param kwargs:
+        """
         super().__init__(prefix, model_path, 
                         fp_type, n_jobs, **kwargs)
         changing = self.model_path.split('_')
