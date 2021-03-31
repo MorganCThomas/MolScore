@@ -100,7 +100,7 @@ class EnsembleSKLearnModel(SKLearnModel):
     This class loads different random seeds of a defined sklearn
     model and returns the average of the predicted values.
     """
-    def __init__(self, prefix: str, model_path: str,
+    def __init__(self, prefix: str, model_path: os.PathLike,
                  fp_type: str, n_jobs: int, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
