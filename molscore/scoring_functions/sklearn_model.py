@@ -101,7 +101,7 @@ class EnsembleSKLearnModel(SKLearnModel):
     model and returns the average of the predicted values.
     """
     def __init__(self, prefix: str, model_path: os.PathLike,
-                 fp_type: str, n_jobs: int, **kwargs):
+                 fp_type: str, n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model (saved using joblib)
