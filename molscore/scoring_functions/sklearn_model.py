@@ -6,6 +6,7 @@ import rdkit
 import numpy as np
 from rdkit.Chem import rdMolDescriptors
 from rdkit import Chem
+from rdkit.Avalon import pyAvalonTools
 from rdkit import rdBase
 import joblib
 rdBase.DisableLog('rdApp.error')
@@ -49,7 +50,7 @@ class SKLearnModel:
 
             # Structural fingerprints:
             elif fp_type == "Avalon":
-                fp = rdkit.Avalon.pyAvalonTools.GetAvalonFP(mol, nBits=1024) # Avalon
+                fp = pyAvalonTools.GetAvalonFP(mol, nBits=1024) # Avalon
             elif fp_type == "MACCSkeys":
                 fp = rdkit.Chem.rdMolDescriptors.GetMACCSKeysFingerprint(mol) #MACCS Keys
             
