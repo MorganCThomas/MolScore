@@ -11,6 +11,9 @@ import os
 from directed_generator import SmilesRnnDirectedGenerator
 from molscore.manager import MolScore
 
+from torch import cuda
+cuda.device(1)
+
 def get_args():
     parser = argparse.ArgumentParser(description='Goal-directed generation benchmark for SMILES RNN',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -18,7 +21,6 @@ def get_args():
     parser.add_argument('--model_path', default=None, help='Full path to the pre-trained SMILES RNN model')
     parser.add_argument('--max_len', default=100, type=int, help='Max length of a SMILES string')
     parser.add_argument('--seed', default=42, type=int, help='Random seed')
-    parser.add_argument('--output_dir', default=None, help='Output directory for results')
     parser.add_argument('--number_repetitions', default=1, type=int, help='Number of re-training runs to average')
     parser.add_argument('--keep_top', default=512, type=int, help='Molecules kept each step')
     parser.add_argument('--n_epochs', default=20, type=int, help='Epochs to sample')

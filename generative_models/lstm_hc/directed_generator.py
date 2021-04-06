@@ -21,7 +21,7 @@ from utils import load_rnn_model
 class SmilesRnnDirectedGenerator: # (GoalDirectedGenerator):
     def __init__(self, pretrained_model_path: str, n_epochs=4, mols_to_sample=1028, keep_top=512,
                  optimize_n_epochs=2, max_len=100, optimize_batch_size=64, number_final_samples=1028,
-                 sample_final_model_only=False, random_start=False, smi_file=None, n_jobs=-1) -> None:
+                 sample_final_model_only=True, random_start=False, smi_file=None, n_jobs=-1) -> None:
         self.pretrained_model_path = pretrained_model_path
         self.n_epochs = n_epochs
         self.mols_to_sample = mols_to_sample
@@ -55,8 +55,10 @@ class SmilesRnnDirectedGenerator: # (GoalDirectedGenerator):
         if starting_population is None:
             print('selecting initial population...')
             if self.random_start:
+                print('    from random')
                 starting_population = []
             else:
+                print('    from highest scoring')
                 all_smiles = self.load_smiles_from_file(self.smi_file)
                 starting_population = self.top_k(all_smiles, scoring_function, self.mols_to_sample)
 

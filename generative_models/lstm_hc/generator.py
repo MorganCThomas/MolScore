@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 
 #from guacamol.scoring_function import ScoringFunction
-from utils import canonicalize_list
+from utils import canonicalize_list, canonicalize
 
 from model import SmilesRnn
 from sampler import SmilesRnnSampler
@@ -96,14 +96,31 @@ class SmilesRnnMoleculeGenerator:
             samples = self.sampler.sample(self.model, mols_to_sample, max_seq_len=self.max_len)
             t1 = time.time()
 
-            canonicalized_samples = set(canonicalize_list(samples, include_stereocenters=True))
-            payload = list(canonicalized_samples.difference(seen))
-            payload.sort()  # necessary for reproducibility between different runs
+            #### Modification
+            # Score all samples
+            scores = objective(samples, flt=True)
+            int_results = [OptResult(smiles=canonicalize(smiles), score=score) for
+                           smiles, score in zip(samples, scores)]
+            # Keep 'payload' i.e. unseen samples
+            int_results = [OR for OR in int_results if (OR.smiles not in seen) and (OR.smiles is not None)]
+            # Sort for reproducibility between different runs
+            int_results = sorted(int_results, key=lambda x: x.smiles)
+            # Update seen
+            seen.update(set(canonicalize_list(samples, include_stereocenters=True)))
+            ####
 
-            seen.update(canonicalized_samples)
+            #### Original
+            # This removes duplicates and invalid smiles which I want to capture in MolScore
+            #canonicalized_samples = set(canonicalize_list(samples, include_stereocenters=True))
+            #payload = list(canonicalized_samples.difference(seen))
+            #payload.sort()  # necessary for reproducibility between different runs
 
-            scores = objective(payload)
-            int_results = [OptResult(smiles=smiles, score=score) for smiles, score in zip(payload, scores)]
+
+            #seen.update(canonicalized_samples)
+
+            #scores = objective(payload, flt=True)
+            #int_results = [OptResult(smiles=smiles, score=score) for smiles, score in zip(payload, scores)]
+            ####
 
             t2 = time.time()
 
