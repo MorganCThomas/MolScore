@@ -11,9 +11,6 @@ import os
 from directed_generator import SmilesRnnDirectedGenerator
 from molscore.manager import MolScore
 
-from torch import cuda
-cuda.device(1)
-
 def get_args():
     parser = argparse.ArgumentParser(description='Goal-directed generation benchmark for SMILES RNN',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
