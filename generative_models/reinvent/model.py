@@ -33,10 +33,10 @@ class MultiGRU(nn.Module):
 class RNN():
     """Implements the Prior and Agent RNN. Needs a Vocabulary instance in
     order to determine size of the vocabulary and index of the END token"""
-    def __init__(self, voc):
+    def __init__(self, voc, device=None):
         self.rnn = MultiGRU(voc.vocab_size)
         if torch.cuda.is_available():
-            self.rnn.cuda()
+            self.rnn.cuda(device)
         self.voc = voc
 
     def likelihood(self, target):

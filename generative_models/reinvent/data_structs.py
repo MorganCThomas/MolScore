@@ -223,24 +223,26 @@ def tokenize(smiles):
     return tokenized
 
 
-def canonicalize_smiles_from_file(fname, n_jobs):  ####
+def canonicalize_smiles_from_file(fname, n_jobs, no_filter=False):  ####
     """Reads a SMILES file and returns a list of RDKIT SMILES"""
     with open(fname, 'r') as f:
         smiles = f.read().splitlines()
 
-    with Pool(n_jobs) as pool:
+    if no_filter:
+        return smiles
+    else:
+        with Pool(n_jobs) as pool:
 
-        filtered_smiles = [
-            x for x in tqdm(
-                pool.imap_unordered(filter_mol, smiles),
-                total=len(smiles),
-                miniters=100000
-            )
-            if x is not None
-        ]
-
-    print(f"{len(set(filtered_smiles))} unique SMILES retrieved")
-    return list(set(filtered_smiles))  # Ensure smiles are unique
+            filtered_smiles = [
+                x for x in tqdm(
+                    pool.imap_unordered(filter_mol, smiles),
+                    total=len(smiles),
+                    miniters=100000
+                )
+                if x is not None
+            ]
+        print(f"{len(set(filtered_smiles))} unique SMILES retrieved")
+        return list(set(filtered_smiles))  # Ensure smiles are unique
 
 
 def filter_mol(smi, max_heavy_atoms=50, min_heavy_atoms=10, element_list=[6,7,8,9,16,17,35]):
@@ -337,6 +339,10 @@ def get_args():
         help='Path to smiles file (.smi)'
     )
     parser.add_argument(
+        '--no_filter', '-nf',
+        action='store_true'
+    )
+    parser.add_argument(
         '--output', '-o',
         type=str,
         help='Path to output directory'
@@ -357,10 +363,13 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    print("Reading smiles...")
-    smiles_list = canonicalize_smiles_from_file(args.input, args.n_jobs)
-    print("Constructing vocabulary...")
-    voc_chars = construct_vocabulary(smiles_list, args.output, args.suffix)
     if not os.path.exists(args.output):
         os.makedirs(args.output)
-    write_smiles_to_file(smiles_list, os.path.join(args.output, f"reinvent_filtered_{args.suffix}.smi"))  ####
+    print("Reading smiles...")
+    smiles_list = canonicalize_smiles_from_file(args.input, args.n_jobs, no_filter=args.no_filter)
+    print("Constructing vocabulary...")
+    voc_chars = construct_vocabulary(smiles_list, args.output, args.suffix)
+    if args.no_filter:
+        write_smiles_to_file(smiles_list, os.path.join(args.output, f"reinvent_{args.suffix}.smi"))  ####
+    else:
+        write_smiles_to_file(smiles_list, os.path.join(args.output, f"reinvent_filtered_{args.suffix}.smi"))

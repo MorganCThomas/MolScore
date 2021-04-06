@@ -6,6 +6,7 @@ import rdkit
 import numpy as np
 from rdkit.Chem import rdMolDescriptors
 from rdkit import Chem
+from rdkit.Avalon import pyAvalonTools
 from rdkit import rdBase
 import joblib
 rdBase.DisableLog('rdApp.error')
@@ -49,7 +50,7 @@ class SKLearnModel:
 
             # Structural fingerprints:
             elif fp_type == "Avalon":
-                fp = rdkit.Avalon.pyAvalonTools.GetAvalonFP(mol, nBits=1024) # Avalon
+                fp = pyAvalonTools.GetAvalonFP(mol, nBits=1024) # Avalon
             elif fp_type == "MACCSkeys":
                 fp = rdkit.Chem.rdMolDescriptors.GetMACCSKeysFingerprint(mol) #MACCS Keys
             
@@ -94,13 +95,21 @@ class SKLearnModel:
 
         return results
 
+
 class EnsembleSKLearnModel(SKLearnModel):
     """
     This class loads different random seeds of a defined sklearn
     model and returns the average of the predicted values.
     """
-    def __init__(self, prefix: str, model_path: str,
-                 fp_type: str, n_jobs: int, **kwargs):
+    def __init__(self, prefix: str, model_path: os.PathLike,
+                 fp_type: str, n_jobs: int = 1, **kwargs):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param model_path: Path to pre-trained model (saved using joblib)
+        :param fp_type: 'ECFP4', 'ECFP6', 'Avalon', 'MACCSkeys', 'hashAP', 'hashTT', 'RDK5', 'RDK6', 'RDK7'
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
+        :param kwargs:
+        """
         super().__init__(prefix, model_path, 
                         fp_type, n_jobs, **kwargs)
         changing = self.model_path.split('_')

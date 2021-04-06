@@ -32,6 +32,7 @@ class MolScore:
         :param task_config: Path to task config file
         """
         # Load in json file
+        assert os.path.exists(task_config), "Configuration file doesn't exist"
         with open(task_config, "r") as f:
             configs = f.read().replace('\r', '').replace('\n', '').replace('\t', '')
         self.configs = json.loads(configs)

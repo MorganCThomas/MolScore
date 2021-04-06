@@ -13,7 +13,8 @@ from model import RNN
 from utils import decrease_learning_rate
 rdBase.DisableLog('rdApp.error')
 
-def pretrain(smi_file, voc_file, output_dir, suffix, restore_from=None):
+
+def pretrain(smi_file, voc_file, output_dir, suffix, restore_from=None, device=None):
     """Trains the Prior RNN"""
 
     # Read vocabulary from a file
@@ -24,7 +25,7 @@ def pretrain(smi_file, voc_file, output_dir, suffix, restore_from=None):
     data = DataLoader(moldata, batch_size=128, shuffle=True, drop_last=True,
                       collate_fn=MolData.collate_fn)
 
-    Prior = RNN(voc)
+    Prior = RNN(voc, device)
 
     # Can restore from a saved RNN
     if restore_from:
@@ -94,10 +95,16 @@ def get_args():
         type=str,
         help='Suffix used to name files e.g. noDRD2'
     )
+    parser.add_argument(
+        '-d', '--device',
+        type=int,
+        default=None,
+        help='GPU Device'
+    )
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_args()
-    pretrain(args.input, args.voc, args.output, args.suffix)
+    pretrain(smi_file=args.input, voc_file=args.voc, output_dir=args.output, suffix=args.suffix, device=args.device)
