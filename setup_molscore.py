@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='molscore',
     version='1.0',
-    packages=['molscore'],
+    packages=['molscore'] + ['molscore.'+p for p in find_packages(where="molscore")],
     license='MIT',
     author='Morgan Thomas',
     author_email='morganthomas263@gmail.com',
