@@ -42,6 +42,8 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
             sum_metrics.update({'Uniqueness': (sum_df['unique'] == 'true').mean()})
+            if 'passes_diversity_filter' in sum_df.columns:
+                sum_metrics.update({'Passed_diversity_filter': (sum_df['passes_diversity_filter'] == 'true').mean()})
             for metric in sum_df.columns:
                 # Anything that is a float, int besides batch_idx...
                 if (any([isinstance(sum_df[metric].values[0], dtype) for dtype in [np.int64, np.float64]])) and \
@@ -64,6 +66,8 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
             sum_metrics.update({'Uniqueness': (sum_df['unique'] == 'true').mean()})
+            if 'passes_diversity_filter' in sum_df.columns:
+                sum_metrics.update({'Passed_diversity_filter': (sum_df['passes_diversity_filter'] == 'true').mean()})
             for metric in sum_df.columns:
                 # Anything that is a float or int besides step, batch_idx, absolute_time
                 if (any([isinstance(sum_df[metric].values[0], dtype) for dtype in [np.int64, np.float64]])) and \
@@ -85,6 +89,8 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
             sum_metrics.update({'Uniqueness': (sum_df['unique'] == 'true').mean()})
+            if 'passes_diversity_filter' in sum_df.columns:
+                sum_metrics.update({'Passed_diversity_filter': (sum_df['passes_diversity_filter'] == 'true').mean()})
             for metric in sum_df.columns:
                 # Anything that is a float, int besides batch_idx...
                 if (any([isinstance(sum_df[metric].values[0], dtype) for dtype in [np.int64, np.float64]])) and \
