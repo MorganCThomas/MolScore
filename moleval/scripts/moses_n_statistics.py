@@ -78,11 +78,13 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             # Append to list per k.
             n_metrics.append(sum_metrics)
     else:
-        for i in tqdm(range(n, math.ceil(results[n_col].values[-1]/n)*n + 1, n)):
+        for i in tqdm(range(results[n_col].values[0],
+                            math.ceil(results[n_col].values[-1]/n)*n,  # original ... * n+1
+                            n)):  # original range(n, ...)
             sum_metrics = {}
-            sum_df = results[(results[n_col] >= i-n) & (results[n_col] < i)]
+            sum_df = results[(results[n_col] >= i) & (results[n_col] < i+n)]  # original >= i-n
             smiles = sum_df['smiles'].unique().tolist()
-            sum_metrics.update({'step': i})
+            sum_metrics.update({'step': i+n})
             # ------ Compute Moses metrics ------
             moses_metrics = get_moses.calculate(smiles)
             sum_metrics.update(moses_metrics)
