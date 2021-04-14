@@ -36,6 +36,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             sum_df = results[results[n_col] == i]
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'step': i})
+            sum_metrics.update({'#_smiles': len(smiles)})
             # ------ Compute Moses metrics ------
             moses_metrics = get_moses.calculate(smiles)
             sum_metrics.update(moses_metrics)
@@ -60,6 +61,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             sum_df = results[i-n:i]
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'n': i})
+            sum_metrics.update({'#_smiles': len(smiles)})
             # ------ Compute Moses metrics ------
             moses_metrics = get_moses.calculate(smiles)
             sum_metrics.update(moses_metrics)
@@ -83,6 +85,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             sum_df = results[(results[n_col] >= i-n) & (results[n_col] < i)]
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'step': i})
+            sum_metrics.update({'#_smiles': len(smiles)})
             # ------ Compute Moses metrics ------
             moses_metrics = get_moses.calculate(smiles)
             sum_metrics.update(moses_metrics)
