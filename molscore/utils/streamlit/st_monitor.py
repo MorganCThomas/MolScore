@@ -12,6 +12,7 @@ from streamlit_bokeh_events import streamlit_bokeh_events
 from molscore.utils.streamlit.SessionState import get
 
 import py3Dmol
+import parmed
 
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
@@ -39,6 +40,15 @@ if len(it_files) > 0:
         main_df = main_df.append(pd.read_csv(f, index_col=0, dtype={'valid': object,
                                                                     'unique': object,
                                                                     'passed_diversity_filter': object}))
+
+# ----- Load in dock path if available -----
+subdirectories = [x for x in os.walk(os.path.abspath(sys.argv[1]))][0][1]
+try:
+    # Find dock path
+    dock_sub = [d for d in subdirectories if 'Dock' in d][0]
+    dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
+except KeyError:
+    dock_path = None
 
 
 def update_files(path, files, df):
@@ -185,26 +195,136 @@ def display_selected_data(y, selection=None):
         return src_str
 
 
-def add_ligand(viewer, path, keepHs=False, colorscheme="orangeCarbon"):
-    if ('.sdfgz' in path) or ('.sdf.gz' in path):
-        with gzip.open(path) as rf:
-            suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
-            for i, m in enumerate(suppl):
-                if i == 0:
-                    viewer.addModel(Chem.MolToMolBlock(m), 'mol', {'keepH': keepHs})
-                    model = viewer.getModel()
-                    model.setStyle({}, {'stick': {"colorscheme": colorscheme}})  # #ED7D31 orange
-    elif '.sdf' in path:
-        viewer.addModel(open(path, 'r').read(), 'sdf', {'keepH': keepHs})
-        model = viewer.getModel()
-        model.setStyle({}, {'stick': {"colorscheme": colorscheme}})
-    elif '.pdb' in path:
-        viewer.addModel(path, 'pdb')
-        model = viewer.getModel()
-        model.setStyle({}, {'stick': {"colorscheme": colorscheme}})
+def display_selected_data2(y, selection=None, viewer=None):
+    global main_df
+    global dock_path
+
+    if selection is None:
+        return
     else:
-        st.write('Unknown format, ligand must be sdf or pdb')
-        pass
+        match_idx = selection['BOX_SELECT']['data']
+        st.write(main_df.iloc[match_idx])
+        smis = main_df.loc[match_idx, 'smiles'].tolist()
+        mols = [Chem.MolFromSmiles(smi) for smi in smis]
+        name_list = list(main_df.iloc[match_idx][y])
+        batch_list = [f"step: {step}\nbatch_index: {batch_idx}" for step, batch_idx in main_df.loc[match_idx, ['step', 'batch_idx']].values]
+        name_list = [f"{x:.02f}" if isinstance(x, float) else f"{x}" for x in name_list]
+        legends = [f"{idx}\n{y}: {name}" for idx, name in zip(batch_list, name_list)]
+        for mol, midx, legend, col in zip(mols, match_idx, legends, cycle(st.beta_columns(5))):
+            col.image(mol2png(mol))
+            col.text(legend)
+            if (dock_path is not None) and (viewer is not None):
+                show_3D = col.button(label='Show 3D', key=f'{legend}_3D_button')
+
+                if show_3D:
+                    # Grab best variants
+                    bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
+                    bv = main_df.loc[midx, bv_col]
+                    # For each best variant ..
+                    step, bidx = bv.split('_')
+                    bv_qpath = os.path.join(dock_path, step, f'{bv}*')
+                    bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
+                    viewer.add_ligand(path=bv_path)
+
+        show_all_3D = st.button('Show all 3D')
+        if show_all_3D:
+            # Grab best variants
+            bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
+            best_variants = main_df.loc[match_idx, bv_col].tolist()
+            # For each best variant ..
+            for bv in best_variants:
+                step, bidx = bv.split('_')
+                bv_qpath = os.path.join(dock_path, step, f'{bv}*')
+                bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
+                viewer.add_ligand(path=bv_path)
+    return
+
+
+class MetaViewer(py3Dmol.view):
+    def __init__(self):
+        super().__init__(width=1000, height=800)
+        self.removeAllModels()
+        self.setBackgroundColor(0x000000)
+
+        # Set simple parameters
+        self.n_ligands = 0
+        self.rec_model = None
+        self.rec_path = None
+        self.colors = list(mcolors.CSS4_COLORS.keys())
+
+    def add_receptor(self, path):
+        if '.pdb' in path:
+            self.rec_path = path
+            self.addModel(open(path, 'r').read(), 'pdb')
+            self.rec_model = self.getModel()
+            self.rec_model.setStyle({}, {'cartoon': {'color': '#44546A'}})
+
+    def add_ligand(self, path, keepHs=False, color=None):
+        if color is None:
+            color = self.colors[self.n_ligands]
+        if ('.sdfgz' in path) or ('.sdf.gz' in path):
+            with gzip.open(path) as rf:
+                suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
+                for i, m in enumerate(suppl):
+                    if i == 0:
+                        self.addModel(Chem.MolToMolBlock(m), 'mol', {'keepH': keepHs})
+                        model = self.getModel()
+                        model.setStyle({}, {'stick': {"colorscheme": f'{color}Carbon'}})  # #ED7D31 orange
+                        self.n_ligands += 1
+        elif '.sdf' in path:
+            self.addModel(open(path, 'r').read(), 'sdf', {'keepH': keepHs})
+            model = self.getModel()
+            model.setStyle({}, {'stick': {"colorscheme": f'{color}Carbon'}})
+            self.n_ligands += 1
+        elif '.pdb' in path:
+            self.addModel(path, 'pdb')
+            model = self.getModel()
+            model.setStyle({}, {'stick': {"colorscheme": f'{color}Carbon'}})
+            self.n_ligands += 1
+        else:
+            st.write('Unknown format, ligand must be sdf or pdb')
+
+    def add_surface(self, surface):
+        rec = {'resn': ["AQD", "UNL"], 'invert': 1}
+        if surface is not None:
+            if surface == 'VDW':
+                self.addSurface(py3Dmol.VDW, {'opacity': 0.75, 'color': 'white'}, rec)
+            if surface == 'MS':
+                self.addSurface(py3Dmol.MS, {'opacity': 0.75, 'color': 'white'}, rec)
+            if surface == 'SAS':
+                self.addSurface(py3Dmol.SAS, {'opacity': 0.75, 'color': 'white'}, rec)
+            if surface == 'SES':
+                self.addSurface(py3Dmol.SES, {'opacity': 0.75, 'color': 'white'}, rec)
+
+    def label_receptor(self):
+        structure = parmed.read_PDB(self.rec_path)
+        self.addResLabels({'resi': [n.number for n in structure.residues]},
+                          {'font': 'Arial', 'fontColor': 'white', 'showBackground': 'false',
+                           'fontSize': 10})
+
+    def get_residues(self):
+        if self.rec_path is not None:
+            structure = parmed.read_PDB(self.rec_path)
+            return [r.number for r in structure.residues]
+        else:
+            return []
+
+    def show_residue(self, number):
+        self.rec_model.setStyle({'resi': number}, {'stick': {'colorscheme': 'darkslategrayCarbon'}})
+
+    def render2st(self):
+        # ----- render -----
+        #self.zoomTo({'model': -1})  # Zoom to last model
+        self.zoomTo()
+        self.render()
+
+        t = self.js()
+        f = open('viz.html', 'w')
+        f.write(t.startjs)
+        f.write(t.endjs)
+        f.close()
+
+        st.components.v1.html(open('viz.html', 'r').read(), width=1200, height=800)
 
 
 def main():
@@ -212,13 +332,15 @@ def main():
     global main_df
     global it_path
     global it_files
+    global dock_path
+
     st.sidebar.title('MolScore')
     st.sidebar.header(f"Run: {main_df['model'].values[0]}-{main_df['task'].values[0]}")
     if st.sidebar.button('Update'):
         main_df, it_files = update_files(it_path, it_files, main_df)
 
     # Radio buttons for navigation
-    nav = st.sidebar.radio(label='Navigation', options=['Main', 'Scaffold memory', '3D'])
+    nav = st.sidebar.radio(label='Navigation', options=['Main', 'Scaffold memory'])
 
     # ----- Main page -----
     if nav == 'Main':
@@ -232,13 +354,52 @@ def main():
                 override_height=None,
                 debounce_time=0)
 
+        mviewer = MetaViewer()
+
         st.subheader('Selected structures')
-        st.image(display_selected_data(y=y_axis, selection=selection))
+        #st.image(display_selected_data(y=y_axis, selection=selection))
+        display_selected_data2(y=y_axis, selection=selection, viewer=mviewer)
+
+        st.subheader('Selected 3D poses')
+        # ---- User options -----
+        col1, col2 = st.beta_columns(2)
+        input_structure_ss = get(key='input_structure', input_path='./', ref_path='./')
+        input_structure_ss.input_path = st_file_selector(label='Input structure',
+                                                         st_placeholder=col1.empty(),
+                                                         path=input_structure_ss.input_path,
+                                                         key='input_structure')
+        input_structure = input_structure_ss.input_path
+        col1.write(f"Selected: {input_structure}")
+        mviewer.add_receptor(path=input_structure)
+
+        input_structure_ss.ref_path = st_file_selector(label='Reference ligand',
+                                                       st_placeholder=col2.empty(),
+                                                       path=input_structure_ss.ref_path,
+                                                       key='reference_ligand')
+        ref_path = input_structure_ss.ref_path
+        col2.write(f"Selected: {ref_path}")
+
+        col1, col2, col3 = st.beta_columns(3)
+        surface = col1.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'])
+        mviewer.add_surface(surface)
+        show_residue_labels = col2.selectbox(label='Label residues', options=[True, False], index=1)
+        if show_residue_labels:
+            mviewer.label_receptor()
+        show_residues = col3.multiselect(label='Show residues', options=mviewer.get_residues())
+        _ = [mviewer.show_residue(r) for r in show_residues]
+
+        mviewer.add_ligand(path=ref_path, color='orange')
+
+        mviewer.render2st()
 
     # ----- Scaffold memory page ----
     if nav == 'Scaffold memory':
         memory_path = os.path.join(os.path.abspath(sys.argv[1]), 'scaffold_memory.csv')
         if os.path.exists(memory_path):
+
+            if dock_path is not None:
+                mviewer = MetaViewer()
+
             memory = pd.read_csv(memory_path)
             memory_list = []
             max_score = 0
@@ -312,117 +473,81 @@ def main():
             show_no = st.number_input(label='Number to show', value=20, step=5)
             for cluster, column in zip(memory_list[:show_no], cycle(st.beta_columns(5))):
                 column.image(mol2png(Chem.MolFromSmiles(cluster['centroid'])))
-                column.text(f"Cluster size: {len(cluster['members'])}")
-                column.text(f"Mean score: {np.mean(cluster['score']):.02f}")
-                column.text(f"Mean step: {np.mean(cluster['step']):.02f}")
+                column.text(f"Cluster size: {len(cluster['members'])}\n"
+                            f"Mean score: {np.mean(cluster['score']):.02f}\n"
+                            f"Mean step: {np.mean(cluster['step']):.02f}")
+                memory_ss = get(key='memory', expand=False)
                 expand = column.button(label='Expand', key=cluster['centroid'] + '_expand')
-                if expand:
+                collapse = column.button(label='Collapse', key=cluster['centroid'] + '_collapse')
+                if collapse:
+                    memory_ss.expand = False
+                if expand or memory_ss.expand:
+                    memory_ss.expand = True
                     with st.beta_container():
                         st.subheader('Cluster members')
-                        collapse = st.button(label='Collapse', key=cluster['centroid'] + '_collapse')
-                        if collapse:
-                            expand = False
                         for i, (m, column2) in enumerate(zip(cluster['members'], cycle(st.beta_columns(5)))):
                             column2.image(mol2png(Chem.MolFromSmiles(m)))
-                            column2.text(f"Score: {cluster['score'][i]:.02f}")
-                            column2.text(f"Step: {cluster['step'][i]}")
+                            column2.text(f"Score: {cluster['score'][i]:.02f}\n"
+                                         f"Step: {cluster['step'][i]}")
+                            if dock_path is not None:
+                                show_3D = column2.button('Show 3D', key=f'{i}_{m}')
+                                if show_3D:
+                                    # Grab best variants
+                                    bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
+                                    bv = main_df.loc[main_df.smiles == m, bv_col].tolist()[0] # First instance shld be it
+                                    # For each best variant ..
+                                    step, bidx = bv.split('_')
+                                    bv_qpath = os.path.join(dock_path, step, f'{bv}*')
+                                    bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
+                                    mviewer.add_ligand(path=bv_path)
+
+                        if dock_path is not None:
+                            show_all_3D = st.button('Show all 3D', key='Memory_all')
+                            if show_all_3D:
+                                # Grab best variants
+                                bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
+                                best_variants = main_df.loc[main_df.smiles.isin(cluster['members']),
+                                                            bv_col].drop_duplicates().tolist()
+                                # For each best variant ..
+                                for bv in best_variants:
+                                    step, bidx = bv.split('_')
+                                    bv_qpath = os.path.join(dock_path, step, f'{bv}*')
+                                    bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
+                                    mviewer.add_ligand(path=bv_path)
                         break
 
-    # ----- 3D docked pose -----
-    if nav == '3D':
-        input_structure_ss = get(key='input_structure', input_path='./', ref_path='./')
-        input_structure_ss.input_path = st_file_selector(label='Input structure',
-                                                         st_placeholder=st.empty(),
-                                                         path=input_structure_ss.input_path,
-                                                         key='input_structure')
-        input_structure = input_structure_ss.input_path
-        st.write(f"Selected: {input_structure}")
+            if dock_path is not None:
+                st.subheader('Selected 3D poses')
+                # ---- User options -----
+                col1, col2 = st.beta_columns(2)
+                input_structure_ss = get(key='input_structure', input_path='./', ref_path='./')
+                input_structure_ss.input_path = st_file_selector(label='Input structure',
+                                                                 st_placeholder=col1.empty(),
+                                                                 path=input_structure_ss.input_path,
+                                                                 key='input_structure')
+                input_structure = input_structure_ss.input_path
+                col1.write(f"Selected: {input_structure}")
+                mviewer.add_receptor(path=input_structure)
 
-        input_structure_ss.ref_path = st_file_selector(label='Reference ligand',
-                                                       st_placeholder=st.empty(),
-                                                       path=input_structure_ss.ref_path,
-                                                       key='reference_ligand')
-        ref_path = input_structure_ss.ref_path
-        st.write(f"Selected: {ref_path}")
+                input_structure_ss.ref_path = st_file_selector(label='Reference ligand',
+                                                               st_placeholder=col2.empty(),
+                                                               path=input_structure_ss.ref_path,
+                                                               key='reference_ligand')
+                ref_path = input_structure_ss.ref_path
+                col2.write(f"Selected: {ref_path}")
 
-        if (os.path.exists(input_structure)) and ('.pdb' in os.path.basename(input_structure)):
-            # ---- Show plot to allow selection ----
-            y_axis = st.sidebar.selectbox('Plot y-axis', main_df.columns.tolist(), index=6)
-            p = bokeh_plot(y_axis)
-            selection = streamlit_bokeh_events(
-                bokeh_plot=p,
-                events="BOX_SELECT",
-                key="main",
-                refresh_on_update=True,
-                override_height=None,
-                debounce_time=0)
-            if selection is not None:
-                match_idx = selection['BOX_SELECT']['data']
-                st.write(main_df.iloc[match_idx])
+                col1, col2, col3 = st.beta_columns(3)
+                surface = col1.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'])
+                mviewer.add_surface(surface)
+                show_residue_labels = col2.selectbox(label='Label residues', options=[True, False], index=1)
+                if show_residue_labels:
+                    mviewer.label_receptor()
+                show_residues = col3.multiselect(label='Show residues', options=mviewer.get_residues())
+                _ = [mviewer.show_residue(r) for r in show_residues]
 
-            # ---- User options -----
-            st.subheader('User options')
-            surface = st.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'])
+                mviewer.add_ligand(path=ref_path, color='orange')
 
-            # ---- Set up viewer -----
-            viewer = py3Dmol.view(width=1000, height=800)
-            viewer.removeAllModels()
-            viewer.setBackgroundColor(0x000000)
-            #viewer.setCameraParameters({'fov': '50', 'z': 150});
-
-            # ---- receptor ----
-            viewer.addModel(open(input_structure, 'r').read(), 'pdb')
-            rec_model = viewer.getModel()
-            rec = {'resn': ["AQD", "UNL"], 'invert': 1}
-            rec_model.setStyle({}, {'cartoon': {'color': '#44546A'}})
-            rec_model.addResLabels({'res': [i for i in range(100, 110)]}, {'fontcolor': 'white'})
-            if surface is not None:
-                if surface == 'VDW':
-                    viewer.addSurface(py3Dmol.VDW, {'opacity': 0.75, 'color': 'white'}, rec)
-                if surface == 'MS':
-                    viewer.addSurface(py3Dmol.MS, {'opacity': 0.75, 'color': 'white'}, rec)
-                if surface == 'SAS':
-                    viewer.addSurface(py3Dmol.SAS, {'opacity': 0.75, 'color': 'white'}, rec)
-                if surface == 'SES':
-                    viewer.addSurface(py3Dmol.SES, {'opacity': 0.75, 'color': 'white'}, rec)
-
-            # ----- ref ligand -----
-            add_ligand(viewer=viewer, path=ref_path)
-
-            # ----- Add selected -----
-            if selection is not None:
-                match_idx = selection['BOX_SELECT']['data']
-                subdirectories = [x for x in os.walk(os.path.abspath(sys.argv[1]))][0][1]
-                try:
-                    # Find dock path
-                    dock_sub = [d for d in subdirectories if 'Dock' in d][0]
-                    dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
-                    # Grab best variants
-                    bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-                    best_variants = main_df.loc[match_idx, bv_col].tolist()
-                    # For each best variant ..
-                    for bv, c in zip(best_variants, cycle(mcolors.CSS4_COLORS.keys())):
-                        step, bidx = bv.split('_')
-                        bv_qpath = os.path.join(dock_path, step, f'{bv}*')
-                        bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
-                        add_ligand(viewer, path=bv_path, colorscheme=f"{c}Carbon")
-
-                except IndexError:
-                    st.write('No subdirectory containing \'Dock\' found')
-
-            # ----- render -----
-            viewer.zoomTo({'model': 1})  # Zoom to last model
-            viewer.render()
-
-            t = viewer.js()
-            f = open('viz.html', 'w')
-            f.write(t.startjs)
-            f.write(t.endjs)
-            f.close()
-
-            st.components.v1.html(open('viz.html', 'r').read(), width=1200, height=800)
-        else:
-            st.write('No receptor file found')
+                mviewer.render2st()
 
 
 if __name__ == '__main__':
