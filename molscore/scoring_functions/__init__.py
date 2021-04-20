@@ -8,6 +8,7 @@ from molscore.scoring_functions.descriptors import RDKitDescriptors
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
 from molscore.scoring_functions.substructure_match import SubstructureMatch
 from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLearnModel
+from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 
 all_scoring_functions = [
     ROCS,
@@ -20,5 +21,6 @@ all_scoring_functions = [
     SubstructureFilters,
     SubstructureMatch,
     SKLearnModel,
-    EnsembleSKLearnModel
+    EnsembleSKLearnModel,
+    RAScore_XGB
 ]
