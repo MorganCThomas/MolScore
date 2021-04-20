@@ -226,7 +226,10 @@ def get_mol(smiles_or_mol):
         except ValueError:
             return None
         return mol
-    return smiles_or_mol
+    elif isinstance(smiles_or_mol, Chem.rdchem.Mol):
+        return smiles_or_mol
+    else:
+        return None
 
 
 class StringDataset:
