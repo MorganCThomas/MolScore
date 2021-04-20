@@ -9,5 +9,6 @@ setup(
     author_email='morganthomas263@gmail.com',
     description='A scoring framework for goal directed generative models',
     include_package_data=True,
-    package_data={'molscore': ['test/data/sample.smi']},
+    package_data={'molscore': ['data/sample.smi',
+                               'data/models/RAScore/*/*.pkl']},
 )

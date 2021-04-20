@@ -30,6 +30,7 @@ dependencies:
   - streamlit
   - bokeh=2.2
   - py3dmol
+  - xgboost
   - pip:
       - importlib-resources
       - streamlit-bokeh-events
