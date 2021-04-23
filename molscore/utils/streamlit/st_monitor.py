@@ -3,7 +3,7 @@ import os
 import gzip
 import pandas as pd
 import numpy as np
-from itertools import cycle
+from itertools import cycle, chain
 from glob import glob
 import matplotlib.colors as mcolors
 
@@ -240,6 +240,30 @@ def display_selected_data2(y, selection=None, viewer=None):
     return
 
 
+def save_sdf(mol_paths, mol_names, out_name=''):
+    # Setup writer
+    out_file = os.path.join(os.path.abspath(sys.argv[1]), f'{out_name}.sdf')
+    writer = AllChem.SDWriter(out_file)
+
+    for path, name in zip(mol_paths, mol_names):
+        if ('.sdfgz' in path) or ('.sdf.gz' in path):
+            with gzip.open(path) as rf:
+                suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
+                mol = suppl.__next__() # Grab first mol
+                mol.SetProp('_Name', name)
+                writer.write(mol)
+        elif '.sdf' in path:
+            with open(path) as rf:
+                suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
+                mol = suppl.__next__()
+                mol.SetProp('_Name', name)
+                writer.write(mol)
+    writer.flush()
+    writer.close()
+    #st.write(f'Saved to: {out_file}')
+    return
+
+
 class MetaViewer(py3Dmol.view):
     def __init__(self):
         super().__init__(width=1000, height=800)
@@ -356,10 +380,26 @@ def main():
 
         mviewer = MetaViewer()
 
+        # ----- Show selected data -----
         st.subheader('Selected structures')
-        #st.image(display_selected_data(y=y_axis, selection=selection))
         display_selected_data2(y=y_axis, selection=selection, viewer=mviewer)
+        # ----- Add option to save sdf -----
+        if (dock_path is not None) and (selection is not None):
+            with st.beta_expander(label='Save selected'):
+                # User input
+                out_file = st.text_input(label='File name')
+                st.write(f'File name: {out_file}.sdf')
+                save_all_selected = st.button(label='Save', key='save_all_selected')
+                # Get best variants
+                bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
+                best_variants = main_df.loc[selection['BOX_SELECT']['data'], bv_col].drop_duplicates().tolist()
+                file_paths = [glob(os.path.join(dock_path, bv.split('_')[0], f'{bv}*'))[0] for bv in best_variants]
+                mol_names = [f'Mol: {bv}' for bv in best_variants]
+                save_sdf(mol_paths=file_paths,
+                         mol_names=mol_names,
+                         out_name=out_file)
 
+        # ----- Show 3D poses -----
         st.subheader('Selected 3D poses')
         # ---- User options -----
         col1, col2 = st.beta_columns(2)
@@ -468,29 +508,29 @@ def main():
                       source=hist_source)
             st.bokeh_chart(hist)
 
-            # Plot first 20 centroids
+            # ----- Plot first 20 centroids -----
             st.subheader('Cluster centroids (may be a scaffold)')
             show_no = st.number_input(label='Number to show', value=20, step=5)
-            for cluster, column in zip(memory_list[:show_no], cycle(st.beta_columns(5))):
+            for i, (cluster, column) in enumerate(zip(memory_list[:show_no], cycle(st.beta_columns(5)))):
                 column.image(mol2png(Chem.MolFromSmiles(cluster['centroid'])))
                 column.text(f"Cluster size: {len(cluster['members'])}\n"
                             f"Mean score: {np.mean(cluster['score']):.02f}\n"
                             f"Mean step: {np.mean(cluster['step']):.02f}")
-                memory_ss = get(key='memory', expand=False)
+                memory_ss = get(key='memory', expand=None)
                 expand = column.button(label='Expand', key=cluster['centroid'] + '_expand')
                 collapse = column.button(label='Collapse', key=cluster['centroid'] + '_collapse')
                 if collapse:
-                    memory_ss.expand = False
-                if expand or memory_ss.expand:
-                    memory_ss.expand = True
+                    memory_ss.expand = None
+                if expand or memory_ss.expand == i:
+                    memory_ss.expand = i
                     with st.beta_container():
                         st.subheader('Cluster members')
-                        for i, (m, column2) in enumerate(zip(cluster['members'], cycle(st.beta_columns(5)))):
+                        for j, (m, column2) in enumerate(zip(cluster['members'], cycle(st.beta_columns(5)))):
                             column2.image(mol2png(Chem.MolFromSmiles(m)))
-                            column2.text(f"Score: {cluster['score'][i]:.02f}\n"
-                                         f"Step: {cluster['step'][i]}")
+                            column2.text(f"Score: {cluster['score'][j]:.02f}\n"
+                                         f"Step: {cluster['step'][j]}")
                             if dock_path is not None:
-                                show_3D = column2.button('Show 3D', key=f'{i}_{m}')
+                                show_3D = column2.button('Show 3D', key=f'{j}_{m}')
                                 if show_3D:
                                     # Grab best variants
                                     bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
@@ -515,7 +555,31 @@ def main():
                                     bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
                                     mviewer.add_ligand(path=bv_path)
                         break
+            # ----- Option to save sdf -----
+            if not expand:
+                with st.beta_expander(label='Save selected'):
+                    out_file = st.text_input(label='File name')
+                    st.write(f'File name: {out_file}.sdf')
+                    save_all_clusters = st.button(label='Save', key='save_all_clusters')
+                    if save_all_clusters:
+                        file_paths = []
+                        mol_names = []
+                        for cluster in memory_list[:show_no]:
+                            # Grab best variants
+                            bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
+                            best_variants = main_df.loc[main_df.smiles.isin(cluster['members']),
+                                                        bv_col].drop_duplicates().tolist()
+                            # For each best variant grab file path ...
+                            for bv in best_variants:
+                                step, bidx = bv.split('_')
+                                bv_qpath = os.path.join(dock_path, step, f'{bv}*')
+                                file_paths.append(glob(bv_qpath)[0])  # Return first (should be only) hit
+                                mol_names.append(f'ClusterCentroid:{best_variants[0]} - Mol:{bv}')
+                        save_sdf(mol_paths=file_paths,
+                                 mol_names=mol_names,
+                                 out_name=out_file)
 
+            # ----- Show 3D poses -----
             if dock_path is not None:
                 st.subheader('Selected 3D poses')
                 # ---- User options -----
@@ -548,6 +612,10 @@ def main():
                 mviewer.add_ligand(path=ref_path, color='orange')
 
                 mviewer.render2st()
+
+    exit = st.sidebar.button('Exit')
+    if exit:
+        os._exit(0)
 
 
 if __name__ == '__main__':
