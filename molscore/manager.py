@@ -520,7 +520,7 @@ class MolScore:
             logger.info(f'    MolScore elapsed time: {time.time() - batch_start:.02f}s')
 
             # Write out memory intermittently
-            if step % 5 == 0:
+            if self.step % 5 == 0:
                 if self.diversity_filter is not None:
                     self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
 
