@@ -5,6 +5,7 @@ import json
 import logging
 import numpy as np
 import subprocess
+import inspect
 
 import molscore.scoring_functions as scoring_functions
 from molscore import utils
@@ -364,6 +365,42 @@ class MolScore:
 
         return self
 
+    def _write_attributes(self):
+        dir = os.path.join(self.save_dir, 'molscore_attributes')
+        os.makedirs(dir)
+        prims = {}
+        # If list, dict or csv write to appropriate format
+        for k, v in self.__dict__.items():
+            if k == 'fh':
+                continue
+            # Convert class to string
+            elif k == 'scoring_functions':
+                with open(os.path.join(dir, k), 'wt') as f:
+                    nv = [str(i.__class__) for i in v]
+                    json.dump(nv, f)
+            # Convert functions to string
+            elif k == 'diversity_filter':
+                prims.update({k: v.__class__})
+            elif k == 'modifier_functions':
+                continue
+            elif k == 'mpo_method':
+                prims.update({k: str(v.__name__)})
+            # Else do it on type
+            elif isinstance(v, (list, dict)):
+                with open(os.path.join(dir, k), 'wt') as f:
+                    json.dump(v, f)
+            elif isinstance(v, pd.core.frame.DataFrame):
+                with open(os.path.join(dir, k), 'wt') as f:
+                    v.to_csv(f)
+            else:
+                prims.update({k: v})
+
+        # Else write everything else to text
+        with open(os.path.join(dir, 'single_attributes.txt'), 'wt') as f:
+            _ = [f.write(f'{k}: {v}\n')
+                 for k, v in prims.items()]
+        return
+
     def run_dash_monitor(self):
         """
         Run Dash Monitor.
@@ -520,7 +557,7 @@ class MolScore:
             logger.info(f'    MolScore elapsed time: {time.time() - batch_start:.02f}s')
 
             # Write out memory intermittently
-            if step % 5 == 0:
+            if self.step % 5 == 0:
                 if self.diversity_filter is not None:
                     self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
 
