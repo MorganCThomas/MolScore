@@ -5,6 +5,7 @@ import json
 import logging
 import numpy as np
 import subprocess
+import inspect
 
 import molscore.scoring_functions as scoring_functions
 from molscore import utils
@@ -363,6 +364,42 @@ class MolScore:
         self.fh.close()
 
         return self
+
+    def _write_attributes(self):
+        dir = os.path.join(self.save_dir, 'molscore_attributes')
+        os.makedirs(dir)
+        prims = {}
+        # If list, dict or csv write to appropriate format
+        for k, v in self.__dict__.items():
+            if k == 'fh':
+                continue
+            # Convert class to string
+            elif k == 'scoring_functions':
+                with open(os.path.join(dir, k), 'wt') as f:
+                    nv = [str(i.__class__) for i in v]
+                    json.dump(nv, f)
+            # Convert functions to string
+            elif k == 'diversity_filter':
+                prims.update({k: v.__class__})
+            elif k == 'modifier_functions':
+                continue
+            elif k == 'mpo_method':
+                prims.update({k: str(v.__name__)})
+            # Else do it on type
+            elif isinstance(v, (list, dict)):
+                with open(os.path.join(dir, k), 'wt') as f:
+                    json.dump(v, f)
+            elif isinstance(v, pd.core.frame.DataFrame):
+                with open(os.path.join(dir, k), 'wt') as f:
+                    v.to_csv(f)
+            else:
+                prims.update({k: v})
+
+        # Else write everything else to text
+        with open(os.path.join(dir, 'single_attributes.txt'), 'wt') as f:
+            _ = [f.write(f'{k}: {v}\n')
+                 for k, v in prims.items()]
+        return
 
     def run_dash_monitor(self):
         """
