@@ -1,0 +1,1 @@
+{"accuracy": "0.89", "balanced_accuracy_score": "0.84", "f1_score": "0.77", "matthews_corrcoef": "0.7", "precision_score": "0.81", "average_precision": "0.87", "recall_score": "0.73", "roc_auc": "0.94"}

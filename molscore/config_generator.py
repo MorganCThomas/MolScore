@@ -13,8 +13,6 @@ import molscore.scoring_functions as scoring_functions
 ss = get(key='ss', input_path='configs', n_sf=1, n_sp=1, maxmin=False)
 
 # Functions
-
-
 def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...'):
     # get base path (directory)
     base_path = '.' if path is None or path is '' else path
@@ -241,13 +239,12 @@ config = {}
 
 # ------ Basic information ------
 config['task'] = st.text_input(label='Task name (for file naming)', value='QED').strip().replace(' ', '_')
-config['output_dir'] = st.text_input(label='Output directory', value='./molscore_results')
+config['output_dir'] = os.path.abspath(st.text_input(label='Output directory', value='./molscore_results'))
+st.write(f"Selected: {config['output_dir']}")
 config['load_from_previous'] = st.selectbox(label='Continue from previous directory', options=[True, False], index=1)
 if config['load_from_previous']:
     col1, col2 = st.beta_columns([1, 9])
     with col2:
-        #setattr(ss, 'previous_dir', '.')  # Set SessionState attributes
-        #st.script_runner.RerunException(None)
         previous_dir_ss = get(key='previous_dir', input_path='configs')
         previous_dir_ss.input_path = st_file_selector(label='Select a previously used folder',
                                                     st_placeholder=st.empty(),
@@ -365,8 +362,3 @@ with col1:
 with col2:
     if st.button(label='Exit'):
         os._exit(0)
-        #try:
-        #    sys.exit()
-        #except SystemExit as se:
-        #    if se.code != 0:
-        #        raise

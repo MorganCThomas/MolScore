@@ -19,7 +19,7 @@ class MockGenerator:
         :param augment_duplicates: Forcefully augment duplicates by copying certain SMILES strings
         """
         if smi_file is None:
-            with resources.open_text('molscore.test.data', 'sample.smi') as f:
+            with resources.open_text('molscore.data', 'sample.smi') as f:
                 self.smiles = f.read().splitlines()
         else:
             with open(smi_file, 'r') as f:

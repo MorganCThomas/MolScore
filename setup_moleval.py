@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='moleval',
     version='1.0',
-    packages=['moleval'],
+    packages=['moleval'] + ['moleval.'+p for p in find_packages(where="moleval")],
     license='MIT',
     author='Morgan Thomas',
     author_email='morganthomas263@gmail.com',
