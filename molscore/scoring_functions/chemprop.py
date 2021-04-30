@@ -14,6 +14,8 @@ class ChemPropModel:
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model
+        :param no_cuda: Whether to use cuda
+        :param device: Which gpu device to use (if using cuda)
         :param kwargs:
         """
         self.prefix = prefix
