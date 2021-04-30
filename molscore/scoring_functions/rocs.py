@@ -92,7 +92,7 @@ class ROCS:
         for smi in smiles:
             result = {'smiles': smi}
 
-            if Chem.MolFromsmiles(smi):
+            if Chem.MolFromSmiles(smi):
                 try:
                     self.setup_smi(smi)
                     self.run_omega()
