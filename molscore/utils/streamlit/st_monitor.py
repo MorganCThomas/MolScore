@@ -45,7 +45,7 @@ if len(it_files) > 0:
 subdirectories = [x for x in os.walk(os.path.abspath(sys.argv[1]))][0][1]
 try:
     # Find dock path
-    dock_sub = [d for d in subdirectories if 'Dock' in d][0]
+    dock_sub = [d for d in subdirectories if ('Dock' in d) or ('ROCS' in d)][0]
     dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
 except KeyError:
     dock_path = None
@@ -338,8 +338,8 @@ class MetaViewer(py3Dmol.view):
 
     def render2st(self):
         # ----- render -----
-        #self.zoomTo({'model': -1})  # Zoom to last model
-        self.zoomTo()
+        self.zoomTo({'model': -1})  # Zoom to last model
+        #self.zoomTo()
         self.render()
 
         t = self.js()
