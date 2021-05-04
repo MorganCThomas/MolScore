@@ -120,6 +120,7 @@ class ROCS:
                     ofs = oechem.oemolostream()
                     if ofs.open(os.path.join(self.directory, f'{file}.sdf.gz')):
                         oechem.OEWriteMolecule(ofs, self.best_overlay)
+                        result.update({f'{self.prefix}_best_conformer': file})
 
                 except:
                     logger.debug(f'{smi}: Can\'t process molecule')
