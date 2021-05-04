@@ -218,26 +218,38 @@ def display_selected_data2(y, selection=None, viewer=None):
 
                 if show_3D:
                     # Grab best variants
-                    bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-                    bv = main_df.loc[midx, bv_col]
-                    # For each best variant ..
-                    step, bidx = bv.split('_')
-                    bv_qpath = os.path.join(dock_path, step, f'{bv}*')
-                    bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
-                    viewer.add_ligand(path=bv_path)
+                    file_paths, _ = find_sdfs([midx])
+                    viewer.add_ligand(path=file_paths[0])
 
         show_all_3D = st.button('Show all 3D')
         if show_all_3D:
-            # Grab best variants
-            bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-            best_variants = main_df.loc[match_idx, bv_col].tolist()
-            # For each best variant ..
-            for bv in best_variants:
-                step, bidx = bv.split('_')
-                bv_qpath = os.path.join(dock_path, step, f'{bv}*')
-                bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
-                viewer.add_ligand(path=bv_path)
+            file_paths, _ = find_sdfs(match_idx)
+            for p in file_paths:
+                viewer.add_ligand(path=p)
     return
+
+
+def find_sdfs(match_idxs):
+    global main_df
+    global dock_path
+    # Drop duplicate smiles
+    sel_smiles = main_df.loc[match_idxs, 'smiles'].drop_duplicates().tolist()
+    # Find first (potentially non-matching idx of first recorded unique smiles)
+    first_idxs = []
+    for smi in sel_smiles:
+        first_idx = main_df.loc[
+            main_df['smiles'] == smi,
+            ['step', 'batch_idx']].drop_duplicates().to_records(index=False)
+        first_idxs.append(first_idx[0])
+
+    # List names of matching index (drop duplicate smiles in selection)
+    idx_names = main_df.loc[
+        match_idxs,
+        ['smiles', 'step', 'batch_idx']].drop_duplicates(subset=['smiles']).to_records(index=False)
+
+    file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}*sdf*'))[0] for s, b in first_idxs]
+
+    return file_paths, [f'Mol: {s}_{b}' for _, s, b in idx_names]
 
 
 def save_sdf(mol_paths, mol_names, out_name=''):
@@ -390,14 +402,11 @@ def main():
                 out_file = st.text_input(label='File name')
                 st.write(f'File name: {out_file}.sdf')
                 save_all_selected = st.button(label='Save', key='save_all_selected')
-                # Get best variants
-                bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-                best_variants = main_df.loc[selection['BOX_SELECT']['data'], bv_col].drop_duplicates().tolist()
-                file_paths = [glob(os.path.join(dock_path, bv.split('_')[0], f'{bv}*'))[0] for bv in best_variants]
-                mol_names = [f'Mol: {bv}' for bv in best_variants]
-                save_sdf(mol_paths=file_paths,
-                         mol_names=mol_names,
-                         out_name=out_file)
+                if save_all_selected:
+                    file_paths, mol_names = find_sdfs(selection['BOX_SELECT']['data'])
+                    save_sdf(mol_paths=file_paths,
+                             mol_names=mol_names,
+                             out_name=out_file)
 
         # ----- Show 3D poses -----
         st.subheader('Selected 3D poses')
@@ -532,28 +541,17 @@ def main():
                             if dock_path is not None:
                                 show_3D = column2.button('Show 3D', key=f'{j}_{m}')
                                 if show_3D:
-                                    # Grab best variants
-                                    bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-                                    bv = main_df.loc[main_df.smiles == m, bv_col].tolist()[0] # First instance shld be it
-                                    # For each best variant ..
-                                    step, bidx = bv.split('_')
-                                    bv_qpath = os.path.join(dock_path, step, f'{bv}*')
-                                    bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
-                                    mviewer.add_ligand(path=bv_path)
+                                    match_idx = main_df.index[main_df.smiles == m].tolist()
+                                    paths, names = find_sdfs(match_idx)
+                                    mviewer.add_ligand(path=paths[0])
 
                         if dock_path is not None:
                             show_all_3D = st.button('Show all 3D', key='Memory_all')
                             if show_all_3D:
-                                # Grab best variants
-                                bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-                                best_variants = main_df.loc[main_df.smiles.isin(cluster['members']),
-                                                            bv_col].drop_duplicates().tolist()
-                                # For each best variant ..
-                                for bv in best_variants:
-                                    step, bidx = bv.split('_')
-                                    bv_qpath = os.path.join(dock_path, step, f'{bv}*')
-                                    bv_path = glob(bv_qpath)[0]  # Return first (should be only) hit
-                                    mviewer.add_ligand(path=bv_path)
+                                match_idx = main_df.index[main_df.smiles.isin(cluster['members'])].tolist()
+                                paths, names = find_sdfs(match_idx)
+                                for p in paths:
+                                    mviewer.add_ligand(path=p)
                         break
             # ----- Option to save sdf -----
             if not expand:
@@ -565,16 +563,11 @@ def main():
                         file_paths = []
                         mol_names = []
                         for cluster in memory_list[:show_no]:
-                            # Grab best variants
-                            bv_col = [c for c in main_df.columns if 'best_variant' in c][0]
-                            best_variants = main_df.loc[main_df.smiles.isin(cluster['members']),
-                                                        bv_col].drop_duplicates().tolist()
-                            # For each best variant grab file path ...
-                            for bv in best_variants:
-                                step, bidx = bv.split('_')
-                                bv_qpath = os.path.join(dock_path, step, f'{bv}*')
-                                file_paths.append(glob(bv_qpath)[0])  # Return first (should be only) hit
-                                mol_names.append(f'ClusterCentroid:{best_variants[0]} - Mol:{bv}')
+                            match_idx = main_df.index[main_df.smiles.isin(cluster['members'])].tolist()
+                            paths, names = find_sdfs(match_idx)
+                            file_paths += paths
+                            names = [f'ClusterCentroid: {names[0].split(":")[1]} - {n}' for n in names]
+                            mol_names += names
                         save_sdf(mol_paths=file_paths,
                                  mol_names=mol_names,
                                  out_name=out_file)
