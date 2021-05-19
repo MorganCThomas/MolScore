@@ -32,7 +32,7 @@ class SKLearnModel:
         self.prefix = prefix.replace(" ", "_")
         self.model_path = model_path
         self.fp_type = fp_type
-        self.nBits = nBits
+        self.nBits = int(nBits)
         self.n_jobs = n_jobs
 
         # Load in model and assign to attribute
