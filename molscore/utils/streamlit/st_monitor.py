@@ -30,25 +30,33 @@ st.set_page_config(
      initial_sidebar_state="expanded",
 )
 
+
 # ----- Load in iterations files -----
-it_path = os.path.join(os.path.abspath(sys.argv[1]), 'iterations')
-it_files = glob(os.path.join(it_path, '*.csv'))
-main_df = pd.DataFrame()
-if len(it_files) > 0:
-    it_files = sorted(it_files)
-    for f in it_files:
-        main_df = main_df.append(pd.read_csv(f, index_col=0, dtype={'valid': object,
-                                                                    'unique': object,
-                                                                    'passed_diversity_filter': object}))
+@st.cache(allow_output_mutation=True)
+def load_iterations(it_path):
+    it_path = os.path.join(os.path.abspath(sys.argv[1]), 'iterations')
+    it_files = glob(os.path.join(it_path, '*.csv'))
+    main_df = pd.DataFrame()
+    if len(it_files) > 0:
+        it_files = sorted(it_files)
+        for f in it_files:
+            main_df = main_df.append(pd.read_csv(f, index_col=0, dtype={'valid': object,
+                                                                        'unique': object,
+                                                                        'passed_diversity_filter': object}))
+    return main_df, it_files
+
 
 # ----- Load in dock path if available -----
-subdirectories = [x for x in os.walk(os.path.abspath(sys.argv[1]))][0][1]
-try:
-    # Find dock path
-    dock_sub = [d for d in subdirectories if ('Dock' in d) or ('ROCS' in d)][0]
-    dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
-except KeyError:
-    dock_path = None
+@st.cache
+def check_dock_paths(path):
+    subdirectories = [x for x in os.walk(os.path.abspath(path))][0][1]
+    try:
+        # Find dock path
+        dock_sub = [d for d in subdirectories if ('Dock' in d) or ('ROCS' in d)][0]
+        dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
+    except (KeyError, IndexError):
+        dock_path = None
+    return dock_path
 
 
 def update_files(path, files, df):
@@ -61,8 +69,6 @@ def update_files(path, files, df):
             # Append new files to df and files list
             for new_file in new_files:
                 it_df = pd.read_csv(new_file, index_col=0, dtype={'valid': object, 'unique': object})
-                #it_df['mol'] = [Chem.MolFromSmiles(s) if Chem.MolFromSmiles(s) else None for s in main_df.smiles]
-                #_ = [AllChem.Compute2DCoords(m) for m in it_df.mol if m]
                 df = df.append(it_df)
                 files += [new_file]
             return df, files
@@ -116,10 +122,7 @@ def mol2png(mol):
     return d2d.GetDrawingText()
 
 
-def bokeh_plot(y, *args):
-    # Bring in global values
-    global main_df
-
+def bokeh_plot(y, main_df, *args):
     TOOLTIPS = """
     <div>
     Step_batch_idx: @ids<br>
@@ -195,9 +198,9 @@ def display_selected_data(y, selection=None):
         return src_str
 
 
-def display_selected_data2(y, selection=None, viewer=None):
-    global main_df
-    global dock_path
+def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=None):
+    #global main_df
+    #global dock_path
 
     if selection is None:
         return
@@ -229,9 +232,9 @@ def display_selected_data2(y, selection=None, viewer=None):
     return
 
 
-def find_sdfs(match_idxs):
-    global main_df
-    global dock_path
+def find_sdfs(match_idxs, main_df, dock_path=None):
+    #global main_df
+    #global dock_path
     # Drop duplicate smiles
     sel_smiles = main_df.loc[match_idxs, 'smiles'].drop_duplicates().tolist()
     # Find first (potentially non-matching idx of first recorded unique smiles)
@@ -365,10 +368,13 @@ class MetaViewer(py3Dmol.view):
 
 def main():
     # ----- Universal ----
-    global main_df
-    global it_path
-    global it_files
-    global dock_path
+    it_path = os.path.join(os.path.abspath(sys.argv[1]), 'iterations')
+    main_df, it_files = load_iterations(it_path)
+    dock_path = check_dock_paths(os.path.abspath(sys.argv[1]))
+    #global main_df
+    #global it_path
+    #global it_files
+    #global dock_path
 
     st.sidebar.title('MolScore')
     st.sidebar.header(f"Run: {main_df['model'].values[0]}-{main_df['task'].values[0]}")
@@ -381,7 +387,7 @@ def main():
     # ----- Main page -----
     if nav == 'Main':
         y_axis = st.sidebar.selectbox('Plot y-axis', main_df.columns.tolist(), index=6)
-        p = bokeh_plot(y_axis)
+        p = bokeh_plot(y_axis, main_df)
         selection = streamlit_bokeh_events(
                 bokeh_plot=p,
                 events="BOX_SELECT",
@@ -394,7 +400,7 @@ def main():
 
         # ----- Show selected data -----
         st.subheader('Selected structures')
-        display_selected_data2(y=y_axis, selection=selection, viewer=mviewer)
+        display_selected_data2(y=y_axis, main_df=main_df, dock_path=dock_path, selection=selection, viewer=mviewer)
         # ----- Add option to save sdf -----
         if (dock_path is not None) and (selection is not None):
             with st.beta_expander(label='Save selected'):
@@ -403,7 +409,7 @@ def main():
                 st.write(f'File name: {out_file}.sdf')
                 save_all_selected = st.button(label='Save', key='save_all_selected')
                 if save_all_selected:
-                    file_paths, mol_names = find_sdfs(selection['BOX_SELECT']['data'])
+                    file_paths, mol_names = find_sdfs(selection['BOX_SELECT']['data'], main_df, dock_path)
                     save_sdf(mol_paths=file_paths,
                              mol_names=mol_names,
                              out_name=out_file)
@@ -542,14 +548,14 @@ def main():
                                 show_3D = column2.button('Show 3D', key=f'{j}_{m}')
                                 if show_3D:
                                     match_idx = main_df.index[main_df.smiles == m].tolist()
-                                    paths, names = find_sdfs(match_idx)
+                                    paths, names = find_sdfs(match_idx, main_df, dock_path)
                                     mviewer.add_ligand(path=paths[0])
 
                         if dock_path is not None:
                             show_all_3D = st.button('Show all 3D', key='Memory_all')
                             if show_all_3D:
                                 match_idx = main_df.index[main_df.smiles.isin(cluster['members'])].tolist()
-                                paths, names = find_sdfs(match_idx)
+                                paths, names = find_sdfs(match_idx, main_df, dock_path)
                                 for p in paths:
                                     mviewer.add_ligand(path=p)
                         break
@@ -564,7 +570,7 @@ def main():
                         mol_names = []
                         for cluster in memory_list[:show_no]:
                             match_idx = main_df.index[main_df.smiles.isin(cluster['members'])].tolist()
-                            paths, names = find_sdfs(match_idx)
+                            paths, names = find_sdfs(match_idx, main_df, dock_path)
                             file_paths += paths
                             names = [f'ClusterCentroid: {names[0].split(":")[1]} - {n}' for n in names]
                             mol_names += names
