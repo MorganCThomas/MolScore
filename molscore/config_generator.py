@@ -185,7 +185,7 @@ def getspconfig(options, key_i=0):
         if sp_config['name'] is None:
             return
         sp_config['weight'] = st.number_input(label='weight (only applicable if using wsum)',
-                                              value=1, key=f'{key_i}: sp_weight')
+                                              value=1.0, key=f'{key_i}: sp_weight')
         # Get (class/function) from name and print doc ...
         sp_config['modifier'] = st.selectbox(label='Modifier',
                                              options=[m.__name__ for m in utils.all_score_modifiers],

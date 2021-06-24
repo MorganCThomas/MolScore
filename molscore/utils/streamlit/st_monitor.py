@@ -32,7 +32,7 @@ st.set_page_config(
 
 
 # ----- Load in iterations files -----
-@st.cache(allow_output_mutation=True)
+#@st.cache(allow_output_mutation=True)
 def load_iterations(it_path):
     it_path = os.path.join(os.path.abspath(sys.argv[1]), 'iterations')
     it_files = glob(os.path.join(it_path, '*.csv'))
@@ -457,9 +457,9 @@ def main():
 
             memory = pd.read_csv(memory_path)
             memory_list = []
-            max_score = 0
-            max_size = 0
-            max_step = 0
+            max_score = 0.0
+            max_size = 1
+            max_step = 0.0
             # Change format into a list of records per cluster
             for i in memory.to_records():
                 if i['Cluster'] == len(memory_list):
