@@ -178,16 +178,30 @@ class GetMosesMetrics(object):
             metrics['FCD_testSF'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds)
         if self.ptarget:
             metrics['FCD_target'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget)
+
         # Test metrics
         if self.test_int is not None:
+            metrics['Novelty_test'] = novelty(gen, self.test, self.pool)
+            metrics['AnalogueSimilarity_target'], metrics['AnalogueCoverage_target'] = \
+                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'])
+            metrics['FG_target'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.test_int['FG'])
+            metrics['RS_target'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.test_int['RS'])
             metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
+            for name, func in [('logP', logP),
+                               ('NP', NP),
+                               ('SA', SA),
+                               ('QED', QED),
+                               ('weight', weight)]:
+                metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
+
         # Test scaff metrics
         if self.test_scaffolds_int is not None:
             metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
             metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
             metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
+
         # Target metrics
         if self.target_int is not None:
             metrics['Novelty_target'] = novelty(gen, self.target, self.pool)
@@ -204,7 +218,6 @@ class GetMosesMetrics(object):
                                ('QED', QED),
                                ('weight', weight)]:
                 metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
-
 
         return metrics
 
