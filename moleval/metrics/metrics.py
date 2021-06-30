@@ -157,7 +157,7 @@ class GetMosesMetrics(object):
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
         metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
-        if se_k is not None:
+        if (se_k is not None) and (len(gen) >= se_k):
             metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
@@ -314,8 +314,8 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     if k is not None:
         if len(gen) < k:
             warnings.warn(
-                "Can't compute SEDiv@{}.".format(k) +
-                "gen contains only {} molecules".format(len(gen))
+                f"Can't compute SEDiv@{k/1000:.0f} "
+                f"gen contains only {len(gen)} molecules"
             )
         gen = gen[:k]
 
