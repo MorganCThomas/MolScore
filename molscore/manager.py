@@ -306,7 +306,7 @@ class MolScore:
 
             # Check the modifier function exists, and the metric can be found in the dataframe
             assert any([metric['modifier'] == mod.__name__ for mod in self.modifier_functions]), \
-                "Score modifier not found"
+                f"Score modifier {metric['modifier']} not found"
             assert metric['name'] in df.columns, f"Specified metric {metric['name']} not found in dataframe"
 
             df[mod_name] = df.loc[:, metric['name']].apply(
