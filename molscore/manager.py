@@ -307,7 +307,7 @@ class MolScore:
             # Check the modifier function exists, and the metric can be found in the dataframe
             assert any([metric['modifier'] == mod.__name__ for mod in self.modifier_functions]), \
                 "Score modifier not found"
-            assert metric['name'] in df.columns, "Specified metric not found in dataframe"
+            assert metric['name'] in df.columns, f"Specified metric {metric['name']} not found in dataframe"
 
             df[mod_name] = df.loc[:, metric['name']].apply(
                 lambda x: modifier(x, **metric['parameters'])
@@ -498,7 +498,7 @@ class MolScore:
                 smiles_to_process_index = self.batch_df.loc[(self.batch_df.valid.isin(['true', 'sanitized'])) &
                                                             (self.batch_df.unique == 'true'), 'batch_idx'].tolist()
             if len(smiles_to_process) == 0:
-                # If no smiles to process then instead submit all (scoring function should handle invalid)
+                # If no smiles to process then instead submit 10 (scoring function should handle invalid)
                 logger.info(f'    No smiles to score so submitting first 10 SMILES')
                 smiles_to_process = self.batch_df.loc[:9, 'smiles'].tolist()
                 smiles_to_process_index = self.batch_df.loc[:9, 'batch_idx'].tolist()
