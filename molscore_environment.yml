@@ -34,3 +34,5 @@ dependencies:
   - pip:
       - importlib-resources
       - streamlit-bokeh-events
+      - deepsmiles
+      - selfies
