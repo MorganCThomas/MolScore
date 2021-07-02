@@ -159,57 +159,70 @@ class GlideDock:
                         continue
         return self
 
+    @staticmethod
+    def enumerate_stereoisomers(smi: str, name: str, directory: os.PathLike):
+        """
+        For a given smiles string, and file name, enumerate stereoisomers and write out sdf.
+        :param smi:
+        :param name:
+        :param directory:
+        :return:
+        """
+        epik_env = os.path.join(os.environ['SCHRODINGER'], 'epik')
+        structconvert_env = os.path.join(os.environ['SCHRODINGER'], 'utilities', 'structconvert')
+        mol = Chem.MolFromSmiles(smi)
+        if mol:
+            # Add Hs
+            mol = Chem.AddHs(mol)
+            # Enumerate stereoisomers
+            logger.debug(f'{name}: {GetStereoisomerCount(mol)} possible stereoisomers')
+            # Also embeds molecules
+            opts = StereoEnumerationOptions(tryEmbedding=True, unique=True)
+            stereoisomers = list(EnumerateStereoisomers(mol, options=opts))
+            logger.debug(f'{name}: {len(stereoisomers)} enumerated unique stereoisomers')
+            variants = []
+            for variant, iso in enumerate(stereoisomers):
+                variants.append(variant)
+                # Write to sdf
+                sdf_in = os.path.join(directory, f'{name}-{variant}_isomers.sdf')
+                mae_in = os.path.join(directory, f'{name}-{variant}_isomers.mae')
+                sdf_out = os.path.join(directory, f'{name}-{variant}_prepared.sdf')
+                mae_out = os.path.join(directory, f'{name}-{variant}_prepared.mae')
+                w = Chem.rdmolfiles.SDWriter(sdf_in)
+                w.write(iso)
+                w.flush()
+                w.close()
+                command = " ".join((structconvert_env, sdf_in, mae_in, ";",
+                                    epik_env, f"-imae {mae_in}", f"-omae {mae_out}", "-ph 7.4", "-ms 1",
+                                    "-WAIT", "-NOJOBID", ";",
+                                    structconvert_env, mae_out, sdf_out))
+            return name, variants, command
+        else:
+            return name, [], None
+
     def run_epik(self, smiles: list):
         """
         Call epik to prepare molecules, enumerate stereoisomers with rdkit
         :param smiles: List of SMILES strings
         """
-        epik_commands = []
-        # Read in ligprep output files and split to individual variants
-        self.variants = {name: [] for name in self.file_names}
-        for smi, name in zip(smiles, self.file_names):
-            # Convert smiles to mols
-            mol = Chem.MolFromSmiles(smi)
-            if mol:
-                # Add Hs
-                mol = Chem.AddHs(mol)
-                # Enumerate stereoisomers
-                logger.debug(f'{name}: {GetStereoisomerCount(mol)} possible stereoisomers')
-                # Also embeds molecules
-                opts = StereoEnumerationOptions(tryEmbedding=True, unique=True)
-                stereoisomers = list(EnumerateStereoisomers(mol, options=opts))
-                logger.debug(f'{name}: {len(stereoisomers)} enumerated unique stereoisomers')
-                for variant, iso in enumerate(stereoisomers):
-                    self.variants[name].append(variant)
-                    # Write to sdf
-                    sdf_in = os.path.join(self.directory, f'{name}-{variant}_isomers.sdf')
-                    mae_in = os.path.join(self.directory, f'{name}-{variant}_isomers.mae')
-                    sdf_out = os.path.join(self.directory, f'{name}-{variant}_prepared.sdf')
-                    mae_out = os.path.join(self.directory, f'{name}-{variant}_prepared.mae')
-                    w = Chem.rdmolfiles.SDWriter(sdf_in)
-                    w.write(iso)
-                    w.flush()
-                    w.close()
-                    # Convert -> mae, run epik, Convert -> sdf
-                    # Run epik (Setting pht sets -p to cap at 0.1, -ms restricts output, does it include tautomers?)
-                    # -imae <in_file> -omae <out_file> -ph 7.4 -p 0.2-5 -WAIT -NOJOBID
-                    command = " ".join((self.structconvert_env, sdf_in, mae_in, ";",
-                                        self.epik_env, f"-imae {mae_in}", f"-omae {mae_out}", "-ph 7.4", "-ms 1",
-                                        "-WAIT", "-NOJOBID", ";",
-                                        self.structconvert_env, mae_out, sdf_out))
-                    epik_commands.append(command)
-            else:
-                continue
-
         # Initialize subprocess
-        logger.debug('LigPrep called')
+        logger.debug('Epik called')
         p = timedSubprocess(timeout=self.timeout, shell=True).run  # Use shell because ;
 
         # Run commands either using Dask or sequentially
         if self.cluster is not None:
+            futures = [self.client.submit(self.enumerate_stereoisomers, smi, name, self.directory)
+                       for smi, name in zip(smiles, self.file_names)]
+            results = self.client.gather(futures)
+            self.variants = {n: v for n, v, c in results}
+            epik_commands = [c for n, v, c in results if c is not None]
             futures = self.client.map(p, epik_commands)
             _ = self.client.gather(futures)
         else:
+            results = [self.enumerate_stereoisomers(smi, name, self.directory)
+                       for smi, name in zip(smiles, self.file_names)]
+            self.variants = {n: v for n, v, c in results}
+            epik_commands = [c for n, v, c in results if c is not None]
             _ = [p(command) for command in epik_commands]
         logger.debug('Epik finished')
         return self
