@@ -177,7 +177,10 @@ class GlideDock:
             # Enumerate stereoisomers
             logger.debug(f'{name}: {GetStereoisomerCount(mol)} possible stereoisomers')
             # Also embeds molecules
-            opts = StereoEnumerationOptions(tryEmbedding=True, unique=True)
+            if GetStereoisomerCount(mol) > 16:
+                opts = StereoEnumerationOptions(tryEmbedding=False, unique=True, maxIsomers=32)
+            else:
+                opts = StereoEnumerationOptions(tryEmbedding=True, unique=True, maxIsomers=32)
             stereoisomers = list(EnumerateStereoisomers(mol, options=opts))
             logger.debug(f'{name}: {len(stereoisomers)} enumerated unique stereoisomers')
             variants = []
