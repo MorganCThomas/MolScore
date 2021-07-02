@@ -203,7 +203,7 @@ class GlideDock:
 
         # Initialize subprocess
         logger.debug('LigPrep called')
-        p = partial(timedSubprocess(timeout=self.timeout).run, shell=True)  # Use shell because ;
+        p = timedSubprocess(timeout=self.timeout, shell=True).run  # Use shell because ;
 
         # Run commands either using Dask or sequentially
         if self.cluster is not None:
