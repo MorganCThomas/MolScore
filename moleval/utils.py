@@ -183,9 +183,9 @@ def se_picker(dataset: list, input_format='smiles', n=3,
 
     if return_cs:
         cs_subset = [[mols[i] for i in c] for c in cs]
-        return subset, size, cs_subset
+        return subset, size, ids, cs_subset
     else:
-        return subset, size
+        return subset, size, ids
 
 
 def maxmin_picker(dataset: list, input_format='smiles', n=3, seed=123, radius=2, nBits=1024):
