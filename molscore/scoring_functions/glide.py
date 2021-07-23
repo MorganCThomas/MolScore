@@ -3,7 +3,7 @@ import os
 import glob
 import gzip
 import logging
-from functools import partial
+import subprocess
 
 from openeye import oechem
 from dask.distributed import Client
@@ -52,9 +52,6 @@ class GlideDock:
         self.prefix = prefix.replace(" ", "_")
         self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
-        self.ligprep_env = os.path.join(os.environ['SCHRODINGER'], 'ligprep')
-        self.epik_env = os.path.join(os.environ['SCHRODINGER'], 'epik')
-        self.structconvert_env = os.path.join(os.environ['SCHRODINGER'], 'utilities', 'structconvert')
         self.timeout = float(timeout)
         self.cluster = cluster
         if self.cluster is not None:
@@ -65,8 +62,20 @@ class GlideDock:
         # Specify how to prepare
         if ligand_preparation == 'ligprep':
             self.prepare = self.run_ligprep
+            self.ligprep_env = os.path.join(os.environ['SCHRODINGER'], 'ligprep')
         elif ligand_preparation == 'epik':
             self.prepare = self.run_epik
+            self.epik_env = os.path.join(os.environ['SCHRODINGER'], 'epik')
+            self.structconvert_env = os.path.join(os.environ['SCHRODINGER'], 'utilities', 'structconvert')
+        elif ligand_preparation == 'moka':
+            self.prepare = self.run_moka
+            self.moka_env = subprocess.run(args=['which', 'blabber_sd'],
+                                           stdout=subprocess.PIPE).stdout.decode().strip('\n')
+            assert self.moka_env is not None, "Could not find moka"
+            self.corina_env = subprocess.run(args=['which', 'corina'],
+                                             stdout=subprocess.PIPE).stdout.decode().strip('\n')
+            assert self.corina_env is not None, "Could not find corina"
+
         else:
             print(f'Un-recognized ligand preparation {ligand_preparation}, please choose from (ligprep, epik)')
             raise
@@ -229,6 +238,61 @@ class GlideDock:
             epik_commands = [c for n, v, c in results if c is not None]
             _ = [p(command) for command in epik_commands]
         logger.debug('Epik finished')
+        return self
+
+    def run_moka(self, smiles: list):
+        """
+        Call moka and corina to prepare molecules
+        :param smiles: List of SMILES strings
+        """
+        moka_commands = []
+        corina_commands = []
+        for smi, name in zip(smiles, self.file_names):
+            sdf_in = os.path.join(self.directory, f'{name}.sdf')
+            sdf_moka = os.path.join(self.directory, f'{name}_moka.sdf')
+            sdf_corina = os.path.join(self.directory, f'{name}_corina.sdf')
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                # Have to write as sdf as rdkit has no mol2 functionality
+                with Chem.rdmolfiles.SDWriter(sdf_in) as w:
+                    w.write(mol)
+                # blabber_sd -t 0.2 -p=7.4 --explicit-h=none -o <output_file.sdf> <input_file.mol2>
+                moka_commands.append(f'{self.moka_env} -t 0.2 -p=7.4 --explicit-h=none -o {sdf_moka} {sdf_in}')
+                # corina -d stergen,msi=16,wh,preserve <input_file> <output_file>
+                corina_commands.append(f'{self.corina_env} -d stergen,msi=16,wh,preserve {sdf_moka} {sdf_corina}')
+
+        # Initialize subprocesses
+        logger.debug('Moka called')
+        p = timedSubprocess(timeout=self.timeout, shell=False).run
+        # Run commands either using Dask or sequentially
+        if self.cluster is not None:
+            futures = self.client.map(p, moka_commands)
+            _ = self.client.gather(futures)
+            logger.debug('Moka finished')
+            futures = self.client.map(p, corina_commands)
+            _ = self.client.gather(futures)
+            logger.debug('Corina finished')
+        else:
+            _ = [p(command) for command in moka_commands]
+            logger.debug('Moka finished')
+            _ = [p(command) for command in corina_commands]
+            logger.debug('Corina finished')
+
+        # Read in corina output files and split to individual variants
+        self.variants = {name: [] for name in self.file_names}
+        for name in self.file_names:
+            out_file = os.path.join(self.directory, f'{name}_corina.sdf')
+            if os.path.exists(out_file):
+                supp = Chem.rdmolfiles.ForwardSDMolSupplier(os.path.join(self.directory, f'{name}_corina.sdf'),
+                                                            sanitize=False, removeHs=False)
+                for variant, mol in enumerate(supp):
+                    if mol:
+                        self.variants[name].append(variant)
+                        with Chem.SDWriter(os.path.join(self.directory, f'{name}-{variant}_prepared.sdf')) as w:
+                            w.write(mol)
+                            logger.debug(f'Split {name} -> {name}-{variant}')
+                    else:
+                        continue
         return self
 
     def run_glide(self):
