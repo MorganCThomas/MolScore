@@ -257,7 +257,7 @@ class GlideDock:
                 with Chem.rdmolfiles.SDWriter(sdf_in) as w:
                     w.write(mol)
                 # blabber_sd -t 0.2 -p=7.4 --explicit-h=none -o <output_file.sdf> <input_file.mol2>
-                moka_commands.append(f'{self.moka_env} -t 0.2 -p=7.4 --explicit-h=none -o {sdf_moka} {sdf_in}')
+                moka_commands.append(f'{self.moka_env} -t 20 -p 7.4 --explicit-h=none -o {sdf_moka} {sdf_in}')
                 # corina -d stergen,msi=16,wh,preserve <input_file> <output_file>
                 corina_commands.append(f'{self.corina_env} -d stergen,msi=16,wh,preserve {sdf_moka} {sdf_corina}')
 
