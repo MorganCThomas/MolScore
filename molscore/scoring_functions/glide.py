@@ -38,8 +38,8 @@ class GlideDock:
         :param glide_template: Path to a template docking file (.in)
         :param cluster: Address to Dask scheduler for parallel processing via dask
         :param timeout: Timeout (seconds) before killing an individual docking simulation
-        :param ligand_preparation: Whether to use 'ligprep' with limited default functionality, or 'epik' to protonate
-        only the most probable state
+        :param ligand_preparation: Whether to use 'ligprep' with limited default functionality, 'epik' to protonate
+        only the most probable stat, or 'moka' to protonate species with an abundancy > 20%
         :param kwargs:
         """
         # Read in glide template (.in)
