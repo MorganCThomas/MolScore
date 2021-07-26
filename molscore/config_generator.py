@@ -191,7 +191,7 @@ def getspconfig(options, key_i=0):
         sp_config['modifier'] = st.selectbox(label='Modifier',
                                              options=[m.__name__ for m in utils.all_score_modifiers],
                                              index=0,
-                                             key=f'{key_i}: sp_name')
+                                             key=f'{key_i}: sp_modifier')
         smod_obj = [m for m in utils.all_score_modifiers if m.__name__ == sp_config['modifier']][0]
         # Write doc for func
         smod_doc = inspect.getdoc(smod_obj).split(':')[0]
