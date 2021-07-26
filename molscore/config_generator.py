@@ -12,6 +12,7 @@ import molscore.scoring_functions as scoring_functions
 # Persisting parameters that don't get re-run by streamlit with widget interactions
 ss = get(key='ss', input_path='configs', n_sf=1, n_sp=1, maxmin=False)
 
+
 # Functions
 def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...'):
     # get base path (directory)
@@ -234,7 +235,7 @@ def getspconfig(options, key_i=0):
 
 # ----- Start App -----
 st.title('MolScore Config Writer')
-config = {}
+config = dict()
 
 
 # ------ Basic information ------
@@ -348,7 +349,7 @@ if len(config['scoring_functions']) > 0:
 st.subheader('Output json')
 with st.beta_expander(label='Show'):
     st.write(config)
-out_file = os.path.abspath(st.text_input(label='Output file', value='configs/test_config.json'))
+out_file = os.path.abspath(st.text_input(label='Output file', value=f'configs/{config["task"]}.json'))
 st.write(f"Selected: {out_file}")
 col1, col2 = st.beta_columns(2)
 with col1:
