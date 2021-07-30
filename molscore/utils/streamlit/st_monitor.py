@@ -506,7 +506,7 @@ def main():
                 x=[i for i in range(len(memory_list))],
                 top=[len(c['members']) for c in memory_list],
                 img=[mol2svg(Chem.MolFromSmiles(m['centroid']))
-                     if Chem.MolFromSmiles(m['centroid']) else mol2svg(Chem.MolFromSmiles(''))
+                     if isinstance(m['centroid'], str) else mol2svg(Chem.MolFromSmiles(''))
                      for m in memory_list]
             )
             hist_source = ColumnDataSource(hist_data)
