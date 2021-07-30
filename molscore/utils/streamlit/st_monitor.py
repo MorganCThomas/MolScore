@@ -199,8 +199,6 @@ def display_selected_data(y, selection=None):
 
 
 def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=None):
-    #global main_df
-    #global dock_path
 
     if selection is None:
         return
@@ -221,7 +219,7 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
 
                 if show_3D:
                     # Grab best variants
-                    file_paths, _ = find_sdfs([midx])
+                    file_paths, _ = find_sdfs([midx], main_df, dock_path)
                     viewer.add_ligand(path=file_paths[0])
 
         show_all_3D = st.button('Show all 3D')
@@ -233,8 +231,6 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
 
 
 def find_sdfs(match_idxs, main_df, dock_path=None):
-    #global main_df
-    #global dock_path
     # Drop duplicate smiles
     sel_smiles = main_df.loc[match_idxs, 'smiles'].drop_duplicates().tolist()
     # Find first (potentially non-matching idx of first recorded unique smiles)
@@ -371,10 +367,6 @@ def main():
     it_path = os.path.join(os.path.abspath(sys.argv[1]), 'iterations')
     main_df, it_files = load_iterations(it_path)
     dock_path = check_dock_paths(os.path.abspath(sys.argv[1]))
-    #global main_df
-    #global it_path
-    #global it_files
-    #global dock_path
 
     st.sidebar.title('MolScore')
     st.sidebar.header(f"Run: {main_df['model'].values[0]}-{main_df['task'].values[0]}")
@@ -451,7 +443,6 @@ def main():
     if nav == 'Scaffold memory':
         memory_path = os.path.join(os.path.abspath(sys.argv[1]), 'scaffold_memory.csv')
         if os.path.exists(memory_path):
-
             if dock_path is not None:
                 mviewer = MetaViewer()
 
@@ -486,7 +477,7 @@ def main():
             Step_filter = st.sidebar.slider(label='Step', min_value=0.0, max_value=max_step, value=(0.0, max_step))
 
             # Sort options
-            sort_key = st.sidebar.selectbox(label='Sort by', options=['Score', 'Size', 'Step'])
+            sort_key = st.sidebar.selectbox(label='Sort by', options=['Score', 'Size', 'Step'], index=1)
             sort_order = st.sidebar.selectbox(label='Descending', options=[True, False], index=0)
 
             # Filter
@@ -514,7 +505,9 @@ def main():
             hist_data = dict(
                 x=[i for i in range(len(memory_list))],
                 top=[len(c['members']) for c in memory_list],
-                img=[mol2svg(Chem.MolFromSmiles(m['centroid'])) for m in memory_list]
+                img=[mol2svg(Chem.MolFromSmiles(m['centroid']))
+                     if Chem.MolFromSmiles(m['centroid']) else mol2svg(Chem.MolFromSmiles(''))
+                     for m in memory_list]
             )
             hist_source = ColumnDataSource(hist_data)
             hist.vbar(x='x',
