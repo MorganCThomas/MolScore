@@ -525,8 +525,8 @@ def main():
                             f"Mean score: {np.mean(cluster['score']):.02f}\n"
                             f"Mean step: {np.mean(cluster['step']):.02f}")
                 memory_ss = get(key='memory', expand=None)
-                expand = column.button(label='Expand', key=cluster['centroid'] + '_expand')
-                collapse = column.button(label='Collapse', key=cluster['centroid'] + '_collapse')
+                expand = column.button(label='Expand', key=f"cluster['centroid']_expand")
+                collapse = column.button(label='Collapse', key=f"cluster['centroid']_collapse")
                 if collapse:
                     memory_ss.expand = None
                 if expand or memory_ss.expand == i:
