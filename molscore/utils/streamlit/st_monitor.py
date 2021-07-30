@@ -520,7 +520,7 @@ def main():
             st.subheader('Cluster centroids (may be a scaffold)')
             show_no = st.number_input(label='Number to show', value=20, step=5)
             for i, (cluster, column) in enumerate(zip(memory_list[:show_no], cycle(st.beta_columns(5)))):
-                column.image(mol2png(Chem.MolFromSmiles(cluster['centroid'])))
+                column.image(mol2png(Chem.MolFromSmiles(cluster['centroid'] if isinstance(cluster['centroid'], str) else '')))
                 column.text(f"Cluster size: {len(cluster['members'])}\n"
                             f"Mean score: {np.mean(cluster['score']):.02f}\n"
                             f"Mean step: {np.mean(cluster['step']):.02f}")
@@ -534,7 +534,7 @@ def main():
                     with st.beta_container():
                         st.subheader('Cluster members')
                         for j, (m, column2) in enumerate(zip(cluster['members'], cycle(st.beta_columns(5)))):
-                            column2.image(mol2png(Chem.MolFromSmiles(m)))
+                            column2.image(mol2png(Chem.MolFromSmiles(m if isinstance(m, str) else '')))
                             column2.text(f"Score: {cluster['score'][j]:.02f}\n"
                                          f"Step: {cluster['step'][j]}")
                             if dock_path is not None:
