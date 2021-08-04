@@ -21,7 +21,7 @@ class TanimotoSimilarity:
     return_metrics = ['Tc']
 
     def __init__(self, prefix: str, ref_smiles: Union[list, os.PathLike],
-                 radius: int = 2, bits: int = 1024, features: str = False,
+                 radius: int = 2, bits: int = 1024, features: bool = False,
                  method: str = 'mean', n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
@@ -51,10 +51,12 @@ class TanimotoSimilarity:
 
         # Convert ref smiles to mols
         self.ref_mols = [Chem.MolFromSmiles(smi) for smi in self.ref_smiles
-                           if Chem.MolFromSmiles(smi)]
+                         if Chem.MolFromSmiles(smi)]
+
         # Check they're the same length
         if len(self.ref_smiles) != len(self.ref_mols):
             logger.warning(f"{len(self.ref_smiles) - len(self.ref_mols)} query smiles converted to mol successfully")
+
         # Conver ref mols to ref fps
         self.ref_fps = [Chem.GetMorganFingerprintAsBitVect(mol, radius=self.radius, nBits=self.bits,
                                                            useFeatures=self.features)
