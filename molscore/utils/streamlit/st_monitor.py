@@ -14,7 +14,7 @@ from molscore.utils.streamlit.SessionState import get
 import py3Dmol
 import parmed
 
-from bokeh.plotting import figure, show, output_file
+from bokeh.plotting import figure, show, output_file, gridplot
 from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
 
 from rdkit import Chem
@@ -99,11 +99,15 @@ def st_file_selector(st_placeholder, key, path='.', label='Please, select a file
 
 
 def mol2svg(mol):
-    AllChem.Compute2DCoords(mol)
     try:
-        Chem.Kekulize(mol)
+        AllChem.Compute2DCoords(mol)
+        try:
+            Chem.Kekulize(mol)
+        except:
+            pass
     except:
-        pass
+        mol = Chem.MolFromSmiles('')
+        AllChem.Compute2DCoords(mol)
     d2d = MolDraw2DSVG(200, 200)
     d2d.DrawMolecule(mol)
     d2d.FinishDrawing()
@@ -111,18 +115,22 @@ def mol2svg(mol):
 
 
 def mol2png(mol):
-    AllChem.Compute2DCoords(mol)
     try:
-        Chem.Kekulize(mol)
+        AllChem.Compute2DCoords(mol)
+        try:
+            Chem.Kekulize(mol)
+        except:
+            pass
     except:
-        pass
+        mol = Chem.MolFromSmiles('')
+        AllChem.Compute2DCoords(mol)
     d2d = MolDraw2DCairo(200, 200)
     d2d.DrawMolecule(mol)
     d2d.FinishDrawing()
     return d2d.GetDrawingText()
 
 
-def bokeh_plot(y, main_df, *args):
+def bokeh_plot(y, main_df, size=(1000, 500), *args):
     TOOLTIPS = """
     <div>
     Step_batch_idx: @ids<br>
@@ -131,7 +139,7 @@ def bokeh_plot(y, main_df, *args):
     # @img{safe}
 
     if (y == 'valid') or (y == 'unique') or (y == 'passes_diversity_filter'):
-        p = figure(plot_width=1000, plot_height=500)
+        p = figure(plot_width=size[0], plot_height=size[1])
         steps = main_df.step.unique().tolist()
         ratios = main_df.groupby('step')[y].apply(lambda x: (x == 'true').mean()).tolist()
         p.line(x=steps, y=ratios)
@@ -160,7 +168,7 @@ def bokeh_plot(y, main_df, *args):
             )
         )
 
-        p = figure(plot_width=1000, plot_height=500, tooltips=TOOLTIPS)
+        p = figure(plot_width=size[0], plot_height=size[1], tooltips=TOOLTIPS)
         p.add_tools(BoxSelectTool())
         p.circle(x='x', y='y', size=8, source=source)
         p.line(x='x', y='y_mean',
@@ -374,7 +382,7 @@ def main():
         main_df, it_files = update_files(it_path, it_files, main_df)
 
     # Radio buttons for navigation
-    nav = st.sidebar.radio(label='Navigation', options=['Main', 'Scaffold memory'])
+    nav = st.sidebar.radio(label='Navigation', options=['Main', 'Multi-plot', 'MPO', 'Scaffold memory'])
 
     # ----- Main page -----
     if nav == 'Main':
@@ -438,6 +446,77 @@ def main():
         mviewer.add_ligand(path=ref_path, color='orange')
 
         mviewer.render2st()
+
+    # ----- Multi-plot -----
+    if nav == 'Multi-plot':
+        y_variables = st.multiselect('y-axis', main_df.columns.tolist(), default=['valid', 'unique', 'occurrences'])
+        plots = []
+        for y in y_variables:
+            p = bokeh_plot(y, main_df, size=(400, 300))
+            plots.append(p)
+        grid = gridplot(plots, ncols=3)
+        st.bokeh_chart(grid)
+
+    # ----- MPO Graph -----
+    if nav == 'MPO':
+        st.subheader('Per step')
+        x_variables = st.multiselect('x-axis', main_df.columns.tolist())
+        step_idx = st.slider('Step', min_value=int(main_df.step.min()), max_value=int(main_df.step.max()),
+                             value=int(main_df.step.max()))
+
+        p = figure(plot_width=1000, plot_height=500, x_range=x_variables,
+                   tooltips=
+                   """
+                   <div>
+                   @img{safe}
+                   Step_batch_idx: @ids<br>
+                   </div>
+                   """
+                   )
+        #p.add_tools(BoxSelectTool())
+        # TODO figure out indices selection
+        for i, r in main_df.loc[main_df.step == step_idx, :].iterrows():
+            data = dict(x=x_variables,
+                        y=r[x_variables].values,
+                        ids=[f"{r['step']}_{r['batch_idx']}"]*len(x_variables),
+                        img=[mol2svg(Chem.MolFromSmiles(r['smiles']))]*len(x_variables))
+            source = ColumnDataSource(data)
+            # Required for callback
+            #source.selected.js_on_change("indices",
+            #                             CustomJS(args=dict(source=source), code=
+            #                             """
+            #                             document.dispatchEvent(new CustomEvent("BOX_SELECT", {detail: {data: source.selected.indices}}))
+            #                             """)
+            #                             )
+
+            p.circle(x='x', y='y', source=source)
+            p.line(x='x', y='y', source=source)
+        #st.bokeh_chart(p)
+        selection = streamlit_bokeh_events(bokeh_plot=p, events="BOX_SELECT", key="mpo",
+                                           refresh_on_update=True, override_height=None, debounce_time=0)
+
+        if len(x_variables) > 0:
+            st.subheader('Top 100')
+            p2 = figure(plot_width=1000, plot_height=500, x_range=x_variables,
+                        tooltips=
+                        """
+                        <div>
+                        @img{safe}
+                        Step_batch_idx: @ids<br>
+                        </div>
+                        """)
+            for i, r in main_df.sort_values(x_variables, ascending=False).iloc[:100, :].iterrows():
+                data = dict(x=x_variables,
+                            y=r[x_variables].values,
+                            ids=[f"{r['step']}_{r['batch_idx']}"]*len(x_variables),
+                            img=[mol2svg(Chem.MolFromSmiles(r['smiles']))]*len(x_variables))
+                source2 = ColumnDataSource(data)
+                p2.circle(x='x', y='y', source=source2)
+                p2.line(x='x', y='y', source=source2)
+            #st.bokeh_chart(p2)
+            selection = streamlit_bokeh_events(bokeh_plot=p2, events="BOX_SELECT", key="mpo2",
+                                               refresh_on_update=True, override_height=None, debounce_time=0)
+
 
     # ----- Scaffold memory page ----
     if nav == 'Scaffold memory':
