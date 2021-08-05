@@ -273,6 +273,9 @@ if use_3D:
 else:
     config['dash_monitor'].update({'pdb_path': None})
 
+# ----- Unique filter -----
+config['unique_filter'] = st.selectbox(label='Apply unique filter, if a molecule is not unique score it 0',
+                                       options=[True, False], index=1)
 
 # ----- Diversity filter ------
 st.subheader('Diversity filter')
