@@ -106,6 +106,12 @@ class MolScore:
                 self.mpo_method = func
         assert any([self.configs['scoring']['method'] == func.__name__ for func in utils.all_score_methods])
 
+        # Setup unique filter
+        try:
+            self.unique_filter = self.configs['unique_filter']
+        except KeyError:
+            self.unique_filter = False
+
         # Setup diversity filter (adapted from Blaschke et al.)
         self.diversity_filter = None
         if self.configs['diversity_filter']['run']:
@@ -326,13 +332,20 @@ class MolScore:
 
         return df
 
+    def run_unique_filter(self, df):
+        df[f"filtered_{self.configs['scoring']['method']}"] = [s if u == 'true' else 0.0
+                                                               for u, s in
+                                                               zip(df['unique'], df[self.configs['scoring']['method']])]
+        df.fillna(1e-6)
+        return df
+
     def run_diversity_filter(self, df):
         scores_dict = {"total_score": np.asarray(df[self.configs['scoring']['method']].tolist(),
                                                  dtype=np.float64),
                        "step": [self.step] * len(df)}
         filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
                                                       scores_dict=scores_dict)
-        df["passes_diversity_filter"] = [True if a == b else False
+        df["passes_diversity_filter"] = [True if float(a) == float(b) else False
                                          for b, a in
                                          zip(df[self.configs['scoring']['method']],
                                              filtered_scores)]
@@ -527,6 +540,8 @@ class MolScore:
             if self.diversity_filter is not None:
                 self.batch_df = self.run_diversity_filter(self.batch_df)
                 logger.info(f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} SMILES')
+            if self.unique_filter:
+                self.batch_df = self.run_unique_filter(self.batch_df)
 
             # Add information of scoring time
             self.batch_df['score_time'] = time.time() - scoring_start
@@ -547,7 +562,7 @@ class MolScore:
                 self.run_dash_monitor()
 
             # Fetch score
-            if self.diversity_filter is not None:
+            if (self.diversity_filter is not None) or self.unique_filter:
                 scores = self.batch_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
             else:
                 scores = self.batch_df.loc[:, self.configs['scoring']['method']].tolist()
