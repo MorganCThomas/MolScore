@@ -6,6 +6,8 @@ import numpy as np
 from itertools import cycle, chain
 from glob import glob
 import matplotlib.colors as mcolors
+from scipy.stats import gmean as geometricmean
+from sklearn.preprocessing import MinMaxScaler
 
 import streamlit as st
 from streamlit_bokeh_events import streamlit_bokeh_events
@@ -254,7 +256,7 @@ def find_sdfs(match_idxs, main_df, dock_path=None):
         match_idxs,
         ['smiles', 'step', 'batch_idx']].drop_duplicates(subset=['smiles']).to_records(index=False)
 
-    file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}*sdf*'))[0] for s, b in first_idxs]
+    file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}-*sdf*'))[0] for s, b in first_idxs]
 
     return file_paths, [f'Mol: {s}_{b}' for _, s, b in idx_names]
 
@@ -400,7 +402,8 @@ def main():
 
         # ----- Show selected data -----
         st.subheader('Selected structures')
-        display_selected_data2(y=y_axis, main_df=main_df, dock_path=dock_path, selection=selection, viewer=mviewer)
+        display_selected_data2(y=y_axis, main_df=main_df, dock_path=dock_path,
+                               selection=selection, viewer=mviewer)
         # ----- Add option to save sdf -----
         if (dock_path is not None) and (selection is not None):
             with st.beta_expander(label='Save selected'):
@@ -481,22 +484,21 @@ def main():
                         ids=[f"{r['step']}_{r['batch_idx']}"]*len(x_variables),
                         img=[mol2svg(Chem.MolFromSmiles(r['smiles']))]*len(x_variables))
             source = ColumnDataSource(data)
-            # Required for callback
-            #source.selected.js_on_change("indices",
-            #                             CustomJS(args=dict(source=source), code=
-            #                             """
-            #                             document.dispatchEvent(new CustomEvent("BOX_SELECT", {detail: {data: source.selected.indices}}))
-            #                             """)
-            #                             )
-
             p.circle(x='x', y='y', source=source)
             p.line(x='x', y='y', source=source)
-        #st.bokeh_chart(p)
         selection = streamlit_bokeh_events(bokeh_plot=p, events="BOX_SELECT", key="mpo",
                                            refresh_on_update=True, override_height=None, debounce_time=0)
 
         if len(x_variables) > 0:
-            st.subheader('Top 100')
+            st.subheader('Top k')
+            with st.beta_expander(label='Options'):
+                k = st.number_input(label='Top k', value=10)
+                # Get x orders
+                x_orders = []
+                for x in x_variables:
+                    x_orders.append(st.selectbox(label=f'Invert {x} order',
+                                                 options=[True, False], index=1, key=f'{x}_order'))
+
             p2 = figure(plot_width=1000, plot_height=500, x_range=x_variables,
                         tooltips=
                         """
@@ -505,7 +507,24 @@ def main():
                         Step_batch_idx: @ids<br>
                         </div>
                         """)
-            for i, r in main_df.sort_values(x_variables, ascending=False).iloc[:100, :].iterrows():
+
+            # Normalize according to order
+            def maxminnorm(series, invert):
+                series = series * (-1 if invert else 1)
+                data = series.to_numpy().reshape(-1, 1)
+                data_norm = MinMaxScaler().fit_transform(data)
+                series_norm = pd.Series(data=data_norm.flatten(), name=series.name)
+                return series_norm
+            top_df = main_df.loc[:, x_variables].apply(lambda x: maxminnorm(x, x_orders[x_variables.index(x.name)]),
+                                                                              axis=0)
+            # Calculate geometric mean
+            top_df['gmean'] = top_df.fillna(1e6).apply(lambda x: geometricmean(x), axis=1, raw=True)
+            top_df = pd.concat([main_df.loc[:, ['step', 'batch_idx', 'smiles', 'unique']], top_df], axis=1)
+            # Subset top
+            top_df = top_df.loc[top_df.unique == 'true', :]
+            top_df = top_df.sort_values(by='gmean', ascending=False).iloc[:k, :]
+
+            for i, r in top_df.iterrows():
                 data = dict(x=x_variables,
                             y=r[x_variables].values,
                             ids=[f"{r['step']}_{r['batch_idx']}"]*len(x_variables),
@@ -513,9 +532,25 @@ def main():
                 source2 = ColumnDataSource(data)
                 p2.circle(x='x', y='y', source=source2)
                 p2.line(x='x', y='y', source=source2)
-            #st.bokeh_chart(p2)
             selection = streamlit_bokeh_events(bokeh_plot=p2, events="BOX_SELECT", key="mpo2",
                                                refresh_on_update=True, override_height=None, debounce_time=0)
+
+            # Plot mols
+            display_selected_data2('step', main_df, selection={"BOX_SELECT": {"data": top_df.index.to_list()}})
+
+            # ----- Add option to save sdf -----
+            if dock_path is not None:
+                with st.beta_expander(label='Save top k'):
+                    # User input
+                    out_file = st.text_input(label='File name')
+                    st.write(f'File name: {out_file}.sdf')
+                    save_top_k = st.button(label='Save', key='save_top_k_button')
+                    if save_top_k:
+                        file_paths, mol_names = find_sdfs(top_df.index.to_list(), main_df, dock_path)
+                        save_sdf(mol_paths=file_paths,
+                                 mol_names=mol_names,
+                                 out_name=out_file)
+
 
 
     # ----- Scaffold memory page ----
