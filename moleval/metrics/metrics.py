@@ -130,7 +130,7 @@ class GetMosesMetrics(object):
             metrics['Validity'] = fraction_valid(gen, self.pool)
 
         gen = remove_invalid(gen, canonize=True)
-        mols = mapper(self.pool)(get_mol, gen)
+        #mols = mapper(self.pool)(get_mol, gen)
         metrics['# valid'] = len(gen)
 
         # Calculate Uniqueness

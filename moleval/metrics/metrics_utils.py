@@ -30,7 +30,11 @@ def canonic_smiles(smiles_or_mol):
     mol = get_mol(smiles_or_mol)
     if mol is None:
         return None
-    return Chem.MolToSmiles(mol)
+    can_smiles = Chem.MolToSmiles(mol)
+    if Chem.MolFromSmiles(can_smiles):  # Check it can be converted back, rarely something goes wrong
+        return can_smiles
+    else:
+        return None
 
 
 def logP(mol):
@@ -89,47 +93,56 @@ def fragmenter(mol):
 
 
 def functional_groups(mol):
-    fgs = identify_functional_groups(mol)  # each fg is a named tuple (atomIdx, atoms, atoms+environment)
+    mol = get_mol(mol)
+    if mol is None:  #
+        return None  #
+    else:
+        fgs = identify_functional_groups(mol)  # each fg is a named tuple (atomIdx, atoms, atoms+environment)
     return [fg[2] for fg in fgs]
 
 
 def compute_functional_groups(mol_list, n_jobs=1):
     fgs = Counter()
     for mol_groups in mapper(n_jobs)(functional_groups, mol_list):
-        fgs.update(mol_groups)
+        if mol_groups is not None:
+            fgs.update(mol_groups)
     return fgs
 
 
 def ring_systems(mol):
-    ri = mol.GetRingInfo()
-    systems = []
-    for ring in ri.AtomRings():
-        ringAts = set(ring)
-        nSystems = []
-        for system in systems:
-            nInCommon = len(ringAts.intersection(system))
-            if nInCommon: # Making conscious choice to include spiro
-                ringAts = ringAts.union(system)
-            else:
-                nSystems.append(system)
-        nSystems.append(ringAts)
-        systems = nSystems
+    mol = get_mol(mol)
+    if mol is None:  #
+        return None  #
+    else:
+        ri = mol.GetRingInfo()
+        systems = []
+        for ring in ri.AtomRings():
+            ringAts = set(ring)
+            nSystems = []
+            for system in systems:
+                nInCommon = len(ringAts.intersection(system))
+                if nInCommon: # Making conscious choice to include spiro
+                    ringAts = ringAts.union(system)
+                else:
+                    nSystems.append(system)
+            nSystems.append(ringAts)
+            systems = nSystems
 
-    # Get ring system canonical smiles
-    system_smiles = []
-    for ring in systems:
-        mw = Chem.RWMol()
-        atom_map = {}
-        # Build atoms
-        for idx in ring:
-            atom_map.update({idx: mw.GetNumAtoms()})  # Will be index of added atom
-            mw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
-        # Build bonds
-        for i, j in combinations(ring, 2):
-            bond = mol.GetBondBetweenAtoms(i, j)
-            if bond is not None:
-                mw.AddBond(atom_map[i], atom_map[j], bond.GetBondType())
-        system_smiles.append(Chem.MolToSmiles(mw))
+        # Get ring system canonical smiles
+        system_smiles = []
+        for ring in systems:
+            mw = Chem.RWMol()
+            atom_map = {}
+            # Build atoms
+            for idx in ring:
+                atom_map.update({idx: mw.GetNumAtoms()})  # Will be index of added atom
+                mw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
+            # Build bonds
+            for i, j in combinations(ring, 2):
+                bond = mol.GetBondBetweenAtoms(i, j)
+                if bond is not None:
+                    mw.AddBond(atom_map[i], atom_map[j], bond.GetBondType())
+            system_smiles.append(Chem.MolToSmiles(mw))
 
     return system_smiles
 
@@ -137,7 +150,8 @@ def ring_systems(mol):
 def compute_ring_systems(mol_list, n_jobs=1):
     rss = Counter()
     for mol_systems in mapper(n_jobs)(ring_systems, mol_list):
-        rss.update(mol_systems)
+        if mol_systems is not None:
+            rss.update(mol_systems)
     return rss
 
 
