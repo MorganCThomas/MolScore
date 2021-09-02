@@ -221,7 +221,7 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
         batch_list = [f"step: {step}\nbatch_index: {batch_idx}" for step, batch_idx in main_df.loc[match_idx, ['step', 'batch_idx']].values]
         name_list = [f"{x:.02f}" if isinstance(x, float) else f"{x}" for x in name_list]
         legends = [f"{idx}\n{y}: {name}" for idx, name in zip(batch_list, name_list)]
-        for mol, midx, legend, col in zip(mols, match_idx, legends, cycle(st.beta_columns(5))):
+        for mol, midx, legend, col in zip(mols, match_idx, legends, cycle(st.columns(5))):
             col.image(mol2png(mol))
             col.text(legend)
             if (dock_path is not None) and (viewer is not None):
@@ -406,7 +406,7 @@ def main():
                                selection=selection, viewer=mviewer)
         # ----- Add option to save sdf -----
         if (dock_path is not None) and (selection is not None):
-            with st.beta_expander(label='Save selected'):
+            with st.expander(label='Save selected'):
                 # User input
                 out_file = st.text_input(label='File name')
                 st.write(f'File name: {out_file}.sdf')
@@ -420,7 +420,7 @@ def main():
         # ----- Show 3D poses -----
         st.subheader('Selected 3D poses')
         # ---- User options -----
-        col1, col2 = st.beta_columns(2)
+        col1, col2 = st.columns(2)
         input_structure_ss = get(key='input_structure', input_path='./', ref_path='./')
         input_structure_ss.input_path = st_file_selector(label='Input structure',
                                                          st_placeholder=col1.empty(),
@@ -437,7 +437,7 @@ def main():
         ref_path = input_structure_ss.ref_path
         col2.write(f"Selected: {ref_path}")
 
-        col1, col2, col3 = st.beta_columns(3)
+        col1, col2, col3 = st.columns(3)
         surface = col1.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'])
         mviewer.add_surface(surface)
         show_residue_labels = col2.selectbox(label='Label residues', options=[True, False], index=1)
@@ -491,7 +491,7 @@ def main():
 
         if len(x_variables) > 0:
             st.subheader('Top k')
-            with st.beta_expander(label='Options'):
+            with st.expander(label='Options'):
                 k = st.number_input(label='Top k', value=10)
                 # Get x orders
                 x_orders = []
@@ -540,7 +540,7 @@ def main():
 
             # ----- Add option to save sdf -----
             if dock_path is not None:
-                with st.beta_expander(label='Save top k'):
+                with st.expander(label='Save top k'):
                     # User input
                     out_file = st.text_input(label='File name')
                     st.write(f'File name: {out_file}.sdf')
@@ -633,7 +633,7 @@ def main():
             # ----- Plot first 20 centroids -----
             st.subheader('Cluster centroids (may be a scaffold)')
             show_no = st.number_input(label='Number to show', value=20, step=5)
-            for i, (cluster, column) in enumerate(zip(memory_list[:show_no], cycle(st.beta_columns(5)))):
+            for i, (cluster, column) in enumerate(zip(memory_list[:show_no], cycle(st.columns(5)))):
                 column.image(mol2png(Chem.MolFromSmiles(cluster['centroid'] if isinstance(cluster['centroid'], str) else '')))
                 column.text(f"Cluster size: {len(cluster['members'])}\n"
                             f"Mean score: {np.mean(cluster['score']):.02f}\n"
@@ -647,7 +647,7 @@ def main():
                     memory_ss.expand = i
                     with st.beta_container():
                         st.subheader('Cluster members')
-                        for j, (m, column2) in enumerate(zip(cluster['members'], cycle(st.beta_columns(5)))):
+                        for j, (m, column2) in enumerate(zip(cluster['members'], cycle(st.columns(5)))):
                             column2.image(mol2png(Chem.MolFromSmiles(m if isinstance(m, str) else '')))
                             column2.text(f"Score: {cluster['score'][j]:.02f}\n"
                                          f"Step: {cluster['step'][j]}")
@@ -668,7 +668,7 @@ def main():
                         break
             # ----- Option to save sdf -----
             if not expand:
-                with st.beta_expander(label='Save selected'):
+                with st.expander(label='Save selected'):
                     out_file = st.text_input(label='File name')
                     st.write(f'File name: {out_file}.sdf')
                     save_all_clusters = st.button(label='Save', key='save_all_clusters')
@@ -689,7 +689,7 @@ def main():
             if dock_path is not None:
                 st.subheader('Selected 3D poses')
                 # ---- User options -----
-                col1, col2 = st.beta_columns(2)
+                col1, col2 = st.columns(2)
                 input_structure_ss = get(key='input_structure', input_path='./', ref_path='./')
                 input_structure_ss.input_path = st_file_selector(label='Input structure',
                                                                  st_placeholder=col1.empty(),
@@ -706,7 +706,7 @@ def main():
                 ref_path = input_structure_ss.ref_path
                 col2.write(f"Selected: {ref_path}")
 
-                col1, col2, col3 = st.beta_columns(3)
+                col1, col2, col3 = st.columns(3)
                 surface = col1.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'])
                 mviewer.add_surface(surface)
                 show_residue_labels = col2.selectbox(label='Label residues', options=[True, False], index=1)
