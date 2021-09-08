@@ -221,6 +221,27 @@ class GetMosesMetrics(object):
 
         return metrics
 
+    def property_distributions(self, gen):
+        metrics = {}
+        if self.test_int is not None:
+            for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
+                metrics[f'{name}_test'] = self.test_int[name]['values']
+        if self.target_int is not None:
+            for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
+                metrics[f'{name}_test'] = self.target_int[name]['values']
+
+        gen = remove_invalid(gen, canonize=True)
+        gen = list(set(gen))
+        mols = mapper(self.pool)(get_mol, gen)
+        for name, func in [('logP', logP),
+                           ('NP', NP),
+                           ('SA', SA),
+                           ('QED', QED),
+                           ('weight', weight)]:
+
+            metrics[name] = WassersteinMetric(func, **self.kwargs).precalc(mols)['values']
+        return metrics
+
     def close_pool(self):
         enable_rdkit_log()
         if self.close_pool:
