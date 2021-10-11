@@ -5,11 +5,10 @@ import json
 import logging
 import numpy as np
 import subprocess
-import inspect
 
 import molscore.scoring_functions as scoring_functions
 from molscore import utils
-from molscore.utils import dash_utils
+from molscore.utils import streamlit
 import molscore.scaffold_memory as scaffold_memory
 
 import pandas as pd
@@ -17,9 +16,6 @@ from rdkit.Chem import AllChem as Chem
 
 logger = logging.getLogger('molscore')
 logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-logger.addHandler(ch)
 
 
 class MolScore:
@@ -32,13 +28,13 @@ class MolScore:
         :param model_name: Name of generative model, used for file naming and documentation
         :param task_config: Path to task config file
         """
-        # Load in json file
-        assert os.path.exists(task_config), "Configuration file doesn't exist"
+        # Load in configuration file (json)
+        assert os.path.exists(task_config), f"Configuration file {task_config} doesn't exist"
         with open(task_config, "r") as f:
             configs = f.read().replace('\r', '').replace('\n', '').replace('\t', '')
         self.configs = json.loads(configs)
 
-        # Initialize some attributes
+        # Here are attributes used
         self.model_name = model_name
         self.step = 0
         self.init_time = time.time()
@@ -46,16 +42,9 @@ class MolScore:
         self.batch_df = None
         self.exists_df = None
         self.main_df = None
-        self.dash_monitor = None
-        self.logged_parameters = {}
-
-        # Setup dash_utils monitor
-        if self.configs['dash_monitor']['run']:
-            self.dash_monitor = True
-            if self.configs['dash_monitor']['pdb_path'] is not None:
-                self.dash_monitor_path = dash_utils.dash_monitor3D_path
-            else:
-                self.dash_monitor_path = dash_utils.dash_monitor_path
+        self.monitor_app = None
+        self.diversity_filter = None
+        self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
 
         # Setup save directory
         self.run_name = "_".join([time.strftime("%Y_%m_%d", time.localtime()),
@@ -68,7 +57,7 @@ class MolScore:
             self.save_dir = self.configs['previous_dir']
         else:
             if os.path.exists(self.save_dir):
-                logger.warning("Found existing directory, appending current time to distinguish")
+                print("Found existing directory, appending current time to distinguish")  # Not set up logging yet
                 self.save_dir = self.save_dir + time.strftime("_%H_%M_%S", time.localtime())
             os.makedirs(self.save_dir)
             os.makedirs(os.path.join(self.save_dir, 'iterations'))
@@ -79,6 +68,29 @@ class MolScore:
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         self.fh.setFormatter(formatter)
         logger.addHandler(self.fh)
+        ch = logging.StreamHandler()
+        try:
+            if self.configs['logging']:
+                ch.setLevel(logging.INFO)
+            else:
+                ch.setLevel(logging.WARNING)
+            logger.addHandler(ch)
+        except KeyError:
+            ch.setLevel(logging.WARNING)
+            logger.addHandler(ch)
+            logger.info("Verbose logging unspecified, defaulting to non-verbose... so how are seeing this?")
+            pass
+
+        # Setup monitor app
+        try:
+            if self.configs['monitor_app']:
+                self.monitor_app = True
+                self.monitor_app_path = streamlit.monitor_path
+        except KeyError:
+            logger.info("Run monitor option unspecified, defaulting to False")
+            self.monitor_app = False
+            # For backwards compatibility, default too false
+            pass
 
         # Write out config
         with open(os.path.join(self.save_dir, f"{self.run_name}_config.json"), "w") as config_f:
@@ -97,31 +109,34 @@ class MolScore:
                 pass
         assert len(self.scoring_functions) > 0, "No scoring functions assigned"
 
-        # Setup modifiers
+        # Load modifiers/tranformations
         self.modifier_functions = utils.all_score_modifiers
 
-        # Setup mpo methods
+        # Setup aggregation/mpo methods
         for func in utils.all_score_methods:
             if self.configs['scoring']['method'] == func.__name__:
                 self.mpo_method = func
-        assert any([self.configs['scoring']['method'] == func.__name__ for func in utils.all_score_methods])
+        assert any([self.configs['scoring']['method'] == func.__name__ for func in utils.all_score_methods]),\
+            "No aggregation methods not found"
 
-        # Setup unique filter
+        # Setup Diversity filters
         try:
-            self.unique_filter = self.configs['unique_filter']
+            if self.configs['diversity_filter']['run']:
+                self.diversity_filter = self.configs['diversity_filter']['name']
+                if self.diversity_filter not in ['Unique', 'Occurrence']:  # Then it's a memory-assisted one
+                    for filt in scaffold_memory.all_scaffold_filters:
+                        if self.configs['diversity_filter']['name'] == filt.__name__:
+                            self.diversity_filter = filt(**self.configs['diversity_filter']['parameters'])
+                    if all([filt.__name__ != self.configs['diversity_filter']['name']
+                            for filt in scaffold_memory.all_scaffold_filters]):
+                        logger.warning(
+                            f'Not found associated diversity filter for {self.configs["diversity_filter"]["name"]}')
+                self.log_parameters({'diversity_filter': self.configs['diversity_filter']['name'],
+                                     'diversity_filter_params': self.configs['diversity_filter']['parameters']})
         except KeyError:
-            self.unique_filter = False
-
-        # Setup diversity filter (adapted from Blaschke et al.)
-        self.diversity_filter = None
-        if self.configs['diversity_filter']['run']:
-            for filt in scaffold_memory.all_scaffold_filters:
-                if self.configs['diversity_filter']['name'] == filt.__name__:
-                    self.diversity_filter = filt(**self.configs['diversity_filter']['parameters'])
-                    self.log_parameters({'diversity_filter': self.configs['diversity_filter']['name']})
-            if all([filt.__name__ != self.configs['diversity_filter']['name']
-                    for filt in scaffold_memory.all_scaffold_filters]):
-                logger.warning(f'Not found associated diversity filter for {self.configs["diversity_filter"]["name"]}')
+            # Backward compatibility if diversity filter not found, default to not run one...
+            self.diversity_filter = None
+            pass
 
         # Load from previous
         if self.configs['load_from_previous']:
@@ -136,7 +151,7 @@ class MolScore:
             # Update max min
             self.update_maxmin(df=self.main_df)
 
-        logger.info('molscore initiated')
+        logger.info('MolScore initiated')
 
     def parse_smiles(self, smiles: list, step: int):
         """
@@ -332,25 +347,49 @@ class MolScore:
 
         return df
 
-    def run_unique_filter(self, df):
-        df[f"filtered_{self.configs['scoring']['method']}"] = [s if u == 'true' else 0.0
-                                                               for u, s in
-                                                               zip(df['unique'], df[self.configs['scoring']['method']])]
-        df.fillna(1e-6)
-        return df
+#    def run_unique_filter(self, df):
+#        df[f"filtered_{self.configs['scoring']['method']}"] = [s if u == 'true' else 0.0
+#                                                               for u, s in
+#                                                               zip(df['unique'], df[self.configs['scoring']['method']])]
+#        df.fillna(1e-6)
+#        return df
 
     def run_diversity_filter(self, df):
-        scores_dict = {"total_score": np.asarray(df[self.configs['scoring']['method']].tolist(),
-                                                 dtype=np.float64),
-                       "step": [self.step] * len(df)}
-        filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
-                                                      scores_dict=scores_dict)
-        df["passes_diversity_filter"] = [True if float(a) == float(b) else False
-                                         for b, a in
-                                         zip(df[self.configs['scoring']['method']],
-                                             filtered_scores)]
-        df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
-        df.fillna(1e-6)
+        if self.diversity_filter == 'Unique':
+            df[f"filtered_{self.configs['scoring']['method']}"] = [s if u == 'true' else 0.0
+                                                                   for u, s in
+                                                                   zip(df['unique'],
+                                                                       df[self.configs['scoring']['method']])]
+            df["passes_diversity_filter"] = [True if float(a) == float(b) else False
+                                             for b, a in
+                                             zip(df[self.configs['scoring']['method']],
+                                                 df[f"filtered_{self.configs['scoring']['method']}"])]
+            df.fillna(1e-6)
+
+        elif self.diversity_filter == 'Occurrence':
+            df[f"filtered_{self.configs['scoring']['method']}"] = \
+                [s * utils.lin_thresh(x=o, objective='minimize', upper=0,
+                                      lower=self.configs['diversity_filter']['parameters']['tolerance'],
+                                      buffer=self.configs['diversity_filter']['parameters']['buffer'])
+                 for o, s in
+                 zip(df['occurrences'], df[self.configs['scoring']['method']])]
+            df["passes_diversity_filter"] = [True if float(a) == float(b) else False
+                                             for b, a in
+                                             zip(df[self.configs['scoring']['method']],
+                                                 df[f"filtered_{self.configs['scoring']['method']}"])]
+
+        else:  # Memory-assisted
+            scores_dict = {"total_score": np.asarray(df[self.configs['scoring']['method']].tolist(),
+                                                     dtype=np.float64),
+                           "step": [self.step] * len(df)}
+            filtered_scores = self.diversity_filter.score(smiles=df['smiles'].tolist(),
+                                                          scores_dict=scores_dict)
+            df["passes_diversity_filter"] = [True if float(a) == float(b) else False
+                                             for b, a in
+                                             zip(df[self.configs['scoring']['method']],
+                                                 filtered_scores)]
+            df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
+            df.fillna(1e-6)
         return df
 
     def log_parameters(self, parameters: dict):
@@ -414,28 +453,27 @@ class MolScore:
                  for k, v in prims.items()]
         return
 
-    def run_dash_monitor(self):
+    def run_monitor(self):
         """
         Run Dash Monitor.
         """
         # Start dash_utils monitor (Killed in write scores method)
-        cmd = ['python', self.dash_monitor_path, self.save_dir]
-        if self.configs['dash_monitor']['pdb_path'] is not None:
-            cmd += [self.configs['dash_monitor']['pdb_path']]
-        self.dash_monitor = subprocess.Popen(cmd,
-                                             preexec_fn=os.setsid)
+        cmd = ['streamlit', 'run', self.monitor_app_path, self.save_dir]
+        #if self.configs['dash_monitor']['pdb_path'] is not None:
+        #    cmd += [self.configs['dash_monitor']['pdb_path']]
+        self.monitor_app = subprocess.Popen(cmd, preexec_fn=os.setsid)
         return self
 
-    def kill_dash_monitor(self):
+    def kill_monitor(self):
         """
         Kill dash_utils monitor
         """
-        if self.dash_monitor is None:
-            logger.info('No dash monitor to kill')
+        if self.monitor_app is None:
+            logger.info('No monitor to kill')
             return self
         else:
-            os.killpg(os.getpgid(self.dash_monitor.pid), signal.SIGTERM)
-            _, _ = self.dash_monitor.communicate()
+            os.killpg(os.getpgid(self.monitor_app.pid), signal.SIGTERM)
+            _, _ = self.monitor_app.communicate()
         return self
 
     def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
@@ -491,13 +529,14 @@ class MolScore:
 
             # Parse smiles and initiate batch df
             self.parse_smiles(smiles=smiles, step=self.step)
-            logger.info(f'    Pre-processed: {len(self.batch_df)} SMILES')
+            logger.debug(f'    Pre-processed: {len(self.batch_df)} SMILES')
+            logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
 
             # If a main df exists check if some molecules have already been sampled
             if isinstance(self.main_df, pd.core.frame.DataFrame):
                 self.check_uniqueness()
-                logger.info(f'    Uniqueness updated: {len(self.batch_df)} SMILES')
-                logger.info(f'    Duplicates found: {self.batch_df.unique[self.batch_df.unique == "false"].count()} SMILES')
+                logger.debug(f'    Uniqueness updated: {len(self.batch_df)} SMILES')
+            logger.info(f'    Duplicates found: {(self.batch_df.unique == "false").sum()} SMILES')
 
             # Subset only unique and valid smiles
             if recalculate:
@@ -512,7 +551,7 @@ class MolScore:
                                                             (self.batch_df.unique == 'true'), 'batch_idx'].tolist()
             if len(smiles_to_process) == 0:
                 # If no smiles to process then instead submit 10 (scoring function should handle invalid)
-                logger.info(f'    No smiles to score so submitting first 10 SMILES')
+                logger.warning(f'    No smiles to score so submitting first 10 SMILES')
                 smiles_to_process = self.batch_df.loc[:9, 'smiles'].tolist()
                 smiles_to_process_index = self.batch_df.loc[:9, 'batch_idx'].tolist()
 
@@ -523,25 +562,23 @@ class MolScore:
             # Run scoring function
             scoring_start = time.time()
             self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names)
-            logger.info(f'    Returned score for {len(self.results_df)} SMILES')
-            logger.info(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
+            logger.debug(f'    Returned score for {len(self.results_df)} SMILES')
+            logger.debug(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
 
             # Append scoring results
             if isinstance(self.main_df, pd.core.frame.DataFrame) and not recalculate:
                 self.concurrent_update()
             else:
                 self.first_update()
-            logger.info(f'    Scores updated: {len(self.batch_df)} SMILES')
+            logger.debug(f'    Scores updated: {len(self.batch_df)} SMILES')
 
             # Compute average / score
             self.update_maxmin(df=self.batch_df)
             self.batch_df = self.compute_score(df=self.batch_df)
-            logger.info(f'    Aggregate score calculated: {len(self.batch_df)} SMILES')
+            logger.debug(f'    Aggregate score calculated: {len(self.batch_df)} SMILES')
             if self.diversity_filter is not None:
                 self.batch_df = self.run_diversity_filter(self.batch_df)
                 logger.info(f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} SMILES')
-            if self.unique_filter:
-                self.batch_df = self.run_unique_filter(self.batch_df)
 
             # Add information of scoring time
             self.batch_df['score_time'] = time.time() - scoring_start
@@ -558,22 +595,22 @@ class MolScore:
             self.batch_df.to_csv(os.path.join(self.save_dir, 'iterations', f'{self.step:06d}_scores.csv'))
 
             # Start dash_utils monitor to track iteration files once first one is written!
-            if self.dash_monitor is True:
-                self.run_dash_monitor()
+            if self.monitor_app is True:
+                self.run_monitor()
 
             # Fetch score
-            if (self.diversity_filter is not None) or self.unique_filter:
+            if self.diversity_filter is not None:
                 scores = self.batch_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
             else:
                 scores = self.batch_df.loc[:, self.configs['scoring']['method']].tolist()
             if not flt:
                 scores = np.array(scores, dtype=np.float32)
-            logger.info(f'    Returning {len(scores)} scores')
+            logger.debug(f'    Returning: {len(scores)} scores')
             logger.info(f'    MolScore elapsed time: {time.time() - batch_start:.02f}s')
 
             # Write out memory intermittently
             if self.step % 5 == 0:
-                if self.diversity_filter is not None:
+                if (self.diversity_filter is not None) and (self.diversity_filter not in ['Unique', 'Occurrence']):
                     self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
 
             # Clean up class

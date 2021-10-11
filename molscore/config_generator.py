@@ -10,11 +10,15 @@ import molscore.scaffold_memory as scaffold_memory
 import molscore.scoring_functions as scoring_functions
 
 # Persisting parameters that don't get re-run by streamlit with widget interactions
+# TODO I think streamlit has updated versions, use those instead?
 ss = get(key='ss', input_path='configs', n_sf=1, n_sp=1, maxmin=False)
 
 
 # Functions
 def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...'):
+    """
+    Code for a file selector widget which remembers where you are...
+    """
     # get base path (directory)
     base_path = '.' if path is None or path is '' else path
     base_path = base_path if os.path.isdir(
@@ -22,7 +26,6 @@ def st_file_selector(st_placeholder, key, path='.', label='Please, select a file
     base_path = '.' if base_path is None or base_path is '' else base_path
     # list files in base path directory
     files = os.listdir(base_path)
-    #if base_path is not '.':
     files.insert(0, '..')
     files.insert(0, '.')
     selected_file = st_placeholder.selectbox(
@@ -37,6 +40,14 @@ def st_file_selector(st_placeholder, key, path='.', label='Please, select a file
 
 
 def type2widget(ptype, label, key, default=None):
+    """
+    Infer widget based on parameter datatype
+    :param ptype: Parameter data type
+    :param label: Description for the widget to write
+    :param key: Unique key for widget
+    :param default: Default parameter value
+    :return:
+    """
     if ptype == str:
         if default is not None:
             widget = st.text_input(label=label, value=default, key=key)
@@ -79,13 +90,12 @@ def type2widget(ptype, label, key, default=None):
 def object2dictionary(obj, key_i=0, exceptions=[]):
     """
     Take an object (function or class.__init__) and use the st interface to return
-     a dictionary of parameters and arguments
+     a dictionary of parameters and arguments - depends on correctly annotated format.
     :param obj: Class or function
-    :param key_i: Widget identifier
+    :param key_i: Key identifier
     :param exceptions: Values we don't want user input for
-    :return:
+    :return: dict
     """
-    sig = inspect.signature(obj)
     exceptions += exceptions + ['kwargs']
 
     # Get the docs...
@@ -106,15 +116,17 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
         default = params[p].default
         ptype = params[p].annotation
         if len(params.keys()) == len(docs):
-            doc = docs[i].split(':')[2].strip()
+            doc = docs[i].split(':')[2].strip()  # Must only be one line per parameter, ah!
         else:
             doc = p
         label = f'{p}: {doc}'
+
         # If no default and no annotation show warning
         if default == inspect._empty and ptype == inspect._empty:
             st.write(f'WARNING: {p} is has no default or type annotation, using text_input')
             result_dict[p] = st.text_input(label=label, key=f'{key_i}: {obj.__name__}_{p}')
-        # If no default use annotation for typ
+
+        # If no default use type annotation
         elif default == inspect._empty and ptype != inspect._empty:
             # Check to see if ptype is union i.e., multiple types possible
             ptype_args = getattr(ptype, '__args__', None)
@@ -122,7 +134,8 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                 ptype = st.selectbox(label=f'{p}: input type', options=ptype_args,
                                      index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
             result_dict[p] = type2widget(ptype, key=f'{key_i}: {obj.__name__}_{p}', label=label)
-        # If both are present, use annotation for typing
+
+        # If both are present, use type annotation
         elif default != inspect._empty and ptype != inspect._empty:
             with st.beta_expander(f"{p}={default}"):
                 # Check to see if ptype is union i.e., multiple types possible
@@ -132,12 +145,13 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                                          index=0, key=f'{key_i}: {obj.__name__}_{p}')
                 result_dict[p] = type2widget(ptype, key=f'{key_i}: {obj.__name__}_{p}',
                                              default=default, label=label)
+
         # If default but no annotation
-        # todo change default label...
         else:
             with st.beta_expander(f"{p}={default}"):
                 result_dict[p] = type2widget(type(default), key=f'{key_i}: {obj.__name__}_{p}',
                                              default=default, label=label)
+
         # If list convert correctly
         if ptype == list:
             result_dict[p] = result_dict[p].replace(',', '').replace('\n', ' ').split(' ')
@@ -149,10 +163,16 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
 
 
 def getsfconfig(key_i=0):
+    """
+    Get configs for scoring functions
+    :param key_i: Key identifier for widgets
+    :return: dict
+    """
     sf_config = {}
     # Inset it slightly
     col1, col2 = st.beta_columns([1, 9])
     with col2:
+        # Choose scoring functions
         sf_config['name'] = st.radio(label='Name',
                                      options=[s.__name__ for s in
                                               scoring_functions.all_scoring_functions],
@@ -161,7 +181,7 @@ def getsfconfig(key_i=0):
         sf_config['run'] = True
         # Get (class/function) from name ...
         sf_obj = [s for s in scoring_functions.all_scoring_functions if s.__name__ == sf_config['name']][0]
-        # Write doc of class, not instance.
+        # Write doc of class (not instance)
         sf_doc = inspect.getdoc(sf_obj)
         if sf_doc is not None:
             st.write(sf_doc)
@@ -174,6 +194,12 @@ def getsfconfig(key_i=0):
 
 
 def getspconfig(options, key_i=0):
+    """
+    Get configs for scoring parameters
+    :param options: List of options taken from selected scoring functions
+    :param key_i: Key identifier
+    :return: dict
+    """
     global ss
     sp_config = {}
     # Inset it slightly
@@ -187,7 +213,7 @@ def getspconfig(options, key_i=0):
             return
         sp_config['weight'] = st.number_input(label='weight (only applicable if using wsum)',
                                               value=1.0, key=f'{key_i}: sp_weight')
-        # Get (class/function) from name and print doc ...
+        # Get (class/function) for transformation/modification from name and print doc ...
         sp_config['modifier'] = st.selectbox(label='Modifier',
                                              options=[m.__name__ for m in utils.all_score_modifiers],
                                              index=0,
@@ -234,7 +260,7 @@ def getspconfig(options, key_i=0):
 
 
 # ----- Start App -----
-st.title('MolScore Config Writer')
+st.title('MolScore Configuration Writer')
 config = dict()
 
 
@@ -242,7 +268,7 @@ config = dict()
 config['task'] = st.text_input(label='Task name (for file naming)', value='QED').strip().replace(' ', '_')
 config['output_dir'] = os.path.abspath(st.text_input(label='Output directory', value='./molscore_results'))
 st.write(f"Selected: {config['output_dir']}")
-config['load_from_previous'] = st.selectbox(label='Continue from previous directory', options=[True, False], index=1)
+config['load_from_previous'] = st.checkbox(label='Continue from previous directory')
 if config['load_from_previous']:
     col1, col2 = st.beta_columns([1, 9])
     with col2:
@@ -254,43 +280,74 @@ if config['load_from_previous']:
         config['previous_dir'] = previous_dir_ss.input_path
         st.write(f"Selected: {config['previous_dir']}")
 
+# ------ Logging ------
+#st.subheader('Logging')
+config['logging'] = st.checkbox(label='Verbose logging')
 
-# ------ Dash monitor ------
-st.subheader('Dash monitor')
-config['dash_monitor'] = {}
-config['dash_monitor'].update({'run': st.selectbox(label='Run', options=[True, False], index=0)})
-use_3D = st.selectbox(label='Use 3D dash monitor', options=[True, False], index=1)
-if use_3D:
-    col1, col2 = st.beta_columns([1, 9])
-    with col2:
-        pdb_path_ss = get(key='pdb_path', input_path='configs')
-        pdb_path_ss.input_path = st_file_selector(label='Select a receptor pdb file',
-                                         st_placeholder=st.empty(),
-                                         path=pdb_path_ss.input_path,
-                                         key='pdb_path')
-        config['dash_monitor']['pdb_path'] = pdb_path_ss.input_path
-        st.write(f"Selected: {config['dash_monitor']['pdb_path']}")
-else:
-    config['dash_monitor'].update({'pdb_path': None})
+# ------ App monitor ------
+#st.subheader('Monitor app')
+config['monitor_app'] = st.checkbox(label='Run live monitor app')
+#config['monitor_app'] = {}
+#config['monitor_app'].update({'run': st.selectbox(label='Run', options=[True, False], index=0)})
+#use_3D = st.selectbox(label='Use 3D dash monitor', options=[True, False], index=1)
+#if use_3D:
+#    col1, col2 = st.beta_columns([1, 9])
+#    with col2:
+#        pdb_path_ss = get(key='pdb_path', input_path='configs')
+#        pdb_path_ss.input_path = st_file_selector(label='Select a receptor pdb file',
+#                                         st_placeholder=st.empty(),
+#                                         path=pdb_path_ss.input_path,
+#                                         key='pdb_path')
+#        config['monitor_app']['pdb_path'] = pdb_path_ss.input_path
+#        st.write(f"Selected: {config['monitor_app']['pdb_path']}")
+#else:
+#    config['monitor_app'].update({'pdb_path': None})
 
-# ----- Unique filter -----
-config['unique_filter'] = st.selectbox(label='Apply unique filter, if a molecule is not unique score it 0',
-                                       options=[True, False], index=1)
-
-# ----- Diversity filter ------
+# ----- Diversity filters -----
 st.subheader('Diversity filter')
-st.write('see https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0)')
 config['diversity_filter'] = {}
-config['diversity_filter']['run'] = st.selectbox(label='Run', options=[True, False], index=1)
+config['diversity_filter']['run'] = st.checkbox(label='Run diversity filter')
 if config['diversity_filter']['run']:
-    config['diversity_filter']['name'] = st.radio(label='Name',
-                                                  options=[s.__name__ for s in scaffold_memory.all_scaffold_filters],
+    config['diversity_filter']['name'] = st.radio(label='Type of filter',
+                                                  options=['Unique', 'Occurrence'] +
+                                                          [s.__name__ for s in scaffold_memory.all_scaffold_filters],
                                                   index=0)
-    # Get (class/function) from name ...
-    dv_obj = [s for s in scaffold_memory.all_scaffold_filters if s.__name__ == config['diversity_filter']['name']][0]
-    config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
+    if config['diversity_filter']['name'] == 'Unique':
+        st.write('Penalize non-unique molecules by assigning a score of 0')
+        config['diversity_filter']['parameters'] = {}
+    elif config['diversity_filter']['name'] == 'Occurrence':
+        st.write('Penalize non-unique molecules based on the number of occurrences')
+        config['diversity_filter']['parameters'] = {'tolerance': st.number_input(label='Number of duplicates allowed'
+                                                                                       ' before penalization',
+                                                                                 min_value=0, value=5),
+                                                    'buffer': st.number_input(label='Number of linear penalization\'s'
+                                                                                    ' until a reward of 0 is returned',
+                                                                              min_value=0, value=5)}
+    else:  # 'Memory-assisted' types:
+        st.write('Use as dynamic memory: see https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0')
+        # Get (class/function) from name ...
+        dv_obj = [s
+                  for s in scaffold_memory.all_scaffold_filters
+                  if s.__name__ == config['diversity_filter']['name']][0]
+        config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
     with st.beta_expander(label='Check parsing'):
         st.write(config['diversity_filter'])
+
+#config['unique_filter'] = st.selectbox(label='Apply unique filter, if a molecule is not unique score it 0',
+#                                       options=[True, False], index=1)
+
+#st.write('see https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0)')
+#config['diversity_filter'] = {}
+#config['diversity_filter']['run'] = st.selectbox(label='Run', options=[True, False], index=1)
+#if config['diversity_filter']['run']:
+#    config['diversity_filter']['name'] = st.radio(label='Name',
+#                                                  options=[s.__name__ for s in scaffold_memory.all_scaffold_filters],
+#                                                  index=0)
+#    # Get (class/function) from name ...
+#    dv_obj = [s for s in scaffold_memory.all_scaffold_filters if s.__name__ == config['diversity_filter']['name']][0]
+#    config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
+#    with st.beta_expander(label='Check parsing'):
+#        st.write(config['diversity_filter'])
 
 
 # ----- Scoring functions ------
