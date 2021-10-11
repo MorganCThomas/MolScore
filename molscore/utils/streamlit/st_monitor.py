@@ -706,7 +706,7 @@ def main():
                 ref_path = input_structure_ss.ref_path
                 col2.write(f"Selected: {ref_path}")
 
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3 = st.beta_columns(3)
                 surface = col1.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'])
                 mviewer.add_surface(surface)
                 show_residue_labels = col2.selectbox(label='Label residues', options=[True, False], index=1)
