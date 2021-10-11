@@ -281,27 +281,10 @@ if config['load_from_previous']:
         st.write(f"Selected: {config['previous_dir']}")
 
 # ------ Logging ------
-#st.subheader('Logging')
 config['logging'] = st.checkbox(label='Verbose logging')
 
 # ------ App monitor ------
-#st.subheader('Monitor app')
 config['monitor_app'] = st.checkbox(label='Run live monitor app')
-#config['monitor_app'] = {}
-#config['monitor_app'].update({'run': st.selectbox(label='Run', options=[True, False], index=0)})
-#use_3D = st.selectbox(label='Use 3D dash monitor', options=[True, False], index=1)
-#if use_3D:
-#    col1, col2 = st.beta_columns([1, 9])
-#    with col2:
-#        pdb_path_ss = get(key='pdb_path', input_path='configs')
-#        pdb_path_ss.input_path = st_file_selector(label='Select a receptor pdb file',
-#                                         st_placeholder=st.empty(),
-#                                         path=pdb_path_ss.input_path,
-#                                         key='pdb_path')
-#        config['monitor_app']['pdb_path'] = pdb_path_ss.input_path
-#        st.write(f"Selected: {config['monitor_app']['pdb_path']}")
-#else:
-#    config['monitor_app'].update({'pdb_path': None})
 
 # ----- Diversity filters -----
 st.subheader('Diversity filter')
@@ -332,23 +315,6 @@ if config['diversity_filter']['run']:
         config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
     with st.beta_expander(label='Check parsing'):
         st.write(config['diversity_filter'])
-
-#config['unique_filter'] = st.selectbox(label='Apply unique filter, if a molecule is not unique score it 0',
-#                                       options=[True, False], index=1)
-
-#st.write('see https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0)')
-#config['diversity_filter'] = {}
-#config['diversity_filter']['run'] = st.selectbox(label='Run', options=[True, False], index=1)
-#if config['diversity_filter']['run']:
-#    config['diversity_filter']['name'] = st.radio(label='Name',
-#                                                  options=[s.__name__ for s in scaffold_memory.all_scaffold_filters],
-#                                                  index=0)
-#    # Get (class/function) from name ...
-#    dv_obj = [s for s in scaffold_memory.all_scaffold_filters if s.__name__ == config['diversity_filter']['name']][0]
-#    config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
-#    with st.beta_expander(label='Check parsing'):
-#        st.write(config['diversity_filter'])
-
 
 # ----- Scoring functions ------
 st.subheader('Scoring functions')
