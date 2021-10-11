@@ -347,13 +347,6 @@ class MolScore:
 
         return df
 
-#    def run_unique_filter(self, df):
-#        df[f"filtered_{self.configs['scoring']['method']}"] = [s if u == 'true' else 0.0
-#                                                               for u, s in
-#                                                               zip(df['unique'], df[self.configs['scoring']['method']])]
-#        df.fillna(1e-6)
-#        return df
-
     def run_diversity_filter(self, df):
         if self.diversity_filter == 'Unique':
             df[f"filtered_{self.configs['scoring']['method']}"] = [s if u == 'true' else 0.0
@@ -459,8 +452,6 @@ class MolScore:
         """
         # Start dash_utils monitor (Killed in write scores method)
         cmd = ['streamlit', 'run', self.monitor_app_path, self.save_dir]
-        #if self.configs['dash_monitor']['pdb_path'] is not None:
-        #    cmd += [self.configs['dash_monitor']['pdb_path']]
         self.monitor_app = subprocess.Popen(cmd, preexec_fn=os.setsid)
         return self
 
