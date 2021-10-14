@@ -12,7 +12,8 @@ class RDKitDescriptors:
 
     return_metrics = ['QED', 'SAscore', 'CLogP', 'MolWt', 'HeavyAtomCount', 'HeavyAtomMolWt',
                       'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms', 'NumRotatableBonds',
-                      'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP', 'FormalCharge']
+                      'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP',
+                      'FormalCharge', 'MolecularFormula']
 
     def __init__(self, prefix: str = 'desc', n_jobs: int = 1, **kwargs):
         """
@@ -72,7 +73,8 @@ class RDKitDescriptors:
                        'RingCount': Descriptors.RingCount,
                        'TPSA': Descriptors.TPSA,
                        'PenLogP': penalized_logp,
-                       'FormalCharge': Chem.GetFormalCharge}
+                       'FormalCharge': Chem.GetFormalCharge,
+                       'MolecularFormula': Descriptors.rdMolDescriptors.CalcMolFormula}
         descriptors = {f'{prefix}_{k}': v for k, v in descriptors.items()}
 
         result = {'smiles': smi}
