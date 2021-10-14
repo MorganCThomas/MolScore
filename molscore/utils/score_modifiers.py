@@ -29,7 +29,6 @@ def norm(x: float, objective: str, max: float, min: float, **kwargs):
         y = (x - max) / (min - max)
 
     else:
-        print("Normalization objective must be either \'minimize\' or \'maximize\'")
         raise
     return y
 
@@ -75,7 +74,6 @@ def lin_thresh(x: float, objective: str, upper: float, lower: float, buffer: flo
                 y = (x - (upper+buffer)) / (upper - (upper+buffer))
 
     else:
-        print("linThresh objective must be either \'minimize\' or \'maximize\' or \'range\'")
         raise
     return y
 
@@ -109,7 +107,6 @@ def step(x: float, objective: str, upper: float, lower: float, **kwargs):
             y = 0.0
 
     else:
-        print("linThresh objective must be either \'minimize\' or \'maximize\' or \'range\'")
         raise
     return y
 
@@ -138,7 +135,6 @@ def gauss(x: float, objective: str, mu: float, sigma: float, **kwargs):
     elif objective == 'range':
         y = np.exp(-0.5 * np.power((x - mu) / sigma, 2.))
     else:
-        print("linThresh objective must be either \'minimize\' or \'maximize\' or \'range\'")
         raise
     return y
 
