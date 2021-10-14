@@ -266,8 +266,13 @@ config = dict()
 
 # ------ Basic information ------
 config['task'] = st.text_input(label='Task name (for file naming)', value='QED').strip().replace(' ', '_')
+
 config['output_dir'] = os.path.abspath(st.text_input(label='Output directory', value='./molscore_results'))
-st.write(f"Selected: {config['output_dir']}")
+absolute_output_path = st.checkbox(label='Absolute path')
+if absolute_output_path:
+    config['output_dir'] = os.path.abspath(config['output_dir'])
+    st.write(f"Selected: {config['output_dir']}")
+
 config['load_from_previous'] = st.checkbox(label='Continue from previous directory')
 if config['load_from_previous']:
     col1, col2 = st.beta_columns([1, 9])
