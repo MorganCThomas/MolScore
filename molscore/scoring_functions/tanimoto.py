@@ -1,4 +1,5 @@
 import os
+import argparse
 import logging
 import numpy as np
 from functools import partial
@@ -22,13 +23,14 @@ class TanimotoSimilarity:
 
     def __init__(self, prefix: str, ref_smiles: Union[list, os.PathLike],
                  radius: int = 2, bits: int = 1024, features: bool = False,
-                 method: str = 'mean', n_jobs: int = 1, **kwargs):
+                 counts: bool = False, method: str = 'mean', n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param ref_smiles: List of SMILES or path to SMILES file with no header (.smi)
         :param radius: Radius of Morgan fingerprints
         :param bits: Number of Morgan fingerprint bits
-        :param features: Whether to include feature information (equiv. FCFP)
+        :param features: Whether to include feature information (sometimes referred to as FCFP)
+        :param counts: Whether to include bit count (sometimes referred to as ECFC)
         :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour)
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
         :param kwargs:
@@ -39,6 +41,7 @@ class TanimotoSimilarity:
         self.radius = radius
         self.bits = bits
         self.features = features
+        self.counts = counts
         self.n_jobs = n_jobs
 
         # If file path provided, load smiles.
@@ -55,16 +58,20 @@ class TanimotoSimilarity:
 
         # Check they're the same length
         if len(self.ref_smiles) != len(self.ref_mols):
-            logger.warning(f"{len(self.ref_smiles) - len(self.ref_mols)} query smiles converted to mol successfully")
+            logger.warning(f"{len(self.ref_mols)}/{len(ref_smiles)} query smiles converted to mol successfully")
 
-        # Conver ref mols to ref fps
-        self.ref_fps = [Chem.GetMorganFingerprintAsBitVect(mol, radius=self.radius, nBits=self.bits,
-                                                           useFeatures=self.features)
-                        for mol in self.ref_mols]
+        # Convert ref mols to ref fps
+        if self.counts:
+            self.ref_fps = [Chem.GetMorganFingerprint(mol, radius=self.radius, useFeatures=self.features)
+                            for mol in self.ref_mols]
+        else:
+            self.ref_fps = [Chem.GetMorganFingerprintAsBitVect(mol, radius=self.radius, nBits=self.bits,
+                                                               useFeatures=self.features)
+                            for mol in self.ref_mols]
 
     @staticmethod
     def calculate_Tc(smi: str, ref_fps: np.ndarray, radius: int, nBits: int,
-        useFeatures: bool, method: str):
+        useFeatures: bool, useCounts: bool, method: str):
         """
         Calculate the Tanimoto coefficient given a SMILES string and list of
          reference fps (np.array for multiprocessing, calculating
@@ -74,6 +81,7 @@ class TanimotoSimilarity:
         :param radius: Radius of Morgan fingerprints
         :param nBits: Number of Morgan fingerprint bits
         :param useFeatures: Whether to include feature information
+        :param useCounts: Whether to include count information
         :param method: 'mean' or 'max'
         :return: (SMILES, Tanimoto coefficient)
         """
@@ -85,9 +93,14 @@ class TanimotoSimilarity:
 
         mol = Chem.MolFromSmiles(smi)
         if mol:
-            fp = np.array(Chem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=nBits,
-                                                             useFeatures=useFeatures))
-            Tc_vec = [np_tanimoto(fp, rfp) for rfp in ref_fps]
+            if useCounts:
+                fp = Chem.GetMorganFingerprint(mol, radius=radius, useFeatures=useFeatures)
+                Tc_vec = [Chem.DataStructs.TanimotoSimilarity(fp, rfp) for rfp in ref_fps]
+            else:
+                fp = np.asarray(Chem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=nBits,
+                                                                   useFeatures=useFeatures))
+                Tc_vec = [np_tanimoto(fp, rfp) for rfp in ref_fps]
+
             if method == 'mean':
                 Tc = np.mean(Tc_vec)
             elif method == 'max':
@@ -108,7 +121,64 @@ class TanimotoSimilarity:
         """
         with Pool(self.n_jobs) as pool:
             calculate_Tc_p = partial(self.calculate_Tc, ref_fps=np.asarray(self.ref_fps), radius=self.radius,
-                                     nBits=self.bits, useFeatures=self.features, method=self.method)
+                                     nBits=self.bits, useFeatures=self.features, useCounts=self.counts,
+                                     method=self.method)
             results = [{'smiles': smi, f'{self.prefix}_Tc': Tc}
                        for smi, Tc in pool.imap(calculate_Tc_p, smiles)]
         return results
+
+
+if __name__ == '__main__':
+    # Read in CLI arguments
+    parser = argparse.ArgumentParser(description='Calculate the Maximum or Average Tanimoto similarity for a set of '
+                                                 'molecules to a set of reference molecules',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    subparsers = parser.add_subparsers(title='Running mode', dest='mode')
+    run = subparsers.add_parser('run', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    run.add_argument('--prefix', type=str, default='test', help='Prefix to returned metrics')
+    run.add_argument('--ref_smiles', help='Path to smiles file (.smi) for ref smiles')
+    run.add_argument('--query_smiles', help='Path to smiles file (.smi) for query smiles')
+    run.add_argument('--radius', default=2, help='Morgan fingerprint radius')
+    run.add_argument('--bits', default=1024, help='Morgan fingerprint bit size')
+    run.add_argument('--features', action='store_true', help='Use Morgan fingerprint features')
+    run.add_argument('--counts', action='store_true', help='Use Morgan fingerprint features')
+    run.add_argument('--method', type=str, choices=['mean', 'max'], default='mean',
+                     help='Use mean or max similarity to ref smiles')
+    run.add_argument('--n_jobs', default=1, type=int, help='How many cores to use')
+    test = subparsers.add_parser('test')
+    args = parser.parse_args()
+
+    # Run mode
+    if args.mode == 'run':
+        from molscore.test import MockGenerator
+        mg = MockGenerator(seed_no=123)
+
+        if args.ref_smiles is None:
+            args.ref_smiles = mg.sample(10)
+
+        ts = TanimotoSimilarity(prefix=args.prefix, ref_smiles=args.ref_smiles, radius=args.radius,
+                                bits=args.bits, features=args.features, counts=args.counts,
+                                method=args.method, n_jobs=args.n_jobs)
+
+        if args.query_smiles is None:
+            _ = [print(o) for o in ts(mg.sample(5))]
+        else:
+            with open(args.query_smiles, 'r') as f:
+                qsmiles = f.read().splitlines()
+            _ = [print(o) for o in ts(qsmiles)]
+
+    # Test mode
+    elif args.mode == 'test':
+        import sys
+        import unittest
+        from molscore.test.tests import test_tanimoto
+        # Remove CLI arguments
+        for i in range(len(sys.argv)-1):
+            sys.argv.pop()
+        # Get and run tests
+        suite = unittest.TestLoader().loadTestsFromModule(test_tanimoto)
+        unittest.TextTestRunner().run(suite)
+
+    # Print usage
+    else:
+        print('Please specify running mode: \'run\' or \'test\'')
