@@ -17,6 +17,7 @@ class Isomer:
         """
         :param prefix: Prefix to identify scoring function instance (e.g., C2H6)
         :param molecular_formula: Element count of 1 must be explicit (simplicity hack e.g., C9H10N2O2P1F2Cl1)
+        :param kwargs:
         """
         self.prefix = prefix
         self.ref_formula = molecular_formula
