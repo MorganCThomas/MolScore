@@ -1,6 +1,6 @@
 from multiprocessing import Pool
 from functools import partial
-from rdkit.Chem import Descriptors, QED, Crippen
+from rdkit.Chem import Descriptors, QED, Crippen, GraphDescriptors
 from rdkit.Chem import AllChem as Chem
 from molscore.scoring_functions.SA_Score import sascorer
 
@@ -13,7 +13,7 @@ class RDKitDescriptors:
     return_metrics = ['QED', 'SAscore', 'CLogP', 'MolWt', 'HeavyAtomCount', 'HeavyAtomMolWt',
                       'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms', 'NumRotatableBonds',
                       'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP',
-                      'FormalCharge', 'MolecularFormula']
+                      'FormalCharge', 'MolecularFormula', 'Bertz']
 
     def __init__(self, prefix: str = 'desc', n_jobs: int = 1, **kwargs):
         """
@@ -74,7 +74,8 @@ class RDKitDescriptors:
                        'TPSA': Descriptors.TPSA,
                        'PenLogP': penalized_logp,
                        'FormalCharge': Chem.GetFormalCharge,
-                       'MolecularFormula': Descriptors.rdMolDescriptors.CalcMolFormula}
+                       'MolecularFormula': Descriptors.rdMolDescriptors.CalcMolFormula,
+                       'Bertz': GraphDescriptors.BertzCT}
         descriptors = {f'{prefix}_{k}': v for k, v in descriptors.items()}
 
         result = {'smiles': smi}
