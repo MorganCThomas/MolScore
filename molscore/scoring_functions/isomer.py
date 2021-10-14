@@ -1,5 +1,5 @@
 import re
-from rdkit.Chem import Descriptors, QED, Crippen
+from rdkit.Chem import Descriptors, QED, Crippen, GetPeriodicTable
 from rdkit.Chem import AllChem as Chem
 from molscore.utils.score_modifiers import gauss
 from molscore.utils.score_methods import gmean
@@ -16,7 +16,7 @@ class Isomer:
     def __init__(self, prefix: str, molecular_formula: str, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., C2H6)
-        :param molecular_formula: Formula that'll be broken down for scoring (e.g., C2H6)
+        :param molecular_formula: Element count of 1 must be explicit (simplicity hack e.g., C9H10N2O2P1F2Cl1)
         """
         self.prefix = prefix
         self.ref_formula = molecular_formula
