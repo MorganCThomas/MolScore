@@ -407,7 +407,7 @@ class MolScore:
         else:
             self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
 
-        if self.diversity_filter is not None:
+        if (self.diversity_filter is not None) and (not isinstance(self.diversity_filter, str)):
             self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
 
         self.fh.close()
