@@ -398,7 +398,11 @@ class MolScore:
         if len(self.logged_parameters) > 0:
             temp = self.main_df.copy()
             for p, v in self.logged_parameters.items():
-                temp[p] = [v]*len(temp)
+                try:
+                    temp[p] = v
+                except ValueError:
+                    # temp[p] = [v]*len(temp)
+                    pass
             temp.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
         else:
             self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
@@ -542,7 +546,7 @@ class MolScore:
                                                             (self.batch_df.unique == 'true'), 'batch_idx'].tolist()
             if len(smiles_to_process) == 0:
                 # If no smiles to process then instead submit 10 (scoring function should handle invalid)
-                logger.warning(f'    No smiles to score so submitting first 10 SMILES')
+                logger.info(f'    No smiles to score so submitting first 10 SMILES')
                 smiles_to_process = self.batch_df.loc[:9, 'smiles'].tolist()
                 smiles_to_process_index = self.batch_df.loc[:9, 'batch_idx'].tolist()
 
