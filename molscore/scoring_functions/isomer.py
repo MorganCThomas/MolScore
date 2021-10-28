@@ -28,10 +28,14 @@ class Isomer:
         """
         Use regex to retrieve elements and counts
         """
-        components = re.findall('[a-zA-Z]+[0-9]+', formula)
+        components = re.findall(r'([A-Z][a-z]*)(\d*)', formula)
+
+        # Convert matches to the required format
         elements = {}
         for c in components:
-            elements[re.search('[a-zA-Z]+', c).group()] = int(re.search('[0-9]+', c).group())
+            # convert count to an integer, and set it to 1 if the count is not visible in the molecular formula
+            count = 1 if not c[1] else int(c[1])
+            elements[c[0]] = count
         return elements
 
     def calculate_isomer_score(self, smi):
