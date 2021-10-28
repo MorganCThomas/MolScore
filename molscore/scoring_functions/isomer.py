@@ -62,6 +62,8 @@ class Isomer:
                                 objective='range',
                                 mu=sum(self.ref_elements.values()),
                                 sigma=2))
+            # Add dummy value for 0's to get rid of annoying error
+            scores = [s if s != 0 else 1e-6 for s in scores]
             score = gmean(scores)
         else:
             score = 0.0
