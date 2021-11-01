@@ -102,7 +102,7 @@ class GlideDock:
                     break
         # Otherwise just stick it on the end of the file
         else:
-            glide_in.append(f'{glide_property}  {glide_value}\n')
+            glide_in.append(f'{glide_property}   {glide_value}\n')
 
         return glide_in
 
