@@ -42,9 +42,7 @@ def load_iterations(it_path):
     if len(it_files) > 0:
         it_files = sorted(it_files)
         for f in it_files:
-            main_df = main_df.append(pd.read_csv(f, index_col=0, dtype={'valid': object,
-                                                                        'unique': object,
-                                                                        'passes_diversity_filter': object}))
+            main_df = main_df.append(pd.read_csv(f, index_col=0, dtype={'valid': object}))
     return main_df, it_files
 
 
@@ -140,10 +138,16 @@ def bokeh_plot(y, main_df, size=(1000, 500), *args):
     """
     # @img{safe}
 
-    if (y == 'valid') or (y == 'unique') or (y == 'passes_diversity_filter'):
+    if y == 'valid':
         p = figure(plot_width=size[0], plot_height=size[1])
         steps = main_df.step.unique().tolist()
         ratios = main_df.groupby('step')[y].apply(lambda x: (x == 'true').mean()).tolist()
+        p.line(x=steps, y=ratios)
+
+    elif (y == 'unique') or (y == 'passes_diversity_filter'):
+        p = figure(plot_width=size[0], plot_height=size[1])
+        steps = main_df.step.unique().tolist()
+        ratios = main_df.groupby('step')[y].mean().tolist()
         p.line(x=steps, y=ratios)
 
     else:
