@@ -29,7 +29,7 @@ class GlideDock:
                       'r_i_glide_ligand_efficiency_ln', 'r_i_glide_gscore', 'r_i_glide_lipo',
                       'r_i_glide_hbond', 'r_i_glide_metal', 'r_i_glide_rewards', 'r_i_glide_evdw',
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
-                      'r_i_glide_energy', 'r_i_glide_rmsd_to_input']
+                      'r_i_glide_energy']
 
     def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
                  timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
