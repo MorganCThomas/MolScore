@@ -134,6 +134,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                 ptype = st.selectbox(label=f'{p}: input type', options=ptype_args,
                                      index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
             result_dict[p] = type2widget(ptype, key=f'{key_i}: {obj.__name__}_{p}', label=label)
+            if ptype == int: result_dict[p] = int(result_dict[p])
 
         # If both are present, use type annotation
         elif default != inspect._empty and ptype != inspect._empty:
@@ -145,6 +146,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                                          index=0, key=f'{key_i}: {obj.__name__}_{p}')
                 result_dict[p] = type2widget(ptype, key=f'{key_i}: {obj.__name__}_{p}',
                                              default=default, label=label)
+                if ptype == int: result_dict[p] = int(result_dict[p])
 
         # If default but no annotation
         else:

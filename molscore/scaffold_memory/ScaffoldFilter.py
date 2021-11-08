@@ -280,8 +280,8 @@ class ScaffoldSimilarityAtomPair(CompoundSimilarity):
 class ScaffoldSimilarityECFP(CompoundSimilarity):
     """Penalizes compounds based on atom pair Tanimoto similarity to previously generated Murcko Scaffolds."""
 
-    def __init__(self, nbmax=25, minscore=0.8, minsimilarity=0.8, radius=2, useFeatures=False,
-                 bits=1024, outputmode="binary", **kwargs):
+    def __init__(self, nbmax: int = 25, minscore: float = 0.8, minsimilarity: float = 0.8, radius: int = 2,
+                 useFeatures: bool = False, bits: int = 1024, outputmode: str = "binary", **kwargs):
         """
         :param nbmax: Maximum number of molecules per memory bin (cluster)
         :param minscore: Minimum molecule score required to consider for memory binning
