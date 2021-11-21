@@ -3,6 +3,7 @@ from functools import partial
 from rdkit.Chem import Descriptors, QED, Crippen, GraphDescriptors
 from rdkit.Chem import AllChem as Chem
 from molscore.scoring_functions.SA_Score import sascorer
+from molscore.scoring_functions.utils import charge_counts, max_consecutive_rotatable_bonds
 
 
 class RDKitDescriptors:
@@ -13,7 +14,7 @@ class RDKitDescriptors:
     return_metrics = ['QED', 'SAscore', 'CLogP', 'MolWt', 'HeavyAtomCount', 'HeavyAtomMolWt',
                       'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms', 'NumRotatableBonds',
                       'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP',
-                      'FormalCharge', 'MolecularFormula', 'Bertz']
+                      'FormalCharge', 'MolecularFormula', 'Bertz', 'MaxConsecutiveRotatableBonds']
 
     def __init__(self, prefix: str = 'desc', n_jobs: int = 1, **kwargs):
         """
@@ -87,8 +88,14 @@ class RDKitDescriptors:
                 # If any error is thrown append 0.0.
                 except:
                     result.update({k: 0.0})
+
+            # Add custom descriptors
+            result.update({f'{prefix}_MaxConsecutiveRotatableBonds': max_consecutive_rotatable_bonds(mol)})
+
         else:
             result.update({k: 0.0 for k in descriptors.keys()})
+            # Add custom descriptors
+            result.update({f'{prefix}_MaxConsecutiveRotatableBonds': 0.0})
         return result
 
     def __call__(self, smiles: list, **kwargs):

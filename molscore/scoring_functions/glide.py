@@ -11,7 +11,7 @@ from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
 
 from molscore.scoring_functions.rocs import ROCS
-from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions.utils import timedSubprocess, charge_counts
 
 logger = logging.getLogger('glide')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -29,7 +29,7 @@ class GlideDock:
                       'r_i_glide_ligand_efficiency_ln', 'r_i_glide_gscore', 'r_i_glide_lipo',
                       'r_i_glide_hbond', 'r_i_glide_metal', 'r_i_glide_rewards', 'r_i_glide_evdw',
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
-                      'r_i_glide_energy']
+                      'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge']
 
     def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
                  timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
@@ -368,6 +368,11 @@ class GlideDock:
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.glide_metrics})
+                                    # Add charge info
+                                    net_charge, positive_charge, negative_charge = charge_counts(mol)
+                                    docking_result.update({f'{self.prefix}_NetCharge': net_charge,
+                                                           f'{self.prefix}_PositiveCharge': positive_charge,
+                                                           f'{self.prefix}_NegativeCharge': negative_charge})
                                     logger.debug(f'Docking score for {name}-{variant}: {dscore}')
 
                                 # If docking score is better change it...
@@ -377,6 +382,11 @@ class GlideDock:
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.glide_metrics})
+                                    # Add charge info
+                                    net_charge, positive_charge, negative_charge = charge_counts(mol)
+                                    docking_result.update({f'{self.prefix}_NetCharge': net_charge,
+                                                           f'{self.prefix}_PositiveCharge': positive_charge,
+                                                           f'{self.prefix}_NegativeCharge': negative_charge})
                                     logger.debug(f'Found better {name}-{variant}: {dscore}')
 
                                 # Otherwise ignore
