@@ -91,9 +91,11 @@ class SKLearnModel:
             [(valid.append(i), fps.append(fp))
              for i, fp in enumerate(pool.imap(pcalulate_fp, smiles))
              if fp is not None]
-        probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
-        for i, prob in zip(valid, probs):
-            results[i].update({f'{self.prefix}_pred_proba': prob})
+
+        if len(valid) != 0 :
+            probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
+            for i, prob in zip(valid, probs):
+                results[i].update({f'{self.prefix}_pred_proba': prob})
 
         return results
 
