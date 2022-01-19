@@ -155,10 +155,12 @@ class MolScore:
                 assert isinstance(self.diversity_filter, scaffold_memory.ScaffoldMemory),\
                     "Found scaffold_memory.csv but diversity filter seems to not be ScaffoldMemory type" \
                     "are you running the same diversity filter as previously?"
+                logger.info('Loading scaffold_memory.csv from previous run')
                 previous_scaffold_memory = pd.read_csv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
                 self.diversity_filter._update_memory(smiles=previous_scaffold_memory['SMILES'].tolist(),
                                                      scaffolds=previous_scaffold_memory['Scaffold'].tolist(),
-                                                     scores=previous_scaffold_memory['total_score'].tolist())
+                                                     scores=previous_scaffold_memory.loc[: ,
+                                                            ~previous_scaffold_memory.columns.isin(['Cluster', 'Scaffold', 'SMILES'])].to_dict('records'))
 
         logger.info('MolScore initiated')
 
@@ -340,9 +342,7 @@ class MolScore:
             try:
                 assert metric['name'] in df.columns, f"Specified metric {metric['name']} not found in dataframe"
             except:
-                self.results_df.to_csv(os.path.join(self.save_dir, f'results_df_{self.step}.csv'))
-                self.batch_df.to_csv(os.path.join(self.save_dir, f'batch_df_{self.step}.csv'))
-                self.exists_df.to_csv(os.path.join(self.save_dir, f'exists_df_{self.step}.csv'))
+                self._write_temp_state(step=self.step)
                 raise AssertionError
 
 
@@ -405,7 +405,7 @@ class MolScore:
         self.logged_parameters.update(parameters)
         return self
 
-    def write_scores(self, step=None):
+    def write_scores(self):
         """
         Function to write final dataframe to file.
 
@@ -420,18 +420,24 @@ class MolScore:
                     # temp[p] = [v]*len(temp)
                     pass
             temp.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
-            if step is not None: temp.to_csv(os.path.join(self.save_dir, f'scores_{step}.csv'))
         else:
             self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
-            if step is not None: self.main_df.to_csv(os.path.join(self.save_dir, f'scores_{step}.csv'))  # save main csv
 
-        if (self.diversity_filter is not None) and (not isinstance(self.diversity_filter, str)):
+        if (self.diversity_filter is not None) and (isinstance(self.diversity_filter, scaffold_memory.ScaffoldMemory)):
             self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
-            if step is not None: self.diversity_filter.savetocsv(os.path.join(self.save_dir, f'scaffold_memory_{step}.csv'))
 
         self.fh.close()
 
         return self
+
+    def _write_temp_state(self, step):
+        self.main_df.to_csv(os.path.join(self.save_dir, f'scores_{step}.csv'))
+        self.results_df.to_csv(os.path.join(self.save_dir, f'results_df_{step}.csv'))
+        self.batch_df.to_csv(os.path.join(self.save_dir, f'batch_df_{step}.csv'))
+        self.exists_df.to_csv(os.path.join(self.save_dir, f'exists_df_{step}.csv'))
+        if (self.diversity_filter is not None) and (not isinstance(self.diversity_filter, str)):
+            self.diversity_filter.savetocsv(os.path.join(self.save_dir, f'scaffold_memory_{step}.csv'))
+        return
 
     def _write_attributes(self):
         dir = os.path.join(self.save_dir, 'molscore_attributes')

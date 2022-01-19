@@ -347,6 +347,13 @@ class GlideDock:
         for i, (smi, name) in enumerate(zip(smiles, self.file_names)):
             docking_result = {'smiles': smi}
 
+            # If no variants ... next for loop won't run
+            if len(self.variants[name]) == 0:
+                logger.debug(f'{name}_lib.sdfgz does not exist')
+                if best_score[name] is None:  # Only if no other score for prefix
+                    docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.glide_metrics})
+                    logger.debug(f'Returning 0.0 as no variants exist')
+
             # For each variant
             for variant in self.variants[name]:
                 out_file = os.path.join(self.directory, f'{name}-{variant}_lib.sdfgz')
@@ -494,7 +501,7 @@ class GlideDock:
         best_variants = self.get_docking_scores(smiles=smiles, return_best_variant=True)
 
         # Cleanup
-        self.remove_files(keep=best_variants, parallel=True)
+        #self.remove_files(keep=best_variants, parallel=True)
         fh.close()
         logger.removeHandler(fh)
         self.directory = None
