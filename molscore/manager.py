@@ -328,7 +328,14 @@ class MolScore:
             # Check the modifier function exists, and the metric can be found in the dataframe
             assert any([metric['modifier'] == mod.__name__ for mod in self.modifier_functions]), \
                 f"Score modifier {metric['modifier']} not found"
-            assert metric['name'] in df.columns, f"Specified metric {metric['name']} not found in dataframe"
+            try:
+                assert metric['name'] in df.columns, f"Specified metric {metric['name']} not found in dataframe"
+            except:
+                self.results_df.to_csv(f'{self.step}_results_df.csv')
+                self.batch_df.to_csv(f'{self.step}_batch_df.csv')
+                self.exists_df.to_csv(f'{self.step}_exists_df.csv')
+                raise AssertionError
+
 
             df[mod_name] = df.loc[:, metric['name']].apply(
                 lambda x: modifier(x, **metric['parameters'])
