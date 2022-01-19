@@ -501,7 +501,7 @@ class GlideDock:
         best_variants = self.get_docking_scores(smiles=smiles, return_best_variant=True)
 
         # Cleanup
-        #self.remove_files(keep=best_variants, parallel=True)
+        self.remove_files(keep=best_variants, parallel=True)
         fh.close()
         logger.removeHandler(fh)
         self.directory = None
