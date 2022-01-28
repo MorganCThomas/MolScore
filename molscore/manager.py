@@ -431,12 +431,15 @@ class MolScore:
         return self
 
     def _write_temp_state(self, step):
-        self.main_df.to_csv(os.path.join(self.save_dir, f'scores_{step}.csv'))
-        self.results_df.to_csv(os.path.join(self.save_dir, f'results_df_{step}.csv'))
-        self.batch_df.to_csv(os.path.join(self.save_dir, f'batch_df_{step}.csv'))
-        self.exists_df.to_csv(os.path.join(self.save_dir, f'exists_df_{step}.csv'))
-        if (self.diversity_filter is not None) and (not isinstance(self.diversity_filter, str)):
-            self.diversity_filter.savetocsv(os.path.join(self.save_dir, f'scaffold_memory_{step}.csv'))
+        try:
+            self.main_df.to_csv(os.path.join(self.save_dir, f'scores_{step}.csv'))
+            if (self.diversity_filter is not None) and (not isinstance(self.diversity_filter, str)):
+                self.diversity_filter.savetocsv(os.path.join(self.save_dir, f'scaffold_memory_{step}.csv'))
+            self.batch_df.to_csv(os.path.join(self.save_dir, f'batch_df_{step}.csv'))
+            self.exists_df.to_csv(os.path.join(self.save_dir, f'exists_df_{step}.csv'))
+            self.results_df.to_csv(os.path.join(self.save_dir, f'results_df_{step}.csv'))
+        except AttributeError:
+            pass # Some may be NoneType like results
         return
 
     def _write_attributes(self):
@@ -521,12 +524,11 @@ class MolScore:
             logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
             self.update_maxmin(self.results_df)
             self.results_df = self.compute_score(self.results_df)
-            # Don't run diversity filter for score only...
-            # if self.diversity_filter is not None:
-            #     self.results_df = self.run_diversity_filter(self.results_df)
-            #     scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
-            # else:
-            scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
+            if self.diversity_filter is not None:
+                self.results_df = self.run_diversity_filter(self.results_df)
+                scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
+            else:
+                scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
             if not flt:
                 scores = np.array(scores, dtype=np.float32)
             logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
