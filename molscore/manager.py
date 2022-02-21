@@ -519,7 +519,7 @@ class MolScore:
             if step is not None:
                 self.step = step
             logger.info(f'   Scoring: {len(smiles)} SMILES')
-            file_names = [f'tmp_{i}' for i, smi in enumerate(smiles)]
+            file_names = [f'{self.step}_{i}' for i, smi in enumerate(smiles)]
             self.run_scoring_functions(smiles=smiles, file_names=file_names)
             logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
             self.update_maxmin(self.results_df)
