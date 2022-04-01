@@ -12,6 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 import streamlit as st
 from streamlit_bokeh_events import streamlit_bokeh_events
 from molscore.utils.streamlit.SessionState import get
+from molscore.utils.streamlit.pymol_wrapper import PyMol
 
 import py3Dmol
 import parmed
@@ -212,7 +213,7 @@ def display_selected_data(y, selection=None):
         return src_str
 
 
-def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=None):
+def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=None, pymol=None):
 
     if selection is None:
         return
@@ -228,19 +229,35 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
         for mol, midx, legend, col in zip(mols, match_idx, legends, cycle(st.columns(5))):
             col.image(mol2png(mol))
             col.text(legend)
-            if (dock_path is not None) and (viewer is not None):
-                show_3D = col.button(label='Show 3D', key=f'{legend}_3D_button')
-
-                if show_3D:
-                    # Grab best variants
-                    file_paths, _ = find_sdfs([midx], main_df, dock_path)
-                    viewer.add_ligand(path=file_paths[0])
-
-        show_all_3D = st.button('Show all 3D')
-        if show_all_3D:
-            file_paths, _ = find_sdfs(match_idx, main_df, dock_path)
-            for p in file_paths:
-                viewer.add_ligand(path=p)
+            if dock_path is not None:
+                if viewer is not None:
+                    show_3D = col.button(label='Show 3D', key=f'{legend}_3D_button')
+                    if show_3D:
+                        # Grab best variants
+                        file_paths, _ = find_sdfs([midx], main_df, dock_path)
+                        viewer.add_ligand(path=file_paths[0])
+                
+                if pymol is not None:
+                    show_pymol = col.button(label='send2pymol', key=f'{legend}_pymol_button')
+                    if show_pymol:
+                        file_paths, _ = find_sdfs([midx], main_df, dock_path)
+                        idx = '-'.join(legend.split("\n")[:2]).replace(' ', '')
+                        file_path = file_paths[0]
+                        if '.sdfgz' in file_path:
+                            new_file_path = file_path.split(".")[0] + '.sdf.gz'
+                            os.system(f'cp {file_path} {new_file_path} && gunzip -f {new_file_path}')
+                            file_path = file_path.split(".")[0] + '.sdf'
+                        if '.sdf.gz' in file_path:
+                            os.system(f'gunzip -f {file_path}')
+                            file_path = file_path.split(".")[0] + '.sdf'
+                        pymol(f'load {file_path}, {idx}')
+                
+        if (dock_path is not None) and (viewer is not None):
+            show_all_3D = st.button('Show all 3D')
+            if show_all_3D:
+                file_paths, _ = find_sdfs(match_idx, main_df, dock_path)
+                for p in file_paths:
+                    viewer.add_ligand(path=p)
     return
 
 
@@ -393,6 +410,20 @@ def main():
     # Setup mviewer
     mviewer = MetaViewer()
 
+    # Setup PyMol
+    pymol_ss = get(key='pymol_state', pymol=None)
+    if 'pymol' in sys.argv:
+        if 'PYMOL_PATH' in os.environ:
+            if pymol_ss.pymol is None:
+                pymol = PyMol(pymol_path=os.environ['PYMOL_PATH'])
+                pymol_ss.pymol = pymol
+            pymol = pymol_ss.pymol
+        else:
+            print('Not PyMol installation found in environment, install PyMol to enable sending molecules directly to PyMol')
+            pymol = None
+    else:
+        pymol = None
+
     # ----- Main page -----
     if nav == 'Main':
         y_axis = st.sidebar.selectbox('Plot y-axis', main_df.columns.tolist(), index=6)
@@ -408,7 +439,7 @@ def main():
         # ----- Show selected data -----
         st.subheader('Selected structures')
         display_selected_data2(y=y_axis, main_df=main_df, dock_path=dock_path,
-                               selection=selection, viewer=mviewer)
+                               selection=selection, viewer=mviewer, pymol=pymol)
         # ----- Add option to save sdf -----
         if (dock_path is not None) and (selection is not None):
             with st.expander(label='Save selected'):
@@ -544,7 +575,7 @@ def main():
             # Plot mols
             display_selected_data2('step', main_df, dock_path=dock_path,
                                    selection={"BOX_SELECT": {"data": top_df.index.to_list()}},
-                                   viewer=mviewer)
+                                   viewer=mviewer, pymol=pymol)
             mviewer.render2st()
 
             # ----- Add option to save sdf -----
@@ -728,6 +759,8 @@ def main():
 
     exit = st.sidebar.button('Exit')
     if exit:
+        if pymol_ss.pymol is not None:
+            pymol_ss.pymol.close()
         os._exit(0)
 
 
