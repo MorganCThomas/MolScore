@@ -9,7 +9,7 @@ class PyMol:
         :type pymol_path: str
         :param pymol_args: Args
         """
-        self._pymol_path = pymol_path
+        self._pymol_path = os.path.join(pymol_path, 'pymol')
         self._pymol_args = pymol_args
         self._pymol_command = [pymol_path] + pymol_args
         self._initPipe()
