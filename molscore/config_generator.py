@@ -138,7 +138,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
 
         # If both are present, use type annotation
         elif default != inspect._empty and ptype != inspect._empty:
-            with st.beta_expander(f"{p}={default}"):
+            with st.expander(f"{p}={default}"):
                 # Check to see if ptype is union i.e., multiple types possible
                 ptype_args = getattr(ptype, '__args__', None)
                 if ptype_args is not None:
@@ -150,7 +150,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
 
         # If default but no annotation
         else:
-            with st.beta_expander(f"{p}={default}"):
+            with st.expander(f"{p}={default}"):
                 result_dict[p] = type2widget(type(default), key=f'{key_i}: {obj.__name__}_{p}',
                                              default=default, label=label)
 
@@ -172,7 +172,7 @@ def getsfconfig(key_i=0):
     """
     sf_config = {}
     # Inset it slightly
-    col1, col2 = st.beta_columns([1, 9])
+    col1, col2 = st.columns([1, 9])
     with col2:
         # Choose scoring functions
         sf_config['name'] = st.radio(label='Name',
@@ -190,7 +190,7 @@ def getsfconfig(key_i=0):
         else:
             st.write('No documentation')
         sf_config['parameters'] = object2dictionary(sf_obj, key_i=key_i)
-        with st.beta_expander(label='Check parsing'):
+        with st.expander(label='Check parsing'):
             st.write(sf_config)
     return sf_config
 
@@ -205,7 +205,7 @@ def getspconfig(options, key_i=0):
     global ss
     sp_config = {}
     # Inset it slightly
-    col1, col2 = st.beta_columns([1, 9])
+    col1, col2 = st.columns([1, 9])
     with col2:
         sp_config['name'] = st.selectbox(label='Name',
                                          options=options,
@@ -245,7 +245,7 @@ def getspconfig(options, key_i=0):
         else:
             sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
 
-    col1, col2, col3 = st.beta_columns([1, 0.5, 1])
+    col1, col2, col3 = st.columns([1, 0.5, 1])
     try:
         with col2:
             st.write('Example')
@@ -254,9 +254,9 @@ def getspconfig(options, key_i=0):
     except:
         pass
 
-    col1, col2 = st.beta_columns([1, 9])
+    col1, col2 = st.columns([1, 9])
     with col2:
-        with st.beta_expander(label='Check parsing'):
+        with st.expander(label='Check parsing'):
             st.write(sp_config)
     return sp_config
 
@@ -277,7 +277,7 @@ if absolute_output_path:
 
 config['load_from_previous'] = st.checkbox(label='Continue from previous directory')
 if config['load_from_previous']:
-    col1, col2 = st.beta_columns([1, 9])
+    col1, col2 = st.columns([1, 9])
     with col2:
         previous_dir_ss = get(key='previous_dir', input_path='configs')
         previous_dir_ss.input_path = st_file_selector(label='Select a previously used folder',
@@ -320,13 +320,13 @@ if config['diversity_filter']['run']:
                   for s in scaffold_memory.all_scaffold_filters
                   if s.__name__ == config['diversity_filter']['name']][0]
         config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
-    with st.beta_expander(label='Check parsing'):
+    with st.expander(label='Check parsing'):
         st.write(config['diversity_filter'])
 
 # ----- Scoring functions ------
 st.subheader('Scoring functions')
 # Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
-col1, col2 = st.beta_columns(2)
+col1, col2 = st.columns(2)
 with col1:
     if st.button(label='Add scoring function'):
         ss.n_sf += 1
@@ -353,7 +353,7 @@ else:
     st.write('No documentation')
 
 # Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
-col1, col2 = st.beta_columns(2)
+col1, col2 = st.columns(2)
 with col1:
     if st.button(label='Add scoring parameter'):
         ss.n_sp += 1
@@ -380,11 +380,11 @@ if len(config['scoring_functions']) > 0:
 
 # ----- Output -----
 st.subheader('Output json')
-with st.beta_expander(label='Show'):
+with st.expander(label='Show'):
     st.write(config)
 out_file = os.path.abspath(st.text_input(label='Output file', value=f'configs/{config["task"]}.json'))
 st.write(f"Selected: {out_file}")
-col1, col2 = st.beta_columns(2)
+col1, col2 = st.columns(2)
 with col1:
     if st.button(label='Save'):
         if not os.path.exists(os.path.dirname(out_file)):
