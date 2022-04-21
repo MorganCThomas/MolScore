@@ -244,12 +244,12 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
                         idx = '-'.join(legend.split("\n")[:2]).replace(' ', '')
                         file_path = file_paths[0]
                         if '.sdfgz' in file_path:
-                            new_file_path = file_path.split(".")[0] + '.sdf.gz'
+                            new_file_path = os.path.join(os.path.dirname(file_path), os.path.basename(file_path).split(".")[0] + '.sdf.gz')
                             os.system(f'cp {file_path} {new_file_path} && gunzip -f {new_file_path}')
-                            file_path = file_path.split(".")[0] + '.sdf'
+                            file_path = os.path.join(os.path.dirname(file_path), os.path.basename(file_path).split(".")[0] + '.sdf')
                         if '.sdf.gz' in file_path:
                             os.system(f'gunzip -f {file_path}')
-                            file_path = file_path.split(".")[0] + '.sdf'
+                            file_path = os.path.join(os.path.dirname(file_path), os.path.basename(file_path).split(".")[0] + '.sdf')
                         pymol(f'load {file_path}, {idx}')
                 
         if (dock_path is not None) and (viewer is not None):
