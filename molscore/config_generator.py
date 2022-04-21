@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import inspect
 
@@ -39,52 +40,132 @@ def st_file_selector(st_placeholder, key, path='.', label='Please, select a file
     return os.path.abspath(selected_path)
 
 
-def type2widget(ptype, label, key, default=None):
+def type2widget(ptype, label, key, default=None, options=None):
     """
     Infer widget based on parameter datatype
     :param ptype: Parameter data type
     :param label: Description for the widget to write
     :param key: Unique key for widget
     :param default: Default parameter value
+    :param options: If present use selectbox
     :return:
     """
-    if ptype == str:
-        if default is not None:
-            widget = st.text_input(label=label, value=default, key=key)
-        else:
+    if options is not None:
+        widget = st.selectbox(
+            label=label,
+            options=options,
+            index=options.index(default) if default in options else 0,
+            key=key
+        )
+    else:
+        if ptype == str:
+            widget = st.text_input(
+                label=label,
+                value=default if default is not None else "",
+                key=key
+            )
+        if ptype == list:
+            widget = st.text_area(
+                label=label,
+                value=default if default is not None else "",
+                key=key
+            )
+        if ptype == int:
+            widget = st.number_input(
+                label=label,
+                value=default if default is not None else 0,
+                key=key
+            )
+            widget = int(widget)
+        if ptype == float:
+            widget = st.number_input(
+                label=label,
+                value=default if default is not None else 0.0,
+                key=key
+            )
+            widget = float(widget)
+        if ptype == bool:
+            widget = st.selectbox(
+                label=label,
+                options=[True, False],
+                index=[True, False].index(default) if default in [True, False] else 0,
+                key=key
+            )
+        if ptype == type(None):
+            st.write('WARNING: default is None and no type annotation, using text_input')
             widget = st.text_input(label=label, key=key)
-    if (ptype == int) or (ptype == float):
-        if default is not None:
-            widget = st.number_input(label=label, value=default, key=key)
-        else:
-            widget = st.number_input(label=label, key=key)
-    if ptype == os.PathLike:
-        if default is not None and os.path.exists(default):
-            wss = get(key=key, input_path=default)
-            wss.input_path = st_file_selector(label=label, path=wss.input_path,
-                                              st_placeholder=st.empty(), key=key)
-            st.write(f"Selected: {wss.input_path}")
-            widget = wss.input_path
-        else:
-            wss = get(key=key, input_path='configs')
-            wss.input_path = st_file_selector(label=label, path=wss.input_path,
-                                              st_placeholder=st.empty(), key=key)
-            st.write(f"Selected: {wss.input_path}")
-            widget = wss.input_path
-    if ptype == list:
-        if default is not None:
-            widget = st.text_area(label=label, value=default, key=key)
-        else:
-            widget = st.text_area(label=label, key=key)
-    if ptype == bool:
-        if default is not None:
-            widget = st.selectbox(label=label, options=[True, False], index=[True, False].index(default), key=key)
-        else:
-            widget = st.selectbox(label=label, options=[True, False], key=key)
-    if ptype == type(None):
-        st.write('WARNING: default is None and no type annotation, using text_input')
-        widget = st.text_input(label=label, key=key)
+        if ptype == os.PathLike:
+            if default is not None and os.path.exists(default):
+                wss = get(key=key, input_path=default)
+                wss.input_path = st_file_selector(label=label, path=wss.input_path,
+                                                st_placeholder=st.empty(), key=key)
+                st.write(f"Selected: {wss.input_path}")
+                widget = wss.input_path
+            else:
+                wss = get(key=key, input_path='configs')
+                wss.input_path = st_file_selector(label=label, path=wss.input_path,
+                                                st_placeholder=st.empty(), key=key)
+                st.write(f"Selected: {wss.input_path}")
+                widget = wss.input_path
     return widget
+
+
+def parseobject(obj, exceptions=[]):
+    """
+    Parse an object (class or function) to identify parameters and annotation including docstring (must be reST/PyCharm style).
+    Additionally any list enclosed in square brackets will be interpretted as options. 
+    :param obj: The class or function to be parsed
+    :param exceptions: A list of parameters to exclude in parsing [example1, example2]
+    :return: Object, A dictionary of parameters including name, type, default, description and options
+    """
+    exceptions += exceptions + ['kwargs']
+
+    # Find type of object
+    if inspect.isclass(obj):
+        docs = inspect.getdoc(obj.__init__)
+    else:
+        docs = inspect.getdoc(obj)
+
+    # Remove description
+    docs = docs.strip().replace("\n", "").split(":")
+    obj_description = docs.pop(0)
+
+    # Inspect parameter info
+    sig = inspect.signature(obj).parameters
+    params = {}
+    for p in sig:
+        if p in exceptions:
+            continue
+        params[p] = {
+            'name': p,
+            'type': sig[p].annotation if sig[p].annotation != inspect._empty else None,
+            'default': sig[p].default if sig[p].default != inspect._empty else None,
+            'description': None,
+            'options': None
+            }
+    
+    # Add docstring annotation for parameters
+    for d in range(0, len(docs), 2):
+        if docs[d].split(" ")[0] != 'param':
+            continue
+        p = docs[d].split(" ")[1]
+        if p in exceptions:
+            continue
+        
+        p_description = docs[d+1].strip()
+        p_options = re.search("\[(.*?)\]", docs[d+1].strip())
+        if p_options is not None:
+            p_description = p_description.replace(p_options.group(), "").strip()
+            p_options = p_options.group().strip('[]').split(", ")
+
+        try:
+            params[p]['description'] = p_description
+            params[p]['options'] = p_options
+        except KeyError as e:
+            print(f'Parameter-docstring mismatch: {e}')
+            pass
+
+    return obj, params
 
 
 def object2dictionary(obj, key_i=0, exceptions=[]):
@@ -96,66 +177,49 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
     :param exceptions: Values we don't want user input for
     :return: dict
     """
-    exceptions += exceptions + ['kwargs']
-
-    # Get the docs...
-    if inspect.isclass(obj):
-        docs = inspect.getdoc(obj.__init__).split('\n')  # Assume pycharm style of documentation
-    else:  # Assume function
-        docs = inspect.getdoc(obj).split('\n')[1:-1]  # Assume pycharm style of documentation
-
-    # Params can be indexed by parameter name/key and has .default and .annotation attributes
-    # which return inspect._empty if empty
-    params = inspect.signature(obj).parameters
-
     result_dict = {}
+    obj, params = parseobject(obj, exceptions)
 
-    for i, p, in enumerate(params):
-        if p in exceptions:
-            continue
-        default = params[p].default
-        ptype = params[p].annotation
-        if len(params.keys()) == len(docs):
-            doc = docs[i].split(':')[2].strip()  # Must only be one line per parameter, ah!
-        else:
-            doc = p
-        label = f'{p}: {doc}'
+    for p, pinfo in params.items():
+        label = f"{p}: {pinfo['description']}"
 
-        # If no default and no annotation show warning
-        if default == inspect._empty and ptype == inspect._empty:
-            st.write(f'WARNING: {p} is has no default or type annotation, using text_input')
-            result_dict[p] = st.text_input(label=label, key=f'{key_i}: {obj.__name__}_{p}')
-
-        # If no default use type annotation
-        elif default == inspect._empty and ptype != inspect._empty:
-            # Check to see if ptype is union i.e., multiple types possible
-            ptype_args = getattr(ptype, '__args__', None)
-            if ptype_args is not None:
-                ptype = st.selectbox(label=f'{p}: input type', options=ptype_args,
-                                     index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
-            result_dict[p] = type2widget(ptype, key=f'{key_i}: {obj.__name__}_{p}', label=label)
-            if ptype == int: result_dict[p] = int(result_dict[p])
-
-        # If both are present, use type annotation
-        elif default != inspect._empty and ptype != inspect._empty:
-            with st.expander(f"{p}={default}"):
+        # No default
+        if pinfo['default'] is None:
+            # If no type either, print warning and use text input
+            if pinfo['type'] is None:
+                st.write(f'WARNING: {p} is has no default or type annotation, using text_input')
+                result_dict[p] = st.text_input(label=label, key=f'{key_i}: {obj.__name__}_{p}')
+        
+            else:
                 # Check to see if ptype is union i.e., multiple types possible
-                ptype_args = getattr(ptype, '__args__', None)
+                ptype_args = getattr(pinfo['type'], '__args__', None)
                 if ptype_args is not None:
-                    ptype = st.selectbox(label=f'{p}: input type', options=ptype_args,
-                                         index=0, key=f'{key_i}: {obj.__name__}_{p}')
-                result_dict[p] = type2widget(ptype, key=f'{key_i}: {obj.__name__}_{p}',
-                                             default=default, label=label)
-                if ptype == int: result_dict[p] = int(result_dict[p])
+                    pinfo['type'] = st.selectbox(label=f'{p}: input type', options=ptype_args,
+                                                 index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
+                result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}', label=label, options=pinfo['options'])
+                if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
 
-        # If default but no annotation
         else:
-            with st.expander(f"{p}={default}"):
-                result_dict[p] = type2widget(type(default), key=f'{key_i}: {obj.__name__}_{p}',
-                                             default=default, label=label)
+            # Use type annotation if present
+            if pinfo['type'] is not None:
+                with st.expander(f"{p}={pinfo['default']}"):
+                    # Check to see if ptype is union i.e., multiple types possible
+                    ptype_args = getattr(pinfo['type'], '__args__', None)
+                    if ptype_args is not None:
+                        pinfo['type'] = st.selectbox(label=f'{p}: input type', options=ptype_args,
+                                            index=0, key=f'{key_i}: {obj.__name__}_{p}')
+                    result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}',
+                                                 default=pinfo['default'], label=label, options=pinfo['options'])
+                    #if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
+
+            # Otherwise use type of default
+            else:
+                with st.expander(f"{p}={pinfo['default']}"):
+                    result_dict[p] = type2widget(type(pinfo['default']), key=f'{key_i}: {obj.__name__}_{p}', 
+                                                 default=pinfo['default'], label=label, options=pinfo['options'])
 
         # If list convert correctly
-        if ptype == list:
+        if pinfo['default'] == list:
             result_dict[p] = result_dict[p].replace(',', '').replace('\n', ' ').split(' ')
             # Check if empty and handle properly
             if result_dict[p] == [''] or result_dict[p] == ['[]'] or result_dict[p] == ['', '']:
