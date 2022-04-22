@@ -9,6 +9,8 @@ from rdkit import Chem
 from rdkit.Avalon import pyAvalonTools
 from rdkit import rdBase
 import joblib
+
+from molscore.scoring_functions.utils import Fingerprints
 rdBase.DisableLog('rdApp.error')
 
 
@@ -19,11 +21,11 @@ class SKLearnModel:
     return_metrics = ['pred_proba']
 
     def __init__(self, prefix: str, model_path: os.PathLike,
-                 fp_type: str, nBits: int, n_jobs: int = 1, **kwargs):
+                 fp: str, nBits: int = 1024, n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model (saved using joblib)
-        :param fp_type: 'ECFP4', 'ECFP6', 'Avalon', 'MACCSkeys', 'hashAP', 'hashTT', 'RDK5', 'RDK6', 'RDK7'
+        :param fp: What type of fingerprint to use [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, hashAP, hashTT, RDK5, RDK6, RDK7]
         :param nBits: Length of fingerprint
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
         :param kwargs:
@@ -31,7 +33,7 @@ class SKLearnModel:
         self.prefix = prefix
         self.prefix = prefix.replace(" ", "_")
         self.model_path = model_path
-        self.fp_type = fp_type
+        self.fp_type = fp
         self.nBits = int(nBits)
         self.n_jobs = n_jobs
 
@@ -87,9 +89,10 @@ class SKLearnModel:
         valid = []
         fps = []
         with Pool(self.n_jobs) as pool:
-            pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type, nBits=self.nBits)
-            [(valid.append(i), fps.append(fp))
-             for i, fp in enumerate(pool.imap(pcalulate_fp, smiles))
+            #pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type, nBits=self.nBits)
+            pcalculate_fp = partial(Fingerprints.get_fp, name=self.fp_type, nBits=self.nBits, asarray=True)
+            [(valid.append(i), fps.append(fp.reshape(1, -1)))
+             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
              if fp is not None]
 
         if len(valid) != 0 :
@@ -134,9 +137,10 @@ class EnsembleSKLearnModel(SKLearnModel):
         predictions = []
         averages = []
         with Pool(self.n_jobs) as pool:
-            pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type, nBits=self.nBits)
+            #pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type, nBits=self.nBits)
+            pcalculate_fp = partial(Fingerprints.get_fp, name=self.fp_type, nBits=self.nBits, asarray=True)
             [(valid.append(i), fps.append(fp))
-             for i, fp in enumerate(pool.imap(pcalulate_fp, smiles))
+             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
              if fp is not None]
         
         # Predicting the probabilies and appending them to a list.
