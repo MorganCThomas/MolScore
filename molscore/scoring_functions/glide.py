@@ -11,7 +11,8 @@ from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
 
 from molscore.scoring_functions.rocs import ROCS
-from molscore.scoring_functions.utils import timedSubprocess, charge_counts
+from molscore.scoring_functions.descriptors import MolecularDescriptors
+from molscore.scoring_functions.utils import timedSubprocess
 
 logger = logging.getLogger('glide')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -38,7 +39,7 @@ class GlideDock:
         :param glide_template: Path to a template docking file (.in)
         :param cluster: Address to Dask scheduler for parallel processing via dask
         :param timeout: Timeout (seconds) before killing an individual docking simulation
-        :param ligand_preparation: Use 'ligprep' (default), 'epik' (rdkit stereoenum + epik most probable state) or 'moka' (corina+moka abundancy > 20)
+        :param ligand_preparation: Use ligprep (default), rdkit stereoenum + epik most probable state, or corina+moka abundancy > 20 [ligprep, epik, moka]
         :param kwargs:
         """
         # Read in glide template (.in)
@@ -376,7 +377,7 @@ class GlideDock:
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.glide_metrics})
                                     # Add charge info
-                                    net_charge, positive_charge, negative_charge = charge_counts(mol)
+                                    net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
                                     docking_result.update({f'{self.prefix}_NetCharge': net_charge,
                                                            f'{self.prefix}_PositiveCharge': positive_charge,
                                                            f'{self.prefix}_NegativeCharge': negative_charge})
@@ -390,7 +391,7 @@ class GlideDock:
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.glide_metrics})
                                     # Add charge info
-                                    net_charge, positive_charge, negative_charge = charge_counts(mol)
+                                    net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
                                     docking_result.update({f'{self.prefix}_NetCharge': net_charge,
                                                            f'{self.prefix}_PositiveCharge': positive_charge,
                                                            f'{self.prefix}_NegativeCharge': negative_charge})
