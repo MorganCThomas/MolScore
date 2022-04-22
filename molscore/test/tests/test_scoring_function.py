@@ -1,4 +1,5 @@
 import unittest
+import inspect
 
 
 class BaseTests:
@@ -9,8 +10,7 @@ class BaseTests:
         """
 
         def test_has_return_metrics(self):
-            self.assertIn('return_metrics', self.cls.__dict__.keys(),
-                          'Class is missing \'return_metrics\' attribute')
+            self.assertIsNotNone(getattr(self.cls, 'return_metrics', None))
             self.assertIsInstance(self.cls.return_metrics, list,
                                   'return_metrics should be a list')
             self.assertGreater(len(self.cls.return_metrics), 0,
@@ -23,9 +23,21 @@ class BaseTests:
                         self.assertTrue(any([m in k for k in o.keys()]),
                                         'Metric should be in at least one key for all outputs')
 
+        def test_prefix(self):
+            self.assertIn('prefix', inspect.signature(self.cls.__init__).parameters.keys())
+
         def test_output(self):
             self.assertEqual(len(self.input), len(self.output),
                              'Length of output should be the same as the length of input')
+            self.assertIsInstance(self.output, list, 'Output should be a list')
             for o in self.output:
                 with self.subTest('Checking all outputs'):
+                    self.assertIsInstance(o, dict)
                     self.assertIn('smiles', o.keys())
+                    # Check all return metrics are in dict
+                    for rm in self.cls.return_metrics:
+                        self.assertIn(f'{self.inst.prefix}_{rm}', o.keys(), f"{rm} not in output")
+                    # Check all dict keys are in return metrics
+                    o.pop('smiles')
+                    for k in o.keys():
+                        self.assertIn(k.strip(f'{self.inst.prefix}_'), self.cls.return_metrics, "{k} not in return metrics")

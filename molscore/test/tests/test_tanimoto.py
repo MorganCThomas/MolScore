@@ -1,7 +1,7 @@
 import unittest
 from molscore.test.mock_generator import MockGenerator
 from molscore.test.tests.test_scoring_function import BaseTests
-from molscore.scoring_functions.tanimoto import TanimotoSimilarity
+from molscore.scoring_functions.similarity import TanimotoSimilarity
 
 
 class TestTanimotoECFP4MeanSingle(BaseTests.TestScoringFunction):
