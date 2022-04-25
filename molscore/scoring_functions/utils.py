@@ -107,8 +107,8 @@ class Fingerprints:
     Class to organise Fingerprint generation
     """
 
-    @classmethod
-    def get_fp(cls, mol: Union[str, Chem.rdchem.Mol], name: str, nBits: int, asarray: bool = False):
+    @staticmethod
+    def get(mol: Union[str, Chem.rdchem.Mol], name: str, nBits: int, asarray: bool = False):
         """
         Get fp by str instead of method
         :param mol: RDKit mol or Smiles
@@ -274,34 +274,22 @@ class Fingerprints:
             return Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory)
 
 
-def GetSimilarityMeasure(name: str, bulk=False):
-    """
-    Helper function to get correct RDKit similarity function by name
-    :param name: RDKit similarity type
-    :param bulk: Whether get bulk similarity
-    """
-    similarity_function = None
+class SimilarityMeasures:
 
-    if bulk:
-        for f in [
-            DataStructs.BulkAllBitSimilarity, DataStructs.BulkAsymmetricSimilarity, DataStructs.BulkBraunBlanquetSimilarity,
-            DataStructs.BulkCosineSimilarity, DataStructs.BulkMcConnaugheySimilarity, DataStructs.BulkDiceSimilarity,
-            DataStructs.BulkKulczynskiSimilarity, DataStructs.BulkRusselSimilarity, DataStructs.BulkOnBitSimilarity,
-            DataStructs.BulkRogotGoldbergSimilarity, DataStructs.BulkSokalSimilarity, DataStructs.BulkTanimotoSimilarity
-            ]:
-            if "Bulk" + name + "Similarity" == f.__name__:
-                similarity_function = f
-    else:
-        for f in [
-            DataStructs.AllBitSimilarity, DataStructs.AsymmetricSimilarity, DataStructs.BraunBlanquetSimilarity,
-            DataStructs.CosineSimilarity, DataStructs.McConnaugheySimilarity, DataStructs.DiceSimilarity,
-            DataStructs.KulczynskiSimilarity, DataStructs.RusselSimilarity, DataStructs.OnBitSimilarity,
-            DataStructs.RogotGoldbergSimilarity, DataStructs.SokalSimilarity, DataStructs.TanimotoSimilarity
-            ]:
-            if name + "Similarity" == f.__name__:
-                similarity_function = f
+    @staticmethod
+    def get(name, bulk=False):
+        """
+        Helper function to get correct RDKit similarity function by name
+        :param name: RDKit similarity type [AllBit, Asymmetric, BraunBlanquet, Cosine, McConnaughey, Dice, Kulczynski, Russel, OnBit, RogotGoldberg, Sokal, Tanimoto]
+        :param bulk: Whether get bulk similarity
+        """
+        if bulk:
+            name = "Bulk" + name + "Similarity"
+        else:
+            name = name + "Similarity"
 
-    if similarity_function is None:
-        raise KeyError(f"{name} not found")
+        similarity_function = getattr(DataStructs, name, None)
+        if similarity_function is None:
+            raise KeyError(f"\'{name}\' not found")
 
-    return similarity_function
+        return similarity_function

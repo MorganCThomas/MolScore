@@ -90,7 +90,7 @@ class SKLearnModel:
         fps = []
         with Pool(self.n_jobs) as pool:
             #pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type, nBits=self.nBits)
-            pcalculate_fp = partial(Fingerprints.get_fp, name=self.fp_type, nBits=self.nBits, asarray=True)
+            pcalculate_fp = partial(Fingerprints.get, name=self.fp_type, nBits=self.nBits, asarray=True)
             [(valid.append(i), fps.append(fp.reshape(1, -1)))
              for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
              if fp is not None]
@@ -138,7 +138,7 @@ class EnsembleSKLearnModel(SKLearnModel):
         averages = []
         with Pool(self.n_jobs) as pool:
             #pcalulate_fp = partial(self.calculate_fp, fp_type=self.fp_type, nBits=self.nBits)
-            pcalculate_fp = partial(Fingerprints.get_fp, name=self.fp_type, nBits=self.nBits, asarray=True)
+            pcalculate_fp = partial(Fingerprints.get, name=self.fp_type, nBits=self.nBits, asarray=True)
             [(valid.append(i), fps.append(fp))
              for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
              if fp is not None]

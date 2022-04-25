@@ -61,7 +61,7 @@ class Similarity:
             logger.warning(f"{len(self.ref_mols)}/{len(ref_smiles)} query smiles converted to mol successfully")
 
         # Convert ref mols to ref fps
-        self.ref_fps = [Fingerprints.get_fp(mol, self.fp, self.nBits, asarray=False) for mol in self.ref_mols]
+        self.ref_fps = [Fingerprints.get(mol, self.fp, self.nBits, asarray=False) for mol in self.ref_mols]
 
     @staticmethod
     def calculate_sim(smi: str, ref_fps: np.ndarray, fp: int, nBits: int, similarity_measure: str, method: str):
@@ -80,7 +80,7 @@ class Similarity:
 
         mol = get_mol(smi)
         if mol is not None:
-            fp = Fingerprints.get_fp(mol, fp, nBits, asarray=False)
+            fp = Fingerprints.get(mol, fp, nBits, asarray=False)
             sim_vec = similarity_measure(fp, ref_fps)
 
             if method == 'mean':
