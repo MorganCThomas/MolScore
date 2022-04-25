@@ -16,7 +16,7 @@ def norm(x: float, objective: str, max: float, min: float, **kwargs):
     """
     Normalize between maximum and minimum
     :param x: Input value
-    :param objective: 'maximize' or 'minimize'
+    :param objective: Maximize or minimize score [maximize, minimize]
     :param max: Maximum value for normalizing to (optional)
     :param min: Minimum value for normalizing to (optional)
     :param kwargs:
@@ -37,7 +37,7 @@ def lin_thresh(x: float, objective: str, upper: float, lower: float, buffer: flo
     """
     Transform values using a linear threshold
     :param x: Input valid
-    :param objective: 'maximize', 'minimize' or 'range'
+    :param objective: Maximize, minimize or range [maximize, minimize, range]
     :param upper: Upper bound for transforming values ('range' and 'maximize' only)
     :param lower: Lower bound for transforming values ('range' and 'minimize' only)
     :param buffer: Buffer between thresholds which will be on a linear scale
@@ -82,7 +82,7 @@ def step(x: float, objective: str, upper: float, lower: float, **kwargs):
     """
     Transform values using a step transformer (threshold)
     :param x: Input value
-    :param objective: 'maximize', 'minimize' or 'range'
+    :param objective: Maximize, minimize or range [maximize, minimize, range]
     :param upper: Upper bound for transforming values ('range' and 'maximize' only)
     :param lower: Lower bound for transforming values ('range' and 'minimize' only)
     :param kwargs:
@@ -115,7 +115,7 @@ def gauss(x: float, objective: str, mu: float, sigma: float, **kwargs):
     """
     Transform values using a Gaussian transformer
     :param x: Input value
-    :param objective: 'maximize', 'minimize' or 'range'
+    :param objective: Maximize, minimize or range [maximize, minimize, range]
     :param mu: Mean
     :param sigma: Standard deviation
     :param kwargs:
