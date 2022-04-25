@@ -44,11 +44,12 @@ class MolecularDescriptors:
                        'NumAliphaticRings': Descriptors.NumAliphaticRings,
                        'RingCount': Descriptors.RingCount,
                        'TPSA': Descriptors.TPSA,
-                       'PenLogP': RDKitDescriptors.penalized_logp,
+                       'PenLogP': MolecularDescriptors.penalized_logp,
                        'FormalCharge': Chem.GetFormalCharge,
                        'MolecularFormula': Descriptors.rdMolDescriptors.CalcMolFormula,
                        'Bertz': GraphDescriptors.BertzCT,
-                       'MaxConsecutiveRotatableBonds': RDKitDescriptors.max_consecutive_rotatable_bonds}
+                       'MaxConsecutiveRotatableBonds': MolecularDescriptors.max_consecutive_rotatable_bonds,
+                       'FlourineCount': MolecularDescriptors.flourine_count}
         descriptors = {f'{prefix}_{k}': v for k, v in descriptors.items()}
 
         result = {'smiles': smi}
@@ -206,6 +207,15 @@ class MolecularDescriptors:
         net_charge = positive_charge + negative_charge
 
         return net_charge, positive_charge, negative_charge
+
+    @staticmethod
+    def flourine_count(mol: Union[str, Chem.rdchem.Mol]):
+        """
+        Count the number of flourines in a Molecule
+        :param mol: An rdkit mol or str
+        :return: #Flourines
+        """
+        return sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'F')
 
     def __call__(self, smiles: list, **kwargs):
         """
