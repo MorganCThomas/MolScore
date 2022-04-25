@@ -15,7 +15,8 @@ class MolecularDescriptors:
     return_metrics = ['QED', 'SAscore', 'CLogP', 'MolWt', 'HeavyAtomCount', 'HeavyAtomMolWt',
                       'NumHAcceptors', 'NumHDonors', 'NumHeteroatoms', 'NumRotatableBonds',
                       'NumAromaticRings', 'NumAliphaticRings', 'RingCount', 'TPSA', 'PenLogP',
-                      'FormalCharge', 'MolecularFormula', 'Bertz', 'MaxConsecutiveRotatableBonds']
+                      'FormalCharge', 'MolecularFormula', 'Bertz', 'MaxConsecutiveRotatableBonds',
+                      'FlourineCount']
 
     def __init__(self, prefix: str = 'desc', n_jobs: int = 1, **kwargs):
         """
