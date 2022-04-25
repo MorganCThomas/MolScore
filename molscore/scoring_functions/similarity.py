@@ -4,9 +4,7 @@ import logging
 import numpy as np
 from functools import partial
 
-from requests import options
-from torch import ge
-from molscore.scoring_functions.utils import get_mol, Fingerprints, GetSimilarityMeasure
+from molscore.scoring_functions.utils import get_mol, Fingerprints, SimilarityMeasures
 from multiprocessing import Pool
 from rdkit.Chem import AllChem as Chem
 from typing import Union
@@ -19,7 +17,7 @@ ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
 
-class Similarity:
+class MolecularSimilarity:
     """
     Score structures based on Similarity to reference structures
     """
@@ -76,11 +74,11 @@ class Similarity:
         :param method: 'mean' or 'max'
         :return: (SMILES, Tanimoto coefficient)
         """
-        similarity_measure = GetSimilarityMeasure(similarity_measure, bulk=True)
+        similarity_measure = SimilarityMeasures.get(similarity_measure, bulk=True)
 
         mol = get_mol(smi)
         if mol is not None:
-            fp = Fingerprints.get(mol, fp, nBits, asarray=False)
+            fp = Fingerprints.get_fp(mol, fp, nBits, asarray=False)
             sim_vec = similarity_measure(fp, ref_fps)
 
             if method == 'mean':
@@ -107,7 +105,7 @@ class Similarity:
         return results
 
 # Adding for backwards compatability
-class TanimotoSimilarity(Similarity):
+class TanimotoSimilarity(MolecularSimilarity):
     """
     Score structures based on Tanimoto similarity to reference structures
     """

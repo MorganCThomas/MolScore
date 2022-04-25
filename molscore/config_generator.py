@@ -241,7 +241,8 @@ def getsfconfig(key_i=0):
         # Choose scoring functions
         sf_config['name'] = st.radio(label='Name',
                                      options=[s.__name__ for s in
-                                              scoring_functions.all_scoring_functions],
+                                              scoring_functions.all_scoring_functions
+                                              if not (s.__name__ in ['TanimotoSimilarity', 'RDKitDescriptors'])], # Remove these as only present for backwards compatability
                                      index=0,
                                      key=f'{key_i}: sf_name')
         sf_config['run'] = True
