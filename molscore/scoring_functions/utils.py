@@ -10,7 +10,6 @@ from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors, rdmolops, DataStructs
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Avalon import pyAvalonTools
-from xarray import DataArray
 
 
 class timedThread(object):
