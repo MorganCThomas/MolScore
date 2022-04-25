@@ -29,7 +29,7 @@ class MolecularSimilarity:
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param ref_smiles: List of SMILES or path to SMILES file with no header (.smi)
-        :param fp: Type of fingerprint used to featurize the molecule [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, hashAP, hashTT, RDK5, RDK6, RDK7]
+        :param fp: Type of fingerprint used to featurize the molecule [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, AP, hashAP, hashTT, RDK5, RDK6, RDK7, PHCO]
         :param bits: Length of fingerprints (if relevant)
         :param similarity_measure: Type of similarity Measure [AllBit, Asymmetric, BraunBlanquet, Cosine, McConnaughey, Dice, Kulczynski, Russel, OnBit, RogotGoldberg, Sokal, Tanimoto]
         :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour) [mean, max]
@@ -116,7 +116,7 @@ class TanimotoSimilarity(MolecularSimilarity):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param ref_smiles: List of SMILES or path to SMILES file with no header (.smi)
-        :param fp: Type of fingerprint used to featurize the molecule [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, hashAP, hashTT, RDK5, RDK6, RDK7]
+        :param fp: Type of fingerprint used to featurize the molecule [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, AP, hashAP, hashTT, RDK5, RDK6, RDK7, PHCO]
         :param bits: Length of fingerprints (if relevant)
         :param similarity_measure: Type of similarity Measure [AllBit, Asymmetric, BraunBlanquet, Cosine, McConnaughey, Dice, Kulczynski, Russel, OnBit, RogotGoldberg, Sokal, Tanimoto]
         :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour) [mean, max]
