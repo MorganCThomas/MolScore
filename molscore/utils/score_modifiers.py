@@ -147,11 +147,13 @@ def plot_mod(mod, func_kwargs: dict):
     :return:
     """
     fig = plt.figure(figsize=(3, 3))
-    X = np.linspace(0, 1, 101)
+    scale_max = max(v for k, v in func_kwargs.items() if k != 'objective')
+    scale_max = 10 ** np.ceil(np.log10(scale_max))  # Round up to nearest log10
+    X = np.linspace(0, scale_max, 101)
     Y = [mod(x, **func_kwargs) for x in X]
     plt.plot(X, Y, label=func_kwargs)
-    plt.xlabel('E.g input (0-1)')
-    plt.ylabel('E.g transformation')
+    plt.xlabel('E.g input')
+    plt.ylabel('E.g output')
     plt.title(mod.__name__)
     #plt.legend()
     return fig
