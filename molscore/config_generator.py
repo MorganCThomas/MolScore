@@ -219,7 +219,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                                                  default=pinfo['default'], label=label, options=pinfo['options'])
 
         # If list convert correctly
-        if pinfo['default'] == list:
+        if pinfo['type'] == list:
             result_dict[p] = result_dict[p].replace(',', '').replace('\n', ' ').split(' ')
             # Check if empty and handle properly
             if result_dict[p] == [''] or result_dict[p] == ['[]'] or result_dict[p] == ['', '']:
