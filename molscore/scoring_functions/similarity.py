@@ -170,7 +170,7 @@ if __name__ == '__main__':
             args.ref_smiles = mg.sample(10)
 
         ts = TanimotoSimilarity(prefix=args.prefix, ref_smiles=args.ref_smiles, fp=args.fp,
-                                bits=args.bits, method=args.method, n_jobs=args.n_jobs)
+                                bits=args.bits, similarity_measure=args.similarity_measure, method=args.method, n_jobs=args.n_jobs)
 
         if args.query_smiles is None:
             _ = [print(o) for o in ts(mg.sample(5))]
