@@ -8,6 +8,7 @@ import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors, rdmolops, DataStructs
+from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Avalon import pyAvalonTools
 from xarray import DataArray
 
@@ -93,7 +94,7 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     elif isinstance(mol, Chem.rdchem.Mol):
         pass
     else:
-        raise TypeError
+        raise TypeError("Molecule is not a string (SMILES) or rdkit.mol")
 
     if not mol:
         mol = None
@@ -116,20 +117,13 @@ class Fingerprints:
         :return:
         """
         mol = get_mol(mol)
-        fp = None
-        for m in [cls.ECFP4, cls.ECFP4c, cls.FCFP4, cls.FCFP4c,
-                  cls.ECFP6, cls.ECFP6c, cls.FCFP6, cls.FCFP6c,
-                  cls.Avalon, cls.MACCSkeys, cls.hashAP, cls.hashTT,
-                  cls.RDK5, cls.RDK6, cls.RDK7]:
-            if name == m.__name__: fp = m
+        generator = getattr(Fingerprints, name, None)
 
-        if (mol is not None) and (fp is not None):
-            fp = m(mol, nBits, asarray)
+        if generator is None:
+            raise KeyError(f"\'{name}\' not recognised as a valid fingerprint")
 
-        if fp is None:
-            raise KeyError(f"{name} name not recognised as a valid fingerprint")
-
-        return fp
+        if mol is not None:
+            return generator(mol, nBits, asarray)
 
     # Circular fingerprints
     @staticmethod
@@ -225,6 +219,18 @@ class Fingerprints:
 
     # Path-based fingerprints
     @staticmethod
+    def AP(mol, nBits, asarray):
+        if asarray:
+            fp = rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10)
+            nfp = np.zeros((1, nBits), np.int32)
+            for idx, v in fp.GetNonzeroElements().items():
+                nidx = idx % nBits
+                nfp[0, nidx] += int(v)
+            return nfp.reshape(-1)
+        else:
+            return rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10)
+
+    @staticmethod
     def hashAP(mol, nBits, asarray):
         if asarray:
             return np.asarray(rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits))
@@ -258,6 +264,14 @@ class Fingerprints:
             return np.asarray(rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2))
         else:
             return rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
+
+    # Pharmacophore-based
+    @staticmethod
+    def PHCO(mol, nBits, asarray):
+        if asarray:
+            return np.asarray(Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory))
+        else:
+            return Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory)
 
 
 def GetSimilarityMeasure(name: str, bulk=False):
