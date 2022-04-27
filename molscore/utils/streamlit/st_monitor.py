@@ -261,7 +261,7 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
     return
 
 
-def find_sdfs(match_idxs, main_df, dock_path):
+def find_sdfs(match_idxs, main_df, dock_path, gz_only=False):
     # Drop duplicate smiles
     sel_smiles = main_df.loc[match_idxs, 'smiles'].drop_duplicates().tolist()
     # Find first (potentially non-matching idx of first recorded unique smiles)
@@ -276,8 +276,11 @@ def find_sdfs(match_idxs, main_df, dock_path):
     idx_names = main_df.loc[
         match_idxs,
         ['smiles', 'step', 'batch_idx']].drop_duplicates(subset=['smiles']).to_records(index=False)
-
-    file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}-*sdf*'))[0] for s, b in first_idxs]
+    
+    if gz_only:
+        file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}-*sdfgz'))[0] for s, b in first_idxs]
+    else:
+        file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}-*sdf*'))[0] for s, b in first_idxs]
 
     return file_paths, [f'Mol: {s}_{b}' for _, s, b in idx_names]
 
@@ -586,7 +589,7 @@ def main():
                     st.write(f'File name: {out_file}.sdf')
                     save_top_k = st.button(label='Save', key='save_top_k_button')
                     if save_top_k:
-                        file_paths, mol_names = find_sdfs(top_df.index.to_list(), main_df, dock_path)
+                        file_paths, mol_names = find_sdfs(top_df.index.to_list(), main_df, dock_path, gz_only=True)
                         save_sdf(mol_paths=file_paths,
                                  mol_names=mol_names,
                                  out_name=out_file)
