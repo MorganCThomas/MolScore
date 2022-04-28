@@ -1,4 +1,3 @@
-from genericpath import exists
 import unittest
 import logging
 import os
@@ -14,7 +13,7 @@ class TestLigPrep(BaseTests.TestLigandPreparation):
             if not ('SCHRODINGER' in list(os.environ.keys())):
                 self.skipTest('Schrodinger installation not found')
             mg = MockGenerator(seed_no=123)
-            self.cls = LigPrep
+            self.obj = LigPrep
             logger = logging.getLogger('test')
             logger.setLevel(logging.DEBUG)
             self.inst = LigPrep(
@@ -34,7 +33,7 @@ class TestEpik(BaseTests.TestLigandPreparation):
             if not 'SCHRODINGER' in list(os.environ.keys()):
                     self.skipTest('Schrodinger installation not found')
             mg = MockGenerator(seed_no=123)
-            self.cls = Epik
+            self.obj = Epik
             logger = logging.getLogger('test')
             logger.setLevel(logging.DEBUG)
             self.inst = Epik(
@@ -56,7 +55,7 @@ class TestMoka(BaseTests.TestLigandPreparation):
             if (moka_env == '') or (corina_env == ''):
                 self.skipTest('Moka or Corina installation not found')
             mg = MockGenerator(seed_no=123)
-            self.cls = Moka
+            self.obj = Moka
             logger = logging.getLogger('test')
             logger.setLevel(logging.DEBUG)
             self.inst = Moka(
@@ -74,7 +73,7 @@ class TestMoka(BaseTests.TestLigandPreparation):
 class TestGypsumDL(BaseTests.TestLigandPreparation):
     def setUp(self):
             mg = MockGenerator(seed_no=123)
-            self.cls = GypsumDL
+            self.obj = GypsumDL
             logger = logging.getLogger('test')
             logger.setLevel(logging.DEBUG)
             self.inst = GypsumDL(

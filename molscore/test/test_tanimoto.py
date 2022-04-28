@@ -7,7 +7,7 @@ from molscore.scoring_functions.similarity import TanimotoSimilarity
 class TestTanimotoECFP4MeanSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -25,7 +25,7 @@ class TestTanimotoECFP4MeanSingle(BaseTests.TestScoringFunction):
 class TestTanimotoECFP4MaxSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -43,7 +43,7 @@ class TestTanimotoECFP4MaxSingle(BaseTests.TestScoringFunction):
 class TestTanimotoFCFP4MeanSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -61,7 +61,7 @@ class TestTanimotoFCFP4MeanSingle(BaseTests.TestScoringFunction):
 class TestTanimotoFCFP4MaxSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -79,7 +79,7 @@ class TestTanimotoFCFP4MaxSingle(BaseTests.TestScoringFunction):
 class TestTanimotoECFC4MeanSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -97,7 +97,7 @@ class TestTanimotoECFC4MeanSingle(BaseTests.TestScoringFunction):
 class TestTanimotoECFC4MaxSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -115,7 +115,7 @@ class TestTanimotoECFC4MaxSingle(BaseTests.TestScoringFunction):
 class TestTanimotoFCFC4MeanSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -133,7 +133,7 @@ class TestTanimotoFCFC4MeanSingle(BaseTests.TestScoringFunction):
 class TestTanimotoFCFC4MaxSingle(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -151,7 +151,7 @@ class TestTanimotoFCFC4MaxSingle(BaseTests.TestScoringFunction):
 class TestTanimotoFCFC4MeanParallel(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
@@ -169,7 +169,7 @@ class TestTanimotoFCFC4MeanParallel(BaseTests.TestScoringFunction):
 class TestTanimotoFCFC4MaxParallel(BaseTests.TestScoringFunction):
     def setUp(self):
         mg = MockGenerator(seed_no=123)
-        self.cls = TanimotoSimilarity
+        self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
             prefix='test',
             ref_smiles=mg.sample(10),
