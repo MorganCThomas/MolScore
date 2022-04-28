@@ -1,5 +1,8 @@
+import os
 import unittest
 import inspect
+
+from glob import glob
 
 
 class BaseTests:
@@ -41,3 +44,18 @@ class BaseTests:
                     o.pop('smiles')
                     for k in o.keys():
                         self.assertIn(k.strip(f'{self.inst.prefix}_'), self.cls.return_metrics, "{k} not in return metrics")
+
+    class TestLigandPreparation(unittest.TestCase):
+        """
+        Generic tests to be inherited by specific ligand preparation protocols based on inheriting
+          self.cls, self.inst, self.input & self.output
+        """
+        output_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_out')
+
+        def test_output(self):
+            self.assertEqual(len(self.input), len(self.output))
+            self.assertIsInstance(self.output, dict)
+            for i in self.output:
+                for v in self.output[i]:
+                    self.assertGreater(len(os.path.join(self.output_directory, f"{i}-{v}_prepared.*")), 0)
+            
