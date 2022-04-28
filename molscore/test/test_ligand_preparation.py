@@ -4,14 +4,14 @@ import logging
 import os
 import subprocess
 
-from molscore.test.tests.base_tests import BaseTests
+from molscore.test.base_tests import BaseTests
 from molscore.test.mock_generator import MockGenerator
 from molscore.scoring_functions._ligand_preparation import LigPrep, Epik, Moka, GypsumDL
 
 
 class TestLigPrep(BaseTests.TestLigandPreparation):
     def setUp(self):
-            if not 'SCHRODINGER' in list(os.environ.keys()):
+            if not ('SCHRODINGER' in list(os.environ.keys())):
                 self.skipTest('Schrodinger installation not found')
             mg = MockGenerator(seed_no=123)
             self.cls = LigPrep

@@ -53,9 +53,13 @@ class BaseTests:
         output_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_out')
 
         def test_output(self):
-            self.assertEqual(len(self.input), len(self.output))
-            self.assertIsInstance(self.output, dict)
-            for i in self.output:
-                for v in self.output[i]:
+            self.assertIsInstance(self.output, tuple)
+            out1, out2 = self.output
+            self.assertIsInstance(out1, dict)
+            self.assertIsInstance(out2, list)
+            for i in out1:
+                for v in out1[i]:
                     self.assertGreater(len(os.path.join(self.output_directory, f"{i}-{v}_prepared.*")), 0)
-            
+
+            for f in out2:
+                self.assertTrue(os.path.exists(f))

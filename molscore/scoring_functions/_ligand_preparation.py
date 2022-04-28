@@ -57,7 +57,7 @@ class LigPrep(LigandPreparation):
         :param smiles: List of SMILES strings
         :param directory: Output directory
         :param file_names: File names for SMILES
-        :return: List of variant file names per input file smiles
+        :return: (dictionary of variants, file_paths)
         """
         # Write out smiles to sdf files and prepare ligprep commands
         ligprep_commands = []
@@ -94,6 +94,7 @@ class LigPrep(LigandPreparation):
 
         # Read in ligprep output files and split to individual variants
         variants = {name: [] for name in file_names}
+        variant_files = []
         for name in file_names:
             out_file = os.path.join(directory, f'{name}_prepared.sdf')
             if os.path.exists(out_file):
@@ -106,14 +107,16 @@ class LigPrep(LigandPreparation):
                             variant = variant.split(':')[1]
                         variant = variant.split('-')[1]
                         variants[name].append(variant)
-                        w = Chem.rdmolfiles.SDWriter(os.path.join(directory, f'{name}-{variant}_prepared.sdf'))
+                        out_split_file = os.path.join(directory, f'{name}-{variant}_prepared.sdf')
+                        variant_files.append(out_split_file)
+                        w = Chem.rdmolfiles.SDWriter(out_split_file)
                         w.write(mol)
                         w.flush()
                         w.close()
                         if self.logger: self.logger.debug(f'Split {name} -> {name}-{variant}')
                     else:
                         continue
-        return variants
+        return variants, variant_files
 
 
 class Epik(LigandPreparation):
@@ -160,6 +163,7 @@ class Epik(LigandPreparation):
             stereoisomers = list(EnumerateStereoisomers(mol, options=opts))
             #logger.debug(f'{name}: {len(stereoisomers)} enumerated unique stereoisomers')
             variants = []
+            out_paths = []
             for variant, iso in enumerate(stereoisomers):
                 try:
                     Chem.EmbedMolecule(iso)
@@ -171,6 +175,7 @@ class Epik(LigandPreparation):
                 mae_in = os.path.join(directory, f'{name}-{variant}_isomers.mae')
                 sdf_out = os.path.join(directory, f'{name}-{variant}_prepared.sdf')
                 mae_out = os.path.join(directory, f'{name}-{variant}_prepared.mae')
+                out_paths.append(sdf_out)
                 w = Chem.rdmolfiles.SDWriter(sdf_in)
                 w.write(iso)
                 w.flush()
@@ -179,9 +184,9 @@ class Epik(LigandPreparation):
                                     epik_env, f"-imae {mae_in}", f"-omae {mae_out}", "-ph 7.4", "-ms 1",
                                     "-WAIT", "-NOJOBID", ";",
                                     convert_env, mae_out, sdf_out))
-            return name, variants, command
+            return name, variants, command, out_paths
         else:
-            return name, [], None
+            return name, [], None, []
 
     def prepare(self, smiles: list, directory: os.PathLike, file_names: list):
         """
@@ -189,7 +194,7 @@ class Epik(LigandPreparation):
         :param smiles: List of SMILES strings
         :param directory: Output directory
         :param file_names: File names for SMILES
-        :return: List of variant file names per input file smiles
+        :return: (dictionary of variants, file_paths)
         """
         # Initialize subprocess
         if self.logger: self.logger.debug('Epik called')
@@ -200,20 +205,37 @@ class Epik(LigandPreparation):
             futures = [self.cluster.submit(self.enumerate_stereoisomers, smi, name, directory, epik_env=self.env, convert_env=self.convert_env)
                         for smi, name in zip(smiles, file_names)]
             results = self.cluster.gather(futures)
-            variants = {n: v for n, v, c in results}
-            epik_commands = [c for n, v, c in results if c is not None]
+            variants = {}
+            variant_files = []
+            epik_commands = []
+            for n, v, c, op in results:
+                variants[n] = v
+                variant_files += op
+                if c is not None:
+                    epik_commands.append(c)
+            #variants = {n: v for n, v, c, op in results}
+            #variant_files = [op for n, v, c, op in results]
+            #epik_commands = [c for n, v, c, op in results if c is not None]
             futures = self.cluster.map(p, epik_commands)
             _ = self.cluster.gather(futures)
 
         else:
             results = [self.enumerate_stereoisomers(smi, name, directory, epik_env=self.env, convert_env=self.convert_env)
                         for smi, name in zip(smiles, file_names)]
-            variants = {n: v for n, v, c in results}
-            epik_commands = [c for n, v, c in results if c is not None]
+            variants = {}
+            variant_files = []
+            epik_commands = []
+            for n, v, c, op in results:
+                variants[n] = v
+                variant_files += op
+                if c is not None:
+                    epik_commands.append(c)
+            #variants = {n: v for n, v, c, op in results}
+            #epik_commands = [c for n, v, c, op in results if c is not None]
             _ = [p(command) for command in epik_commands]
         
         if self.logger: self.logger.debug('Epik finished')
-        return variants
+        return variants, variant_files
 
 
 class Moka(LigandPreparation):
@@ -239,7 +261,7 @@ class Moka(LigandPreparation):
         :param smiles: List of SMILES strings
         :param directory: Output directory
         :param file_names: File names for SMILES
-        :return: List of variant file names per input file smiles
+        :return: (dictionary of variants, file_paths)
         """
         # Write out SMILES and Generate CLI commands
         moka_commands = []
@@ -278,6 +300,7 @@ class Moka(LigandPreparation):
 
         # Read in corina output files and split to individual variants
         variants = {name: [] for name in file_names}
+        variant_files = []
         for name in file_names:
             out_file = os.path.join(directory, f'{name}_corina.sdf')
             if os.path.exists(out_file):
@@ -286,7 +309,9 @@ class Moka(LigandPreparation):
                 for variant, mol in enumerate(supp):
                     if mol:
                         self.variants[name].append(variant)
-                        with Chem.SDWriter(os.path.join(self.directory, f'{name}-{variant}_prepared.sdf')) as w:
+                        out_path = os.path.join(self.directory, f'{name}-{variant}_prepared.sdf')
+                        variant_files.append(out_path)
+                        with Chem.SDWriter(out_path) as w:
                             w.write(mol)
                             if self.logger: self.logger.debug(f'Split {name} -> {name}-{variant}')
                     else:
@@ -352,7 +377,7 @@ class GypsumDL(LigandPreparation):
         :param smiles: List of SMILES strings
         :param directory: Output directory
         :param file_names: File names for SMILES
-        :return: List of variant file names per input file smiles
+        :return: (dictionary of variants, file_paths)
         """
         # Load SMILES data
         smiles_data = [(smi, name, {}) for smi, name in zip(smiles, file_names)]
@@ -377,8 +402,8 @@ class GypsumDL(LigandPreparation):
         add_mol_id_props(contnrs)
 
         # Save the output.
-        output_paths = []
         variants = {name: [] for name in file_names}
+        variant_files = []
         for i, contnr in enumerate(contnrs):
             # First of all remove duplicates
             contnr.remove_identical_mols_from_contnr()
@@ -386,13 +411,13 @@ class GypsumDL(LigandPreparation):
                 if m:
                     variants[contnr.name].append(v)
                     m.load_conformers_into_rdkit_mol()
-                    path = os.path.join(directory, f'{contnr.name}-{v}_prepared.sdf')
-                    w = Chem.SDWriter(path)
+                    out_path = os.path.join(directory, f'{contnr.name}-{v}_prepared.sdf')
+                    variant_files.append(out_path)
+                    w = Chem.SDWriter(out_path)
                     w.write(m.rdkit_mol)
                     w.flush()
                     w.close()
-                    output_paths.append(path)
                     if self.logger: self.logger.debug(f'Written {contnr.name}-{v}')
-        return variants
+        return variants, variant_files
 
-ligand_preparation_Protocols = [LigPrep, Epik, Moka, GypsumDL]
+ligand_preparation_protocols = [LigPrep, Epik, Moka, GypsumDL]
