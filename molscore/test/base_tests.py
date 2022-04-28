@@ -44,7 +44,7 @@ class BaseTests:
                     # Check all dict keys are in return metrics
                     o.pop('smiles')
                     for k in o.keys():
-                        self.assertIn(k.strip(f'{self.inst.prefix}_'), self.obj.return_metrics, "{k} not in return metrics")
+                        self.assertIn(k.replace(f'{self.inst.prefix}_', ''), self.obj.return_metrics, f"{k} not in return metrics")
 
     class TestLigandPreparation(unittest.TestCase):
         """
