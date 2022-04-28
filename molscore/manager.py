@@ -8,7 +8,7 @@ import subprocess
 
 import molscore.scoring_functions as scoring_functions
 from molscore import utils
-from molscore.utils import streamlit
+from molscore.gui import monitor_path
 import molscore.scaffold_memory as scaffold_memory
 
 import pandas as pd
@@ -85,7 +85,7 @@ class MolScore:
         try:
             if self.configs['monitor_app']:
                 self.monitor_app = True
-                self.monitor_app_path = streamlit.monitor_path
+                self.monitor_app_path = monitor_path
         except KeyError:
             logger.info("Run monitor option unspecified, defaulting to False")
             self.monitor_app = False
