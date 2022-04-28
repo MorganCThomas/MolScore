@@ -1,8 +1,8 @@
 import re
 from rdkit.Chem import Descriptors, QED, Crippen, GetPeriodicTable
 from rdkit.Chem import AllChem as Chem
-from molscore.utils.score_modifiers import gauss
-from molscore.utils.score_methods import gmean
+from molscore.utils.transformation_functions import gauss
+from molscore.utils.aggregation_functions import gmean
 
 
 class Isomer:
