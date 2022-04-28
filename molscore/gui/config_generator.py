@@ -447,7 +447,7 @@ if len(config['scoring_functions']) > 0:
 st.subheader('Output json')
 with st.expander(label='Show'):
     st.write(config)
-out_file = os.path.abspath(st.text_input(label='Output file', value=f'configs/{config["task"]}.json'))
+out_file = os.path.abspath(st.text_input(label='Output file', value=f'../configs/{config["task"]}.json'))
 st.write(f"Selected: {out_file}")
 col1, col2 = st.columns(2)
 with col1:
