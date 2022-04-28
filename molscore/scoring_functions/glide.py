@@ -13,6 +13,7 @@ from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnum
 from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('glide')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -30,7 +31,7 @@ class GlideDock:
                       'r_i_glide_ligand_efficiency_ln', 'r_i_glide_gscore', 'r_i_glide_lipo',
                       'r_i_glide_hbond', 'r_i_glide_metal', 'r_i_glide_rewards', 'r_i_glide_evdw',
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
-                      'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge']
+                      'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
                  timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
@@ -39,7 +40,7 @@ class GlideDock:
         :param glide_template: Path to a template docking file (.in)
         :param cluster: Address to Dask scheduler for parallel processing via dask
         :param timeout: Timeout (seconds) before killing an individual docking simulation
-        :param ligand_preparation: Use ligprep (default), rdkit stereoenum + epik most probable state, or corina+moka abundancy > 20 [ligprep, epik, moka]
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         :param kwargs:
         """
         # Read in glide template (.in)
@@ -59,26 +60,12 @@ class GlideDock:
         self.variants = None
         self.docking_results = None
 
-        # Specify how to prepare
-        if ligand_preparation == 'ligprep':
-            self.prepare = self.run_ligprep
-            self.ligprep_env = os.path.join(os.environ['SCHRODINGER'], 'ligprep')
-        elif ligand_preparation == 'epik':
-            self.prepare = self.run_epik
-            self.epik_env = os.path.join(os.environ['SCHRODINGER'], 'epik')
-            self.structconvert_env = os.path.join(os.environ['SCHRODINGER'], 'utilities', 'structconvert')
-        elif ligand_preparation == 'moka':
-            self.prepare = self.run_moka
-            self.moka_env = subprocess.run(args=['which', 'blabber_sd'],
-                                           stdout=subprocess.PIPE).stdout.decode().strip('\n')
-            assert self.moka_env is not None, "Could not find moka"
-            self.corina_env = subprocess.run(args=['which', 'corina'],
-                                             stdout=subprocess.PIPE).stdout.decode().strip('\n')
-            assert self.corina_env is not None, "Could not find corina"
-
+        # Select ligand preparation protocol
+        self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
+        if self.cluster is not None:
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
-            print(f'Un-recognized ligand preparation {ligand_preparation}, please choose from (ligprep, epik)')
-            raise
+            self.ligand_protocol = self.ligand_protocol(logger=logger)
 
     @staticmethod
     def modify_glide_in(glide_in: str, glide_property: str, glide_value: str):
@@ -106,194 +93,6 @@ class GlideDock:
             glide_in.append(f'{glide_property}   {glide_value}\n')
 
         return glide_in
-
-    def run_ligprep(self, smiles: list):
-        """
-        Call ligprep to prepare molecules.
-        :param smiles: List of SMILES strings
-        """
-        ligprep_commands = []
-        # Write out smiles to sdf files and prepare ligprep commands
-        for smi, name in zip(smiles, self.file_names):
-            smi_in = os.path.join(self.directory, f'{name}.smi')
-            sdf_out = os.path.join(self.directory, f'{name}_prepared.sdf')
-
-            with open(smi_in, 'w') as f:
-                f.write(smi)
-
-            command = " ".join((self.ligprep_env,
-                                f"-ismi {smi_in}",
-                                f"-osd {sdf_out}",
-                                "-ph 7.0",
-                                "-pht 1.0",
-                                "-bff 16",
-                                "-s 8",
-                                "-epik",
-                                "-WAIT",
-                                "-NOJOBID"))
-            ligprep_commands.append(command)
-
-        # Initialize subprocess
-        logger.debug('LigPrep called')
-        p = timedSubprocess(timeout=self.timeout).run
-
-        # Run commands either using Dask or sequentially
-        if self.cluster is not None:
-            futures = self.client.map(p, ligprep_commands)
-            _ = self.client.gather(futures)
-        else:
-            _ = [p(command) for command in ligprep_commands]
-        logger.debug('LigPrep finished')
-
-        # Read in ligprep output files and split to individual variants
-        self.variants = {name: [] for name in self.file_names}
-        for name in self.file_names:
-            out_file = os.path.join(self.directory, f'{name}_prepared.sdf')
-            if os.path.exists(out_file):
-                supp = Chem.rdmolfiles.ForwardSDMolSupplier(os.path.join(self.directory, f'{name}_prepared.sdf'),
-                                                            sanitize=False, removeHs=False)
-                for mol in supp:
-                    if mol:
-                        variant = mol.GetPropsAsDict()['s_lp_Variant']
-                        if ':' in variant:
-                            variant = variant.split(':')[1]
-                        variant = variant.split('-')[1]
-                        self.variants[name].append(variant)
-                        w = Chem.rdmolfiles.SDWriter(os.path.join(self.directory, f'{name}-{variant}_prepared.sdf'))
-                        w.write(mol)
-                        w.flush()
-                        w.close()
-                        logger.debug(f'Split {name} -> {name}-{variant}')
-                    else:
-                        continue
-        return self
-
-    @staticmethod
-    def enumerate_stereoisomers(smi: str, name: str, directory: os.PathLike):
-        """
-        For a given smiles string, and file name, enumerate stereoisomers and write out sdf.
-        :param smi:
-        :param name:
-        :param directory:
-        :return:
-        """
-        epik_env = os.path.join(os.environ['SCHRODINGER'], 'epik')
-        structconvert_env = os.path.join(os.environ['SCHRODINGER'], 'utilities', 'structconvert')
-        mol = Chem.MolFromSmiles(smi)
-        if mol:
-            # Add Hs
-            mol = Chem.AddHs(mol)
-            # Enumerate stereoisomers
-            logger.debug(f'{name}: {GetStereoisomerCount(mol)} possible stereoisomers')
-            # Also embeds molecules
-            opts = StereoEnumerationOptions(tryEmbedding=False, unique=True, maxIsomers=16)
-            stereoisomers = list(EnumerateStereoisomers(mol, options=opts))
-            logger.debug(f'{name}: {len(stereoisomers)} enumerated unique stereoisomers')
-            variants = []
-            for variant, iso in enumerate(stereoisomers):
-                try:
-                    Chem.EmbedMolecule(iso)
-                except:
-                    continue
-                variants.append(variant)
-                # Write to sdf
-                sdf_in = os.path.join(directory, f'{name}-{variant}_isomers.sdf')
-                mae_in = os.path.join(directory, f'{name}-{variant}_isomers.mae')
-                sdf_out = os.path.join(directory, f'{name}-{variant}_prepared.sdf')
-                mae_out = os.path.join(directory, f'{name}-{variant}_prepared.mae')
-                w = Chem.rdmolfiles.SDWriter(sdf_in)
-                w.write(iso)
-                w.flush()
-                w.close()
-                command = " ".join((structconvert_env, sdf_in, mae_in, ";",
-                                    epik_env, f"-imae {mae_in}", f"-omae {mae_out}", "-ph 7.4", "-ms 1",
-                                    "-WAIT", "-NOJOBID", ";",
-                                    structconvert_env, mae_out, sdf_out))
-            return name, variants, command
-        else:
-            return name, [], None
-
-    def run_epik(self, smiles: list):
-        """
-        Call epik to prepare molecules, enumerate stereoisomers with rdkit
-        :param smiles: List of SMILES strings
-        """
-        # Initialize subprocess
-        logger.debug('Epik called')
-        p = timedSubprocess(timeout=self.timeout, shell=True).run  # Use shell because ;
-
-        # Run commands either using Dask or sequentially
-        if self.cluster is not None:
-            futures = [self.client.submit(self.enumerate_stereoisomers, smi, name, self.directory)
-                       for smi, name in zip(smiles, self.file_names)]
-            results = self.client.gather(futures)
-            self.variants = {n: v for n, v, c in results}
-            epik_commands = [c for n, v, c in results if c is not None]
-            futures = self.client.map(p, epik_commands)
-            _ = self.client.gather(futures)
-        else:
-            results = [self.enumerate_stereoisomers(smi, name, self.directory)
-                       for smi, name in zip(smiles, self.file_names)]
-            self.variants = {n: v for n, v, c in results}
-            epik_commands = [c for n, v, c in results if c is not None]
-            _ = [p(command) for command in epik_commands]
-        logger.debug('Epik finished')
-        return self
-
-    def run_moka(self, smiles: list):
-        """
-        Call moka and corina to prepare molecules
-        :param smiles: List of SMILES strings
-        """
-        moka_commands = []
-        corina_commands = []
-        for smi, name in zip(smiles, self.file_names):
-            sdf_in = os.path.join(self.directory, f'{name}.sdf')
-            sdf_moka = os.path.join(self.directory, f'{name}_moka.sdf')
-            sdf_corina = os.path.join(self.directory, f'{name}_corina.sdf')
-            mol = Chem.MolFromSmiles(smi)
-            if mol:
-                # Have to write as sdf as rdkit has no mol2 functionality
-                with Chem.rdmolfiles.SDWriter(sdf_in) as w:
-                    w.write(mol)
-                # blabber_sd -t 0.2 -p=7.4 --explicit-h=none -o <output_file.sdf> <input_file.mol2>
-                moka_commands.append(f'{self.moka_env} -t 20 -p 7.4 --explicit-h=none -o {sdf_moka} {sdf_in}')
-                # corina -d stergen,msi=16,wh,preserve <input_file> <output_file>
-                corina_commands.append(f'{self.corina_env} -d stergen,msi=16,wh,preserve {sdf_moka} {sdf_corina}')
-
-        # Initialize subprocesses
-        logger.debug('Moka called')
-        p = timedSubprocess(timeout=self.timeout, shell=False).run
-        # Run commands either using Dask or sequentially
-        if self.cluster is not None:
-            futures = self.client.map(p, moka_commands)
-            _ = self.client.gather(futures)
-            logger.debug('Moka finished')
-            futures = self.client.map(p, corina_commands)
-            _ = self.client.gather(futures)
-            logger.debug('Corina finished')
-        else:
-            _ = [p(command) for command in moka_commands]
-            logger.debug('Moka finished')
-            _ = [p(command) for command in corina_commands]
-            logger.debug('Corina finished')
-
-        # Read in corina output files and split to individual variants
-        self.variants = {name: [] for name in self.file_names}
-        for name in self.file_names:
-            out_file = os.path.join(self.directory, f'{name}_corina.sdf')
-            if os.path.exists(out_file):
-                supp = Chem.rdmolfiles.ForwardSDMolSupplier(os.path.join(self.directory, f'{name}_corina.sdf'),
-                                                            sanitize=False, removeHs=False)
-                for variant, mol in enumerate(supp):
-                    if mol:
-                        self.variants[name].append(variant)
-                        with Chem.SDWriter(os.path.join(self.directory, f'{name}-{variant}_prepared.sdf')) as w:
-                            w.write(mol)
-                            logger.debug(f'Split {name} -> {name}-{variant}')
-                    else:
-                        continue
-        return self
 
     def run_glide(self):
         """
@@ -497,7 +296,7 @@ class GlideDock:
                 self.client.restart()
 
         # Run protocol
-        self.prepare(smiles=smiles)
+        self.variants, variant_files = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=file_names)
         self.run_glide()
         best_variants = self.get_docking_scores(smiles=smiles, return_best_variant=True)
 
