@@ -34,17 +34,21 @@ class BaseTests:
             self.assertEqual(len(self.input), len(self.output),
                              'Length of output should be the same as the length of input')
             self.assertIsInstance(self.output, list, 'Output should be a list')
+            # Check first entry of output
+            o1 = self.output[0]
+            with self.subTest('Checking first output'):
+                self.assertIsInstance(o1, dict)
+                self.assertIn('smiles', o1.keys())
+                # Check all return metrics are in dict
+                for rm in self.obj.return_metrics:
+                    self.assertIn(f'{self.inst.prefix}_{rm}', o1.keys(), f"{rm} not in output")
+                # Check all dict keys are in return metrics
+                for k in o1.keys():
+                    if k == 'smiles': continue
+                    self.assertIn(k.replace(f'{self.inst.prefix}_', ''), self.obj.return_metrics, f"{k} not in return metrics")
+            # Check the rest are consistent
             for o in self.output:
-                with self.subTest('Checking all outputs'):
-                    self.assertIsInstance(o, dict)
-                    self.assertIn('smiles', o.keys())
-                    # Check all return metrics are in dict
-                    for rm in self.obj.return_metrics:
-                        self.assertIn(f'{self.inst.prefix}_{rm}', o.keys(), f"{rm} not in output")
-                    # Check all dict keys are in return metrics
-                    o.pop('smiles')
-                    for k in o.keys():
-                        self.assertIn(k.replace(f'{self.inst.prefix}_', ''), self.obj.return_metrics, f"{k} not in return metrics")
+                self.assertEqual(o1.keys(), o.keys())
 
     class TestLigandPreparation(unittest.TestCase):
         """

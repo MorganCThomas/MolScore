@@ -15,6 +15,7 @@ from dask.distributed import Client
 from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
 from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
 from molscore.utils.gypsum_dl.MolContainer import MolContainer
+from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 from rdkit import Chem
 
@@ -32,10 +33,10 @@ class SminaDock:
     """
     Score structures based on their Smina docking score, using Gypsum-DL for ligand preparation
     """
-    return_metrics = ['docking_score']
+    return_metrics = ['docking_score', 'best_variant']
 
     def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cpus: int = 1,
-                 cluster: str = None, timeout: float = 120.0):
+                 cluster: str = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param receptor: Path to receptor file (.pdbqt)
@@ -43,6 +44,7 @@ class SminaDock:
         :param cpus: Number of Smina CPUs to use per simulation
         :param cluster: Address to Dask scheduler for parallel processing via dask
         :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         """
         self.prefix = prefix.replace(" ", "_")
         self.receptor = os.path.abspath(receptor)
@@ -55,93 +57,19 @@ class SminaDock:
             self.client = Client(self.cluster)
         self.timeout = timeout
 
-    def preprocess_ligands(self, smiles):
-        """
-        Prepare ligands and save to sdf files <file_name_gypsum.sdf>
-        :param smiles:
-        :return: file locations
-        """
-        # Set Gypsum-DL parameters
-        gypsum_params = {
-            "source": "",
-            "output_folder": "./",
-            "separate_output_files": True,
-            "add_pdb_output": False,
-            "add_html_output": False,
-            "num_processors": -1,
-            "start_time": 0,
-            "end_time": 0,
-            "run_time": 0,
-            "min_ph": 7.0,
-            "max_ph": 7.0,
-            "pka_precision": 1.0,
-            "thoroughness": 1,
-            "max_variants_per_compound": 8,
-            "second_embed": False,
-            "2d_output_only": False,
-            "skip_optimize_geometry": True,
-            "skip_alternate_ring_conformations": True,
-            "skip_adding_hydrogen": False,
-            "skip_making_tautomers": False,
-            "skip_enumerate_chiral_mol": False,
-            "skip_enumerate_double_bonds": False,
-            "let_tautomers_change_chirality": False,
-            "use_durrant_lab_filters": True,
-            "job_manager": "multiprocessing",
-            "cache_prerun": False,
-            "test": False,
-        }
-        gypsum_params["Parallelizer"] = Parallelizer(
-            gypsum_params["job_manager"], gypsum_params["num_processors"], True
-        )
-
-        # Load SMILES data
-        smiles_data = [(smi, name, {}) for smi, name in zip(smiles, self.file_names)]
-
-        # Make the molecule containers.
-        contnrs = []
-        for i in range(0, len(smiles_data)):
-            smiles, name, props = smiles_data[i]
-            new_contnr = MolContainer(smiles, name, i, props)
-            contnrs.append(new_contnr)
-
-        # Remove None types from failed conversion
-        contnrs = [x for x in contnrs if x.orig_smi_canonical != None]
-
-        # Prepare and embed
-        prepare_smiles(contnrs, gypsum_params)
-
-        # Convert the processed SMILES strings to 3D.
-        prepare_3d(contnrs, gypsum_params)
-
-        # Add in name and unique id to each molecule.
-        add_mol_id_props(contnrs)
-
-        # Save the output.
-        output_paths = []
-        self.variants = {name: [] for name in self.file_names}
-        for i, contnr in enumerate(contnrs):
-            # First of all remove duplicates
-            contnr.remove_identical_mols_from_contnr()
-            for v, m in enumerate(contnr.mols):
-                if m:
-                    self.variants[contnr.name].append(v)
-                    m.load_conformers_into_rdkit_mol()
-                    path = os.path.join(self.directory, f'{contnr.name}-{v}_gypsum.sdf')
-                    w = Chem.SDWriter(path)
-                    w.write(m.rdkit_mol)
-                    w.flush()
-                    w.close()
-                    output_paths.append(path)
-                    logger.debug(f'Written {contnr.name}-{v}')
-        return output_paths
+        # Select ligand preparation protocol
+        self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
+        if self.cluster is not None:
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+        else:
+            self.ligand_protocol = self.ligand_protocol(logger=logger)
 
     def dock_ligands(self, ligand_paths):
         smina_commands = []
         log_paths = []
         for l in ligand_paths:
-            out_file = os.path.join(self.directory, os.path.basename(l).replace("_gypsum.sdf", "_docked.sdf"))
-            out_log = os.path.join(self.directory, os.path.basename(l).replace("_gypsum.sdf", "_log.txt"))
+            out_file = os.path.join(self.directory, os.path.basename(l).replace("_prepared.sdf", "_docked.sdf"))
+            out_log = os.path.join(self.directory, os.path.basename(l).replace("_prepared.sdf", "_log.txt"))
             log_paths.append(out_log)
             cmd = f"smina -r {self.receptor} -l {l} --autobox_ligand {self.ref} -o {out_file} " \
                   f"--cpu {self.cpus} --exhaustiveness 8 --energy_range 3 --min_rmsd_filter 1 --quiet " \
@@ -304,10 +232,10 @@ class SminaDock:
         logger.addHandler(fh)
 
         # Prepare ligands
-        output_paths = self.preprocess_ligands(smiles=smiles)
+        self.variants, variant_paths = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=self.file_names)
 
         # Dock ligands
-        self.dock_ligands(output_paths)
+        self.dock_ligands(variant_paths)
 
         # Process output
         best_variants = self.get_docking_scores(smiles, return_best_variant=True)
