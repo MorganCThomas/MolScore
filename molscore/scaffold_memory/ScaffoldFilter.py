@@ -128,7 +128,7 @@ class IdenticalMurckoScaffold(ScaffoldMatcher):
         """
         :param nbmax: Maximum number of molecules per memory bin (cluster)
         :param minscore: Minimum molecule score required to consider for memory binning
-        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin)) [binary, linear, sigmoid]
         :param kwargs:
         """
         super().__init__(nbmax=nbmax, minscore=minscore, generic=False, outputmode=outputmode)
@@ -141,7 +141,7 @@ class IdenticalTopologicalScaffold(ScaffoldMatcher):
         """
         :param nbmax: Maximum number of molecules per memory bin (cluster)
         :param minscore: Minimum molecule score required to consider for memory binning
-        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin)) [binary, linear, sigmoid]
         :param kwargs:
         """
         super().__init__(nbmax=nbmax, minscore=minscore, generic=True, outputmode=outputmode)
@@ -159,7 +159,7 @@ class CompoundSimilarity(ScaffoldFilter):
         :param radius: Morgan fingerprint radius (e.g., 2 = ECFP4)
         :param useFeatures: Include feature information in fingerprint
         :param bits: Length of fingerprint (i.e., number of folded bits)
-        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin)) [binary, linear, sigmoid]
         :param kwargs:
         """
         super().__init__(nbmax=nbmax, minscore=minscore, generic=False, outputmode=outputmode)
@@ -221,7 +221,7 @@ class ScaffoldSimilarityAtomPair(CompoundSimilarity):
         :param nbmax: Maximum number of molecules per memory bin (cluster)
         :param minscore: Minimum molecule score required to consider for memory binning
         :param minsimilarity: Minimum similarity to centroid molecule in bin
-        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin)) [binary, linear, sigmoid]
         :param kwargs:
         """
         super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
@@ -289,7 +289,7 @@ class ScaffoldSimilarityECFP(CompoundSimilarity):
         :param radius: Morgan fingerprint radius (e.g., 2 = ECFP4)
         :param useFeatures: Include feature information in fingerprint
         :param bits: Length of fingerprint (i.e., number of folded bits)
-        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin))
+        :param outputmode: 'binary' (1 or 0), 'linear' (1 - fraction of bin) or 'sigmoid' (1 - sigmoid(fraction of bin)) [binary, linear, sigmoid]
         :param kwargs:
         """
         super().__init__(nbmax=nbmax, minscore=minscore, minsimilarity=minsimilarity, outputmode=outputmode)
