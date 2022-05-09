@@ -315,7 +315,7 @@ def getspconfig(options, key_i=0):
         with col2:
             st.write('Example')
         with col3:
-            st.write(utils.score_modifiers.plot_mod(smod_obj, sp_config['parameters']))
+            st.write(utils.transformation_functions.plot_mod(smod_obj, sp_config['parameters']))
     except:
         pass
 
