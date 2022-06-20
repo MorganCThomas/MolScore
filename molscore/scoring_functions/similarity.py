@@ -78,7 +78,7 @@ class MolecularSimilarity:
 
         mol = get_mol(smi)
         if mol is not None:
-            fp = Fingerprints.get_fp(mol, fp, nBits, asarray=False)
+            fp = Fingerprints.get(mol, fp, nBits, asarray=False)
             sim_vec = similarity_measure(fp, ref_fps)
 
             if method == 'mean':
