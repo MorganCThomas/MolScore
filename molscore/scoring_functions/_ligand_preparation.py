@@ -15,6 +15,7 @@ from molscore.scoring_functions.utils import timedSubprocess, get_mol
 # Stereoisomers: LigPrep / RDKit / Corina / GypsumDL (manual/rdkit)
 # 3D Embedding: LigPrep / GypsumDL(RDKit) / Corina / RDKit / OBabel? / OpenEye?
 
+
 class LigandPreparation:
     """
     Class to collect ligand preparation protocols required for any Docking scoring functions
@@ -23,6 +24,10 @@ class LigandPreparation:
         self.cluster = False if dask_client is None else dask_client
         self.timeout = timeout
         self.logger = False if logger is None else logger
+
+    def prepare(self, smiles, directory, file_names):
+        # This should be overwritten by specific classes
+        raise NotImplementedError
 
     def __call__(self, smiles: list, file_names: list, directory: os.PathLike):
         return self.prepare(smiles=smiles, directory=directory, file_names=file_names)
@@ -308,15 +313,15 @@ class Moka(LigandPreparation):
                                                             sanitize=False, removeHs=False)
                 for variant, mol in enumerate(supp):
                     if mol:
-                        self.variants[name].append(variant)
-                        out_path = os.path.join(self.directory, f'{name}-{variant}_prepared.sdf')
+                        variants[name].append(variant)
+                        out_path = os.path.join(directory, f'{name}-{variant}_prepared.sdf')
                         variant_files.append(out_path)
                         with Chem.SDWriter(out_path) as w:
                             w.write(mol)
                             if self.logger: self.logger.debug(f'Split {name} -> {name}-{variant}')
                     else:
                         continue
-        return variants
+        return variants, variant_files
 
 
 class GypsumDL(LigandPreparation):
