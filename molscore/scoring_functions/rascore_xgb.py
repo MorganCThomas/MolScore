@@ -23,7 +23,7 @@ class RAScore_XGB:
     def __init__(self, prefix: str = 'RAScore', model: str = 'ChEMBL', n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance
-        :param model: Either 'ChEMBL', 'GDB', 'GDBMedChem' or specify a file path to a custom model
+        :param model: Either ChEMBL, GDB, GDBMedChem [ChEMBL, GDB, GDBMedChem]
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
         :param kwargs:
         """
@@ -40,8 +40,9 @@ class RAScore_XGB:
             with resources.open_binary('molscore.data.models.RAScore.XGB_gdbmedechem_ecfp_counts', 'model.pkl') as f:
                 self.model = pkl.load(f)
         else:
-            with open(os.path.abspath(model), 'rb') as f:
-                self.model = pkl.load(f)
+            raise "Please select from ChEMBL, GDB or GDBMedChem"
+            #with open(os.path.abspath(model), 'rb') as f:
+            #    self.model = pkl.load(f)
 
     @staticmethod
     def calculate_fp(smiles):

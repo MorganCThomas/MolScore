@@ -13,9 +13,10 @@ from scipy.stats import wasserstein_distance
 
 from moleval.metrics.utils import mapper
 from moleval.metrics.utils import disable_rdkit_log, enable_rdkit_log
+from moleval.metrics.metrics_utils import SA, QED, NP, weight, logP
 from moleval.metrics.metrics_utils import compute_fragments, average_agg_tanimoto, \
     compute_scaffolds, fingerprints, numpy_fps_to_bitvectors, sphere_exclusion,\
-    get_mol, canonic_smiles, mol_passes_filters
+    get_mol, canonic_smiles, mol_passes_filters, analogues_tanimoto, compute_functional_groups, compute_ring_systems
 
 
 # Modify this function so that it doesn't depend on metrics dataset
@@ -75,6 +76,11 @@ class GetMosesMetrics(object):
         self.test_scaffolds = test_scaffolds
         self.train = train
         self.target = target
+        # Clean up if necessary
+        for att in ['test', 'test_scaffolds', 'target', 'train']:
+            if getattr(self, att) is not None:
+                setattr(self, att, remove_invalid(getattr(self, att), canonize=True))
+        # FCD pre-statistics
         self.ptest = ptest
         self.ptest_scaffolds = ptest_scaffolds
         self.ptrain = ptrain
@@ -115,7 +121,7 @@ class GetMosesMetrics(object):
                                                               device=self.device, batch_size=self.batch_size,
                                                               pool=self.pool)
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=None):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000):
         metrics = {}
         metrics['#'] = len(gen)
 
@@ -124,7 +130,7 @@ class GetMosesMetrics(object):
             metrics['Validity'] = fraction_valid(gen, self.pool)
 
         gen = remove_invalid(gen, canonize=True)
-        mols = mapper(self.pool)(get_mol, gen)
+        #mols = mapper(self.pool)(get_mol, gen)
         metrics['# valid'] = len(gen)
 
         # Calculate Uniqueness
@@ -140,6 +146,8 @@ class GetMosesMetrics(object):
         mol_fps = fingerprints(mols, self.pool, already_unique=True, fp_type='morgan')
         scaffs = compute_scaffolds(mols, n_jobs=self.n_jobs)
         scaff_gen = list(scaffs.keys())
+        fgs = compute_functional_groups(mols, n_jobs=self.n_jobs)
+        rss = compute_ring_systems(mols, n_jobs=self.n_jobs)
         scaff_mols = mapper(self.pool)(get_mol, scaff_gen)
         metrics['# valid & unique'] = len(gen)
 
@@ -149,11 +157,14 @@ class GetMosesMetrics(object):
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
         metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
-        if se_k is not None:
+        if (se_k is not None) and (len(gen) >= se_k):
             metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
         metrics['Scaff uniqueness'] = len(scaff_gen)/len(gen)
+        # Calculate number of FG and RS relative to sample size
+        metrics['FG'] = len(list(fgs.keys()))/len(gen)
+        metrics['RS'] = len(list(rss.keys()))/len(gen)
         # Calculate % pass filters
         metrics['Filters'] = fraction_passes_filters(mols, self.pool)
 
@@ -167,22 +178,68 @@ class GetMosesMetrics(object):
             metrics['FCD_testSF'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds)
         if self.ptarget:
             metrics['FCD_target'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget)
+
         # Test metrics
         if self.test_int is not None:
+            metrics['Novelty_test'] = novelty(gen, self.test, self.pool)
+            metrics['AnalogueSimilarity_test'], metrics['AnalogueCoverage_test'] = \
+                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'])
+            metrics['FG_test'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.test_int['FG'])
+            metrics['RS_test'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.test_int['RS'])
             metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
+            for name, func in [('logP', logP),
+                               ('NP', NP),
+                               ('SA', SA),
+                               ('QED', QED),
+                               ('weight', weight)]:
+                metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
+
         # Test scaff metrics
         if self.test_scaffolds_int is not None:
             metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
             metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
             metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
+
         # Target metrics
         if self.target_int is not None:
+            metrics['Novelty_target'] = novelty(gen, self.target, self.pool)
+            metrics['AnalogueSimilarity_target'], metrics['AnalogueCoverage_target'] = \
+                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'])
+            metrics['FG_target'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.target_int['FG'])
+            metrics['RS_target'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.target_int['RS'])
             metrics['SNN_target'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['SNN'])
             metrics['Frag_target'] = FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag'])
             metrics['Scaf_target'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf'])
+            for name, func in [('logP', logP),
+                               ('NP', NP),
+                               ('SA', SA),
+                               ('QED', QED),
+                               ('weight', weight)]:
+                metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
 
+        return metrics
+
+    def property_distributions(self, gen):
+        metrics = {}
+        if self.test_int is not None:
+            for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
+                metrics[f'{name}_test'] = self.test_int[name]['values']
+        if self.target_int is not None:
+            for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
+                metrics[f'{name}_test'] = self.target_int[name]['values']
+
+        gen = remove_invalid(gen, canonize=True)
+        gen = list(set(gen))
+        mols = mapper(self.pool)(get_mol, gen)
+        for name, func in [('logP', logP),
+                           ('NP', NP),
+                           ('SA', SA),
+                           ('QED', QED),
+                           ('weight', weight)]:
+
+            metrics[name] = WassersteinMetric(func, **self.kwargs).precalc(mols)['values']
         return metrics
 
     def close_pool(self):
@@ -215,10 +272,15 @@ def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
     statistics['SNN'] = SNNMetric(**kwargs).precalc(mols)
     statistics['Frag'] = FragMetric(**kwargs).precalc(mols)
     statistics['Scaf'] = ScafMetric(**kwargs).precalc(mols)
-    #for name, func in [('logP', logP), ('SA', SA),
-    #                   ('QED', QED),
-    #                   ('weight', weight)]:
-    #    statistics[name] = WassersteinMetric(func, **kwargs).precalc(mols)
+    statistics['Analogue'] = FingerprintAnaloguesMetric(**kwargs).precalc(mols)
+    statistics['FG'] = FGMetric(**kwargs).precalc(mols)
+    statistics['RS'] = RSMetric(**kwargs).precalc(mols)
+    for name, func in [('logP', logP),
+                       ('NP', NP),
+                       ('SA', SA),
+                       ('QED', QED),
+                       ('weight', weight)]:
+        statistics[name] = WassersteinMetric(func, **kwargs).precalc(mols)
     if close_pool:
         pool.terminate()
     return statistics
@@ -273,8 +335,8 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     if k is not None:
         if len(gen) < k:
             warnings.warn(
-                "Can't compute SEDiv@{}.".format(k) +
-                "gen contains only {} molecules".format(len(gen))
+                f"Can't compute SEDiv@{k/1000:.0f} "
+                f"gen contains only {len(gen)} molecules"
             )
         gen = gen[:k]
 
@@ -387,6 +449,24 @@ class SNNMetric(Metric):
                                     device=self.device)
 
 
+class FingerprintAnaloguesMetric(Metric):
+    """
+    Computes average max similarities of gen SMILES to ref SMILES
+    """
+
+    def __init__(self, fp_type='morgan', **kwargs):
+        self.fp_type = fp_type
+        super().__init__(**kwargs)
+
+    def precalc(self, mols):
+        return {'fps': fingerprints(mols, n_jobs=self.n_jobs,
+                                    fp_type=self.fp_type)}
+
+    def metric(self, pref, pgen):
+        return analogues_tanimoto(pref['fps'], pgen['fps'],
+                                  device=self.device)  # Tuple returned (Frac analogues, analogue coverage)
+
+
 def cos_similarity(ref_counts, gen_counts):
     """
     Computes cosine similarity between
@@ -417,6 +497,22 @@ class ScafMetric(Metric):
 
     def metric(self, pref, pgen):
         return cos_similarity(pref['scaf'], pgen['scaf'])
+
+
+class FGMetric(Metric):
+    def precalc(self, mols):
+        return {'fgs': compute_functional_groups(mols, n_jobs=self.n_jobs)}
+
+    def metric(self, pref, pgen):
+        return cos_similarity(pref['fgs'], pgen['fgs'])
+
+
+class RSMetric(Metric):
+    def precalc(self, mols):
+        return {'rss': compute_ring_systems(mols, n_jobs=self.n_jobs)}
+
+    def metric(self, pref, pgen):
+        return cos_similarity(pref['rss'], pgen['rss'])
 
 
 class WassersteinMetric(Metric):

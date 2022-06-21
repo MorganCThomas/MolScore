@@ -1,6 +1,4 @@
 from optimizer import BasePSOptimizer
-#from objectives.scoring import ScoringFunction
-#from objectives.mol_functions import qed_score
 from cddd.inference import InferenceModel
 import argparse
 import os
@@ -45,7 +43,7 @@ def get_args():
     parser.add_argument('--smiles_file', default='data/guacamol_v1_all.smiles',
                         help='Initial SMILES to start optimization from')
     parser.add_argument('--num_part', default=200, help='Number of swarm particles (if smiles file,'
-                                           ' this number of molecules will be randomly drawn)')
+                                                        ' this number of molecules will be randomly drawn)')
     parser.add_argument('--num_swarm', default=1, help='Number of swarms')
     parser.add_argument('--num_steps', default=200, help='Number of optimization steps')
     args = parser.parse_args()

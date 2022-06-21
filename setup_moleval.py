@@ -9,5 +9,5 @@ setup(
     author_email='morganthomas263@gmail.com',
     description='A evaluation framework for goal directed generative models',
     include_package_data=True,
-    package_data={'moleval': ['test/data/sample.smi']}
+    package_data={'moleval': ['test/data/sample.smi', 'metrics/mcf.csv', 'metrics/wehi_pains.csv']}
 )

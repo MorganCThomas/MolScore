@@ -3,13 +3,17 @@ import os
 import glob
 import gzip
 import logging
+import subprocess
 
 from openeye import oechem
 from dask.distributed import Client
 from rdkit.Chem import AllChem as Chem
+from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
 
 from molscore.scoring_functions.rocs import ROCS
+from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('glide')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -27,15 +31,16 @@ class GlideDock:
                       'r_i_glide_ligand_efficiency_ln', 'r_i_glide_gscore', 'r_i_glide_lipo',
                       'r_i_glide_hbond', 'r_i_glide_metal', 'r_i_glide_rewards', 'r_i_glide_evdw',
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
-                      'r_i_glide_energy', 'r_i_glide_rmsd_to_input']
+                      'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
-                 timeout: float = 120.0, **kwargs):
+                 timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
         :param cluster: Address to Dask scheduler for parallel processing via dask
         :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         :param kwargs:
         """
         # Read in glide template (.in)
@@ -48,13 +53,19 @@ class GlideDock:
         self.prefix = prefix.replace(" ", "_")
         self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
-        self.ligprep_env = os.path.join(os.environ['SCHRODINGER'], 'ligprep')
         self.timeout = float(timeout)
         self.cluster = cluster
         if self.cluster is not None:
             self.client = Client(self.cluster)
         self.variants = None
         self.docking_results = None
+
+        # Select ligand preparation protocol
+        self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
+        if self.cluster is not None:
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+        else:
+            self.ligand_protocol = self.ligand_protocol(logger=logger)
 
     @staticmethod
     def modify_glide_in(glide_in: str, glide_property: str, glide_value: str):
@@ -83,76 +94,6 @@ class GlideDock:
 
         return glide_in
 
-    def run_ligprep(self, smiles: list):
-        """
-        Call ligprep to prepare molecules.
-        :param smiles: List of SMILES strings
-        """
-        ligprep_commands = []
-        # Write out smiles to sdf files and prepare ligprep commands
-        for smi, name in zip(smiles, self.file_names):
-            smi_in = os.path.join(self.directory, f'{name}.smi')
-            sdf_out = os.path.join(self.directory, f'{name}_ligprep.sdf')
-
-            with open(smi_in, 'w') as f:
-                f.write(smi)
-
-            command = " ".join((self.ligprep_env,
-                                f"-ismi {smi_in}",
-                                f"-osd {sdf_out}",
-                                "-ph 7.0",
-                                "-pht 1.0",
-                                "-bff 16",
-                                "-s 8",
-                                "-epik",
-                                "-WAIT",
-                                "-NOJOBID"))
-            ligprep_commands.append(command)
-
-        # Initialize subprocess
-        logger.debug('LigPrep called')
-        p = timedSubprocess(timeout=self.timeout).run
-
-        # Run commands either using Dask or sequentially
-        if self.cluster is not None:
-            futures = self.client.map(p, ligprep_commands)
-            _ = self.client.gather(futures)
-        else:
-            _ = [p(command) for command in ligprep_commands]
-        logger.debug('LigPrep finished')
-        return self
-
-    @property
-    def split_sdf(self):
-        """
-        Split ligprep output sdf so that each variant can be independently run.
-        """
-        # Read in ligprep output files and split to individual variants
-        self.variants = {name: [] for name in self.file_names}
-        for name in self.file_names:
-            out_file = os.path.join(self.directory, f'{name}_ligprep.sdf')
-
-            if os.path.exists(out_file):
-                supp = Chem.rdmolfiles.ForwardSDMolSupplier(os.path.join(self.directory, f'{name}_ligprep.sdf'),
-                                                            sanitize=False, removeHs=False)
-
-                for mol in supp:
-                    if mol:
-                        variant = mol.GetPropsAsDict()['s_lp_Variant']
-                        if ':' in variant:
-                            variant = variant.split(':')[1]
-                        variant = variant.split('-')[1]
-                        self.variants[name].append(variant)
-                        w = Chem.rdmolfiles.SDWriter(os.path.join(self.directory, f'{name}-{variant}_ligprep.sdf'))
-                        w.write(mol)
-                        w.flush()
-                        w.close()
-                        logger.debug(f'Split {name} -> {name}-{variant}')
-                    else:
-                        continue
-
-        return self
-
     def run_glide(self):
         """
         Write GLIDE new input files and submit each to Glide
@@ -165,7 +106,7 @@ class GlideDock:
                 # Change glide_in file
                 glide_in = self.modify_glide_in(glide_in,
                                                 'LIGANDFILE',
-                                                os.path.join(self.directory, f'{name}-{variant}_ligprep.sdf'))
+                                                os.path.join(self.directory, f'{name}-{variant}_prepared.sdf'))
                 glide_in = self.modify_glide_in(glide_in,
                                                 'OUTPUTDIR',
                                                 os.path.join(self.directory))
@@ -206,6 +147,13 @@ class GlideDock:
         for i, (smi, name) in enumerate(zip(smiles, self.file_names)):
             docking_result = {'smiles': smi}
 
+            # If no variants ... next for loop won't run
+            if len(self.variants[name]) == 0:
+                logger.debug(f'{name}_lib.sdfgz does not exist')
+                if best_score[name] is None:  # Only if no other score for prefix
+                    docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.glide_metrics})
+                    logger.debug(f'Returning 0.0 as no variants exist')
+
             # For each variant
             for variant in self.variants[name]:
                 out_file = os.path.join(self.directory, f'{name}-{variant}_lib.sdfgz')
@@ -227,6 +175,11 @@ class GlideDock:
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.glide_metrics})
+                                    # Add charge info
+                                    net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
+                                    docking_result.update({f'{self.prefix}_NetCharge': net_charge,
+                                                           f'{self.prefix}_PositiveCharge': positive_charge,
+                                                           f'{self.prefix}_NegativeCharge': negative_charge})
                                     logger.debug(f'Docking score for {name}-{variant}: {dscore}')
 
                                 # If docking score is better change it...
@@ -236,6 +189,11 @@ class GlideDock:
                                     docking_result.update({f'{self.prefix}_' + k: v
                                                            for k, v in mol.GetPropsAsDict().items()
                                                            if k in self.glide_metrics})
+                                    # Add charge info
+                                    net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
+                                    docking_result.update({f'{self.prefix}_NetCharge': net_charge,
+                                                           f'{self.prefix}_PositiveCharge': positive_charge,
+                                                           f'{self.prefix}_NegativeCharge': negative_charge})
                                     logger.debug(f'Found better {name}-{variant}: {dscore}')
 
                                 # Otherwise ignore
@@ -338,8 +296,7 @@ class GlideDock:
                 self.client.restart()
 
         # Run protocol
-        self.run_ligprep(smiles=smiles)
-        self.split_sdf  # Catch any erroneous smiles with no output ligprep file
+        self.variants, variant_files = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=file_names)
         self.run_glide()
         best_variants = self.get_docking_scores(smiles=smiles, return_best_variant=True)
 
@@ -365,16 +322,19 @@ class GlideDockFromROCS(GlideDock, ROCS):
     return_metrics = GlideDock.return_metrics + ROCS.return_metrics
 
     def __init__(self, prefix: str, glide_template: os.PathLike, ref_file: os.PathLike, cluster: str = None,
-                 timeout: float = 120.0, **kwargs):
+                 timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
         :param ref_file: Path to reference file to overlay query to (.pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask
         :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param ligand_preparation: Whether to use 'ligprep' with limited default functionality, or 'epik' to protonate
+        only the most probable state
         :param kwargs:
         """
-        GlideDock.__init__(self, prefix=prefix, glide_template=glide_template, cluster=cluster, timeout=timeout)
+        GlideDock.__init__(self, prefix=prefix, glide_template=glide_template, cluster=cluster, timeout=timeout,
+                           ligand_preparation=ligand_preparation)
         ROCS.__init__(self, prefix=prefix, ref_file=ref_file)
 
         self.prefix = prefix.replace(" ", "")
@@ -412,7 +372,7 @@ class GlideDockFromROCS(GlideDock, ROCS):
                 self.client.restart()
 
         # Prepare ligands
-        self.run_ligprep(smiles)
+        self.prepare(smiles)
 
         # Read sdf files and run ROCS and write for docking
         results = []

@@ -1,5 +1,5 @@
-from molscore.utils.score_modifiers import raw, norm, step, gauss, lin_thresh
-from molscore.utils.score_methods import single, wsum, gmean, amean, pareto_pair
+from molscore.utils.transformation_functions import raw, norm, step, gauss, lin_thresh
+from molscore.utils.aggregation_functions import single, wsum, gmean, amean, pareto_pair
 
 all_score_modifiers = [
     raw,
