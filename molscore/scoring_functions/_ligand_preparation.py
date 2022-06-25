@@ -164,6 +164,7 @@ class Epik(LigandPreparation):
             #logger.debug(f'{name}: {len(stereoisomers)} enumerated unique stereoisomers')
             variants = []
             out_paths = []
+            commands = []
             for variant, iso in enumerate(stereoisomers):
                 try:
                     Chem.EmbedMolecule(iso)
@@ -180,13 +181,15 @@ class Epik(LigandPreparation):
                 w.write(iso)
                 w.flush()
                 w.close()
-                command = " ".join((convert_env, sdf_in, mae_in, ";",
+                cmd = " ".join([convert_env, sdf_in, mae_in, ";",
                                     epik_env, f"-imae {mae_in}", f"-omae {mae_out}", "-ph 7.4", "-ms 1",
                                     "-WAIT", "-NOJOBID", ";",
-                                    convert_env, mae_out, sdf_out))
-            return name, variants, command, out_paths
+                                    convert_env, mae_out, sdf_out])
+                commands.append(cmd)
+            assert isinstance(commands, list)
+            return name, variants, commands, out_paths
         else:
-            return name, [], None, []
+            return name, [], [], []
 
     def prepare(self, smiles: list, directory: os.PathLike, file_names: list):
         """
@@ -209,10 +212,12 @@ class Epik(LigandPreparation):
             variant_files = []
             epik_commands = []
             for n, v, c, op in results:
+                assert isinstance(c, list)
                 variants[n] = v
                 variant_files += op
-                if c is not None:
-                    epik_commands.append(c)
+                epik_commands += c
+                #if c is not None:
+                #    epik_commands.append(c)
             #variants = {n: v for n, v, c, op in results}
             #variant_files = [op for n, v, c, op in results]
             #epik_commands = [c for n, v, c, op in results if c is not None]
@@ -228,8 +233,9 @@ class Epik(LigandPreparation):
             for n, v, c, op in results:
                 variants[n] = v
                 variant_files += op
-                if c is not None:
-                    epik_commands.append(c)
+                epik_commands += c
+                #if c is not None:
+                #    epik_commands.append(c)
             #variants = {n: v for n, v, c, op in results}
             #epik_commands = [c for n, v, c, op in results if c is not None]
             _ = [p(command) for command in epik_commands]
