@@ -20,7 +20,7 @@ In total only **3 lines of code are needed** to implement into generative models
 
 Contributions and/or ideas for added functionality are welcomed!
 
-This code here was in the following publications:
+This code here was used in the following publications:
 1. **Thomas, M., Smith, R.T., O’Boyle, N.M. et al. Comparison of structure- and ligand-based scoring functions for deep generative models: a GPCR case study. J Cheminform 13, 39 (2021). https://doi.org/10.1186/s13321-021-00516-0**
 2. **Thomas M, O'Boyle NM, Bender A, de Graaf C. Augmented Hill-Climb increases reinforcement learning efficiency for language-based de novo molecule generation. ChemRxiv.  https://chemrxiv.org/engage/chemrxiv/article-details/6253f5f66c989c04f6b40986**
 
