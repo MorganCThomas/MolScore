@@ -76,39 +76,26 @@ This code here was in the following publications:
 
 ## Installation
 
-Conda is recommended to install this codebase, first clone this repo:
+To install molscore:
 
 ```
 git clone https://github.com/MorganCThomas/MolScore.git
-```
-
-Move inside the directory:
-
-```
 cd MolScore
-```
-
-Now create a new conda environment using the .yml file:
-
-```
 conda env create -f molscore_environment.yml
-```
-
-Activate the new conda environment:
-
-```
 conda activate molscore
-```
-
-Next install the `molscore` package (I'd recommend `develop` instead of `install`):
-
-```
 python setup_molscore.py develop
+```
+
+To install moleval:
+```
+conda env create -f moleval_environment.yml
+conda activate moleval
+python setup_moleval.py develop
 ```
 
 ## Implementation
 
-Implementing `molscore` is as simple as importing it, instantiating it (pointing to the configuration file) and then scoring molecules. This should easily fit in most generative model pipelines.
+Implementing `molscore` is as simple as importing it, instantiating it (pointing to the configuration file) and then scoring molecules. This should easily fit into most generative model pipelines.
 
 ```python
 from molscore.manager import MolScore
@@ -122,7 +109,7 @@ scores = ms(SMILES)
     
 # When finished, all recorded smiles need to be saved and the live monitor killed
 ms.write_scores()
-ms.kill_dash_monitor()
+ms.kill_monitor()
 ```
 
 ## Usage
@@ -135,9 +122,11 @@ Instead let's use an app to write it for us! This app contains parameters, their
 streamlit run molscore/config_generator.py
 ```
 
-![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/utils/images/config_generator.png?raw=True)
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/data/images/config_generator_1.png?raw=True)
 
-Then simply point to the saved configuration file and run *de novo* molecule optimization!!!
+Then simply point use this configuration file and run *de novo* molecule optimization. If running with the live monitor you'll be able to investigate molecules as they're being generated.
+
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/data/images/st_monitor_2.png?raw=True)
 
 
 
