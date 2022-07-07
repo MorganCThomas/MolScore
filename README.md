@@ -4,7 +4,7 @@
 
 The aim of this codebase is to simply and flexibly 
 automate the scoring of *de novo* compounds in generative models (`molscore`).
-In doing so, also track and record de novo compounds for automated evaluation downstream (`moleval`).
+In doing so, also track and record *de novo* compounds for automated evaluation downstream (`moleval`).
 
 1. Install both python packages
 2. Implement molscore in a generative model script (substituted for a scoring function)
