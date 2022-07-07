@@ -1,0 +1,1 @@
+from molscore.test.mock_generator import MockGenerator

@@ -9,7 +9,7 @@ channels:
 dependencies:
   - python=3.6
   - ipython
-  - rdkit
+  - rdkit>=2019.03
   - dash
   - dash-bio
   - dask
@@ -30,7 +30,9 @@ dependencies:
   - streamlit
   - bokeh=2.2
   - py3dmol
-  - xgboost
+  - xgboost=1.3.3
   - pip:
       - importlib-resources
       - streamlit-bokeh-events
+      - deepsmiles
+      - selfies

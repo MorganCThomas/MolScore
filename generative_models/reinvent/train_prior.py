@@ -14,7 +14,7 @@ from utils import decrease_learning_rate
 rdBase.DisableLog('rdApp.error')
 
 
-def pretrain(smi_file, voc_file, output_dir, suffix, restore_from=None, device=None):
+def pretrain(smi_file, voc_file, output_dir, suffix, n_epochs=5, restore_from=None, device=None):
     """Trains the Prior RNN"""
 
     # Read vocabulary from a file
@@ -32,7 +32,7 @@ def pretrain(smi_file, voc_file, output_dir, suffix, restore_from=None, device=N
         Prior.rnn.load_state_dict(torch.load(restore_from))
 
     optimizer = torch.optim.Adam(Prior.rnn.parameters(), lr = 0.001)
-    for epoch in range(1, 6):
+    for epoch in range(1, n_epochs+1):
         # When training on a few million compounds, this model converges
         # in a few of epochs or even faster. If model sized is increased
         # its probably a good idea to check loss against an external set of
@@ -101,10 +101,17 @@ def get_args():
         default=None,
         help='GPU Device'
     )
+    parser.add_argument(
+        '--n_epochs',
+        type=int,
+        help='Number of training epochs',
+        default=5
+    )
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_args()
-    pretrain(smi_file=args.input, voc_file=args.voc, output_dir=args.output, suffix=args.suffix, device=args.device)
+    pretrain(smi_file=args.input, voc_file=args.voc, output_dir=args.output,
+             n_epochs=args.n_epochs, suffix=args.suffix, device=args.device)

@@ -78,7 +78,7 @@ class ROCS:
                 self.best_overlay = conf
         return self
 
-    def __call__(self, smiles: list, return_best_overlay: bool = False, **kwargs):
+    def __call__(self, smiles: list, directory: str, file_names: list, return_best_overlay: bool = False, **kwargs):
         """
         Calculate ROCS metrics for a list of smiles compared to a reference molecule.
 
@@ -86,13 +86,19 @@ class ROCS:
         :param return_best_overlay: Whether to also return the best fitting conformer
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...] (, list best conformers)
         """
+        step = file_names[0].split("_")[0]  # Assume first Prefix is step
+        self.directory = os.path.join(os.path.abspath(directory), 'ROCS', step)
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+        self.file_names = file_names
+
         results = []
         best_overlays = []
 
-        for smi in smiles:
+        for smi, file in zip(smiles, self.file_names):
             result = {'smiles': smi}
 
-            if Chem.MolFromsmiles(smi):
+            if Chem.MolFromSmiles(smi):
                 try:
                     self.setup_smi(smi)
                     self.run_omega()
@@ -107,9 +113,14 @@ class ROCS:
                     result.update({f'{self.prefix}_{m}': v for m, v in rocs_results.items()})
                     results.append(result)
 
-                    if return_best_overlay:
-                        self.get_best_overlay()
-                        best_overlays.append(self.best_overlay)
+                    # Best overlays
+                    self.get_best_overlay()
+                    best_overlays.append(self.best_overlay)
+                    # Save to file
+                    ofs = oechem.oemolostream()
+                    if ofs.open(os.path.join(self.directory, f'{file}.sdf.gz')):
+                        oechem.OEWriteMolecule(ofs, self.best_overlay)
+                        result.update({f'{self.prefix}_best_conformer': file})
 
                 except:
                     logger.debug(f'{smi}: Can\'t process molecule')

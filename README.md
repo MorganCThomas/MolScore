@@ -1,46 +1,49 @@
 # MolScore: An automated scoring function to facilitate and standardize evaluation of goal-directed generative models for de novo molecular design
 
-WARNING: This codebase is still a work in progress and has not been robustly tested. (There's a long TODO list and writing tests is on it!)
-
 ## Overview
 
 The aim of this codebase is to simply and flexibly 
-automate the scoring of de novo compounds in generative models.
-In doing so, also track and record de novo compounds for automated evaluation downstream.
+automate the scoring of *de novo* compounds in generative models (`molscore`).
+In doing so, also track and record de novo compounds for automated evaluation downstream (`moleval`).
 
-- A central `molscore` class that is instantiated with a 
-configuration file defining the scoring function parameters 
-  (static configuration files enables reproducible tasks).
-- When called, the instance 
-accepts a list of SMILES and returns a list of scores. 
-- The `molscore` class saves compounds into a dataframe for live monitoring with a dashboard
-- A standardized dataframe allows automated downstream evaluation with `moleval/scripts/moses_n_statistics.py`
+1. Install both python packages
+2. Implement molscore in a generative model script (substituted for a scoring function)
+3. Describe the desired objective with a configuration file that is passed to `molscore`
+4. Run generative model optimization
+5. Evaluate *de novo* molecules with `moleval`
 
-This requires only 3 lines of code to integrate into generative models.
+The objective can be reproduced and shared via the configuration file to create new benchmarks, or to conduct multi-parameter objectives for AI discovery.
 
-The framework is also **designed to make it as simple as possible to integrate custom scoring functions**, for further information read the `./molscore/scoring_functions/README.md`.
+It is also easy to add new custom scoring function - see [here](https://github.com/MorganCThomas/MolScore/blob/main/molscore/scoring_functions/README.MD)
 
-Contributions and/or ideas for added functionality are welcomed! 
+In total only **3 lines of code are needed** to implement into generative models (...althought 5 is preferable, sorry).
+
+Contributions and/or ideas for added functionality are welcomed!
+
+This code here was in the following publications:
+1. **Thomas, M., Smith, R.T., O’Boyle, N.M. et al. Comparison of structure- and ligand-based scoring functions for deep generative models: a GPCR case study. J Cheminform 13, 39 (2021). https://doi.org/10.1186/s13321-021-00516-0**
+2. **Thomas M, O'Boyle NM, Bender A, de Graaf C. Augmented Hill-Climb increases reinforcement learning efficiency for language-based de novo molecule generation. ChemRxiv.  https://chemrxiv.org/engage/chemrxiv/article-details/6253f5f66c989c04f6b40986**
 
 ## Functionality
-
-Some functionality has been adapted from other sources, so special mentions to:
-* [GuacaMol](https://github.com/BenevolentAI/guacamol)
-* [MOSES](https://github.com/molecularsets/moses)
-* [REINVENT v2.0](https://github.com/MolecularAI/Reinvent)
-* [reinvent-memory](https://github.com/tblaschke/reinvent-memory)
-
-The current functionality included in this codebase includes:
 * Scoring functions
-  * Glide docking \[requires Schrodinger and licence]
-  * Smina docking
-  * ROCS shape overlay \[requires OpenEye and licence]
-  * Glide docking from a ROCS overlay \[requires OpenEye and licence]
-  * Openeye (FRED) docking (not tested) \[requires OpenEye and licence]
-  * Scikit-learn QSAR models 
+  * Docking (parallelized via [Dask](https://docs.dask.org/en/latest/deploying-cli.html))
+    * Glide docking \[licence required]
+    * Glide docking from a ROCS overlay \[licence required]
+    * Smina docking \[open-source]
+    * Openeye-FRED docking (not tested) \[licence required]
+    * GOLD (coming soon ...)
+    * PLANTS (coming soon ...)
+  * Shape
+    * ROCS shape overlay \[licence required]
+  * Ligand preparation
+    * RDKit stereoenumeration and Epik \[licence required]
+    * Moka and Corina \[licence required]
+    * Ligprep \[licence required]
+    * Gypsum-DL \[open-source]
+  * Scikit-learn classification models 
   * Substructure matches
   * Substructure filters
-  * Tanimoto similarity
+  * Fingerprint similarity
   * RDKit Descriptors
   
 * Score modifiers
@@ -53,79 +56,77 @@ The current functionality included in this codebase includes:
   * Arithmetic mean
   * Geometric mean
   * Weighted sum
-  * Pareto pairs ([coming soon ...](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00517))
+  * [Pareto pairs](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00517) (coming soon ...)
   
-* [Diversity filters](https://github.com/tblaschke/reinvent-memory)
-  * IdenticalTopologicalScaffold
-  * CompoundSimilarity
-  * IdenticalMurckoScaffold
-  * ScaffoldSimilarity
+* Filters
+  * Unique
+  * Occurences
+  * [Diversity filters](https://github.com/tblaschke/reinvent-memory)
+  * ScaffoldSimilarity (with ECFP)
+  * [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb) (coming soon ...)
+  
+* Performance metrics
+  * [GuacaMol metrics](https://github.com/BenevolentAI/guacamol)
+  * [MOSES metrics](https://github.com/molecularsets/moses)
+  * [Sphere exclusion diversity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00516-0)
+  * [Functional groups and ring systems](https://pubs.acs.org/doi/10.1021/acs.jcim.0c01328)
+  * [Silly molecules](https://github.com/PatWalters/silly_walks)
+  * [Analogue similarity](https://github.com/tblaschke/reinvent-memory)
+  * [Analogue coverage](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00516-0)
 
 ## Installation
 
-Conda is recommended to install this codebase, first clone this repo:
+To install molscore:
 
-`git clone https://github.com/MorganCThomas/MolScore.git`
+```
+git clone https://github.com/MorganCThomas/MolScore.git
+cd MolScore
+conda env create -f molscore_environment.yml
+conda activate molscore
+python setup_molscore.py develop
+```
 
-Move inside the directory:
+To install moleval:
+```
+conda env create -f moleval_environment.yml
+conda activate moleval
+python setup_moleval.py develop
+```
 
-`cd MolScore`
+## Implementation
 
-Now create a new conda environment using the .yml file:
+Implementing `molscore` is as simple as importing it, instantiating it (pointing to the configuration file) and then scoring molecules. This should easily fit into most generative model pipelines.
 
-`conda env create -f molscore_environment.yml`
+```python
+from molscore.manager import MolScore
 
-Activate the new conda environment:
-
-`conda activate molscore`
-
-Next install the `molscore` package (I'd recommend `develop` instead of `install`):
-
-`python setup_molscore.py develop`
-
-## Configuration
-
-An app can be used to help write the configuration file.
-
-`streamlit run molscore/config_generator.py`
-
-![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/utils/images/config_generator.png?raw=True)
+# Instantiate MolScore and point to configuration file
+ms = MolScore(model_name='test',
+              task_config='molscore/configs/QED.json')
+              
+# Calling it simply scores a list of smiles (SMILES)
+scores = ms(SMILES)
+    
+# When finished, all recorded smiles need to be saved and the live monitor killed
+ms.write_scores()
+ms.kill_monitor()
+```
 
 ## Usage
 
-For a toy demonstration, after installation of `molscore` and activation of the environment with `conda activate molscore`, open the python console (`python` or `ipython`). In the python console, run the following code:
+First we need to decide the objective by writing a configuration json file. What a pain!
 
-```python
-from molscore.test import MockGenerator
-from molscore.manager import MolScore
+Instead let's use an app to write it for us! This app contains parameters, their descriptions and defaults.
 
-# Here we setup a mock generator that simply samples molecules from a smiles file.
-mg = MockGenerator()
-
-# Now we setup MolScore passing in the configuration file
-ms = MolScore(model_name='test',
-              task_config='molscore/configs/QED.json')
-
-# Now to simulate the scoring of a generative model, we'll pass in 100 molecules 10 times (e.g. batch size 100, iterations 10)
-for i in range(10):
-    ms(mg.sample(100))
-    
-# Finished mock generative model, wrap things up
-ms.write_scores()
-ms.kill_dash_monitor()
+```
+streamlit run molscore/config_generator.py
 ```
 
-**Important** the MolScore class doesn't save the final dataframe until told to do so
-with ms.write_scores(). This saves crucial time (which really does make a difference)
-reading and writing from a .csv each iteration. During development, other formats were
-explored such as an SQL database and parallelised dask dataframes, however, it was found
-pandas was much quicker and parallelisation unnecessary, the dataframe shouldn't get so
-large it's a problem for memory. If it does - the generative model should be more efficient!
-Neither does the class close the dash monitor without calling ms.kill_dash_monitor()
-(as it is run as a subprocess).
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/data/images/config_generator_1.png?raw=True)
 
-## Comparison of Structure- and Ligand-Based Scoring Functions for Deep Generative Models: A GPCR Case Study
+Then simply point use this configuration file and run *de novo* molecule optimization. If running with the live monitor you'll be able to investigate molecules as they're being generated.
 
-The data for this publication can be found [here](https://chemrxiv.org/articles/preprint/Comparison_of_Structure-_and_Ligand-Based_Scoring_Functions_for_Deep_Generative_Models_A_GPCR_Case_Study/14138147).
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/data/images/st_monitor_2.png?raw=True)
+
 
 

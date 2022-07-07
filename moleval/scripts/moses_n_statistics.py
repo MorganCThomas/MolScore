@@ -37,7 +37,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'step': i})
             # ------ Compute Moses metrics ------
-            moses_metrics = get_moses.calculate(smiles)
+            moses_metrics = get_moses.calculate(smiles, se_k=None)
             sum_metrics.update(moses_metrics)
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
@@ -61,7 +61,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'n': i})
             # ------ Compute Moses metrics ------
-            moses_metrics = get_moses.calculate(smiles)
+            moses_metrics = get_moses.calculate(smiles, se_k=None)
             sum_metrics.update(moses_metrics)
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
@@ -86,7 +86,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'step': i+n})
             # ------ Compute Moses metrics ------
-            moses_metrics = get_moses.calculate(smiles)
+            moses_metrics = get_moses.calculate(smiles, se_k=None)
             sum_metrics.update(moses_metrics)
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})

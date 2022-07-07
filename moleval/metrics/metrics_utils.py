@@ -1,5 +1,6 @@
 import os
 from collections import Counter
+from itertools import combinations
 from functools import partial
 import numpy as np
 import pandas as pd
@@ -12,9 +13,10 @@ from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect as Morgan
 from rdkit.Chem.QED import qed
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem import Descriptors
-# from metrics.metrics.SA_Score import sascorer
-# from metrics.metrics.NP_Score import npscorer
+from moleval.metrics.SA_Score import sascorer
+from moleval.metrics.NP_Score import npscorer
 from moleval.metrics.utils import mapper, get_mol
+from moleval.metrics.ifg import identify_functional_groups
 
 _base_dir = os.path.split(__file__)[0]
 _mcf = pd.read_csv(os.path.join(_base_dir, 'mcf.csv'))
@@ -28,7 +30,11 @@ def canonic_smiles(smiles_or_mol):
     mol = get_mol(smiles_or_mol)
     if mol is None:
         return None
-    return Chem.MolToSmiles(mol)
+    can_smiles = Chem.MolToSmiles(mol)
+    if Chem.MolFromSmiles(can_smiles):  # Check it can be converted back, rarely something goes wrong
+        return can_smiles
+    else:
+        return None
 
 
 def logP(mol):
@@ -84,6 +90,69 @@ def fragmenter(mol):
     fgs = AllChem.FragmentOnBRICSBonds(mol)  # get_mol(mol) -> mol
     fgs_smi = Chem.MolToSmiles(fgs).split(".")
     return fgs_smi
+
+
+def functional_groups(mol):
+    mol = get_mol(mol)
+    if mol is None:  #
+        return None  #
+    else:
+        fgs = identify_functional_groups(mol)  # each fg is a named tuple (atomIdx, atoms, atoms+environment)
+    return [fg[2] for fg in fgs]
+
+
+def compute_functional_groups(mol_list, n_jobs=1):
+    fgs = Counter()
+    for mol_groups in mapper(n_jobs)(functional_groups, mol_list):
+        if mol_groups is not None:
+            fgs.update(mol_groups)
+    return fgs
+
+
+def ring_systems(mol):
+    mol = get_mol(mol)
+    if mol is None:  #
+        return None  #
+    else:
+        ri = mol.GetRingInfo()
+        systems = []
+        for ring in ri.AtomRings():
+            ringAts = set(ring)
+            nSystems = []
+            for system in systems:
+                nInCommon = len(ringAts.intersection(system))
+                if nInCommon: # Making conscious choice to include spiro
+                    ringAts = ringAts.union(system)
+                else:
+                    nSystems.append(system)
+            nSystems.append(ringAts)
+            systems = nSystems
+
+        # Get ring system canonical smiles
+        system_smiles = []
+        for ring in systems:
+            mw = Chem.RWMol()
+            atom_map = {}
+            # Build atoms
+            for idx in ring:
+                atom_map.update({idx: mw.GetNumAtoms()})  # Will be index of added atom
+                mw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(idx).GetAtomicNum()))
+            # Build bonds
+            for i, j in combinations(ring, 2):
+                bond = mol.GetBondBetweenAtoms(i, j)
+                if bond is not None:
+                    mw.AddBond(atom_map[i], atom_map[j], bond.GetBondType())
+            system_smiles.append(Chem.MolToSmiles(mw))
+
+    return system_smiles
+
+
+def compute_ring_systems(mol_list, n_jobs=1):
+    rss = Counter()
+    for mol_systems in mapper(n_jobs)(ring_systems, mol_list):
+        if mol_systems is not None:
+            rss.update(mol_systems)
+    return rss
 
 
 def compute_fragments(mol_list, n_jobs=1):
@@ -165,6 +234,41 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
     if p != 1:
         agg_tanimoto = (agg_tanimoto) ** (1 / p)
     return np.mean(agg_tanimoto)
+
+
+def analogues_tanimoto(stock_vecs, gen_vecs,
+                       batch_size=5000, similarity_threshold=0.4,
+                       device='cpu'):
+    """
+    For each molecule in gen_vecs finds closest molecule in stock_vecs.
+    Returns average tanimoto score for between these molecules
+
+    Parameters:
+        stock_vecs: numpy array <n_vectors x dim>
+        gen_vecs: numpy array <n_vectors' x dim>
+        similarity_threshold: Molecules above this threshold are considered analogues
+    """
+    stock_analogues = np.zeros(len(stock_vecs))
+    gen_analogues = np.zeros(len(gen_vecs))
+
+    for j in range(0, stock_vecs.shape[0], batch_size):
+        x_stock = torch.tensor(stock_vecs[j:j + batch_size]).to(device).float()
+        for i in range(0, gen_vecs.shape[0], batch_size):
+            y_gen = torch.tensor(gen_vecs[i:i + batch_size]).to(device).float()
+            y_gen = y_gen.transpose(0, 1)
+            tp = torch.mm(x_stock, y_gen)
+            jac = (tp / (x_stock.sum(1, keepdim=True) +
+                         y_gen.sum(0, keepdim=True) - tp)).cpu().numpy()
+            jac[np.isnan(jac)] = 1
+
+            # Compute number below threshold
+            jac_thresh = np.where(jac > similarity_threshold, 1, 0)
+            gen_analogues[i:i + y_gen.shape[1]] = np.maximum(
+                    gen_analogues[i:i + y_gen.shape[1]], jac_thresh.max(0)) # max will be 1 if any analogue
+            stock_analogues[j:j + x_stock.shape[0]] = np.maximum(stock_analogues[j:j + x_stock.shape[0]],
+                                                                 jac_thresh.max(1))
+
+    return gen_analogues.mean(), stock_analogues.mean()
 
 
 def fingerprint(smiles_or_mol, fp_type='maccs', dtype=None, morgan__r=2,
@@ -282,31 +386,55 @@ def sphere_exclusion(fps, dist_thresh=0.65):
 
 def mol_passes_filters(mol,
                        allowed=None,
-                       allow_charge=False,
-                       isomericSmiles=False):
+                       allow_charge=True,
+                       isomericSmiles=False,
+                       molwt_min=150,
+                       molwt_max=650,
+                       mollogp_max=4.5,
+                       rotatable_bonds_max=7,
+                       filters=True):
     """
-    Checks if mol
+    MOSES defaults
     * passes MCF and PAINS filters,
     * has only allowed atoms
     * is not charged
+    * is between 250 - 350 Da
+    * is not greater than 7 rotatable bonds
+    * XlogP < 3.5
     """
     allowed = allowed or {'C', 'N', 'S', 'O', 'F', 'Cl', 'Br', 'H'}
     mol = get_mol(mol)
     if mol is None:
         return False
+    # Large rings
     ring_info = mol.GetRingInfo()
     if ring_info.NumRings() != 0 and any(
             len(x) >= 8 for x in ring_info.AtomRings()
     ):
         return False
+    # Charge
     h_mol = Chem.AddHs(mol)
     if not allow_charge:
         if any(atom.GetFormalCharge() != 0 for atom in mol.GetAtoms()):
             return False
+    # Atoms
     if any(atom.GetSymbol() not in allowed for atom in mol.GetAtoms()):
         return False
-    if any(h_mol.HasSubstructMatch(smarts) for smarts in _filters):
+    # MolWt
+    if not molwt_min <= Descriptors.MolWt(mol) <= molwt_max:
         return False
+    # LogP
+    if not Descriptors.MolLogP(mol) <= mollogp_max:
+        return False
+    # Rotatable Bonds
+    if not Descriptors.NumRotatableBonds(mol) <= rotatable_bonds_max:
+        return False
+    # MCF, PAINS filters
+    if filters:
+        if any(h_mol.HasSubstructMatch(smarts) for smarts in _filters):
+            return False
+
+    # RDKit parse check
     smiles = Chem.MolToSmiles(mol, isomericSmiles=isomericSmiles)
     if smiles is None or len(smiles) == 0:
         return False
