@@ -11,7 +11,7 @@ class SomeClass:
     
     def __call__(self, smiles: list, **kwargs) -> list[dict]:
         return results  
-        # results should have a 'smiles' key and every other key should be '<prefix>_<metric>'
+        # results should have a 'smiles' key and every other key should be '<prefix>_<return_metric>'
         # e.g. [{'smiles': 'c1ccccc1', 'test_docking_score': -7.8},
         #       {'smiles': 'c1ccccc1C(=O)O', 'test_docking_score': -9.0]
 ```

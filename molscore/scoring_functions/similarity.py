@@ -78,7 +78,7 @@ class MolecularSimilarity:
 
         mol = get_mol(smi)
         if mol is not None:
-            fp = Fingerprints.get_fp(mol, fp, nBits, asarray=False)
+            fp = Fingerprints.get(mol, fp, nBits, asarray=False)
             sim_vec = similarity_measure(fp, ref_fps)
 
             if method == 'mean':
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     elif args.mode == 'test':
         import sys
         import unittest
-        from molscore.test.tests import test_tanimoto
+        from molscore.test import test_tanimoto
         # Remove CLI arguments
         for i in range(len(sys.argv)-1):
             sys.argv.pop()

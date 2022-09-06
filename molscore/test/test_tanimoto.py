@@ -1,6 +1,6 @@
 import unittest
 from molscore.test.mock_generator import MockGenerator
-from molscore.test.tests.base_tests import BaseTests
+from molscore.test.base_tests import BaseTests
 from molscore.scoring_functions.similarity import TanimotoSimilarity
 
 
