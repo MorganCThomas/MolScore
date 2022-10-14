@@ -1,5 +1,5 @@
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import combinations
 from functools import partial
 import numpy as np
@@ -466,3 +466,50 @@ def neutralize_atoms(mol, isomericSmiles=False):
             return Chem.MolToSmiles(mol, isomericSmiles=isomericSmiles)
     else:
         return None
+
+def MCF_PAINS_filters(mol):
+    """
+    Mol passes MCF and Pains filters
+    :param mol: Smiles or RDKit.Mol
+    :return: bool
+    """
+    mol = get_mol(mol)
+    if mol is None:
+        return False
+    h_mol = Chem.AddHs(mol)
+
+    if any(h_mol.HasSubstructMatch(smarts) for smarts in _filters):
+        return False
+    else:
+        return True
+
+class SillyWalks:
+    """From https://github.com/PatWalters/silly_walks"""
+    def __init__(self, reference_mols, n_jobs=1):
+        self.count_dict = defaultdict(int)
+        self._n_jobs = n_jobs
+        #print('Computing baseline FP bits')
+        mols = [m for m in mapper(self._n_jobs)(get_mol, reference_mols) if m is not None]
+        bit_counts = mapper(self._n_jobs)(self.count_bits, mols)
+        for count_dict in bit_counts:
+            for k, v in count_dict.items():
+                self.count_dict[k] += v
+            
+    @staticmethod
+    def count_bits(mol):
+        count_dict = {}
+        if mol is not None:
+            fp = AllChem.GetMorganFingerprint(mol, 2)
+            for k, v in fp.GetNonzeroElements().items():
+                count_dict[k] = v
+        return count_dict
+        
+    def score(self, mol):
+        mol = get_mol(mol)
+        if mol is not None:
+            bi = {}
+            fp = AllChem.GetMorganFingerprint(mol, 2, bitInfo=bi)
+            on_bits = fp.GetNonzeroElements().keys()
+            silly_bits = [bit for bit in on_bits if self.count_dict[bit] == 0]
+            score = len(silly_bits) / len(on_bits)
+            return score, silly_bits, bi
