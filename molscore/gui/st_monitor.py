@@ -1,6 +1,7 @@
 import sys
 import os
 import gzip
+import tempfile
 import pandas as pd
 import numpy as np
 from itertools import cycle, chain
@@ -391,12 +392,13 @@ class MetaViewer(py3Dmol.view):
         self.render()
 
         t = self.js()
-        f = open('viz.html', 'w')
-        f.write(t.startjs)
-        f.write(t.endjs)
-        f.close()
+        with tempfile.NamedTemporaryFile(mode='w+t', suffix='.html') as tfile:
+            f = open(tfile.name, 'w')
+            f.write(t.startjs)
+            f.write(t.endjs)
+            f.close()
 
-        st.components.v1.html(open('viz.html', 'r').read(), width=1200, height=800)
+            st.components.v1.html(open(tfile.name, 'r').read(), width=1200, height=800)
 
 
 def main():
