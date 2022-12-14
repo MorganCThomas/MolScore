@@ -161,7 +161,7 @@ if __name__ == '__main__':
 
     # Run mode
     if args.mode == 'run':
-        from molscore.test import MockGenerator
+        from molscore.tests import MockGenerator
         mg = MockGenerator(seed_no=123)
 
         if args.ref_smiles is None:
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     elif args.mode == 'test':
         import sys
         import unittest
-        from molscore.test import test_tanimoto
+        from molscore.tests import test_tanimoto
         # Remove CLI arguments
         for i in range(len(sys.argv)-1):
             sys.argv.pop()

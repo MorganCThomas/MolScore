@@ -83,7 +83,7 @@ class Isomer:
 
 
 if __name__ == '__main__':
-    from molscore.test import MockGenerator
+    from molscore.tests import MockGenerator
     mg = MockGenerator()
     iso = Isomer('C12H24', 'C12H24')
     iso(mg.sample(5))
