@@ -4,9 +4,10 @@ import glob
 import gzip
 import logging
 import subprocess
+from typing import Union
 
 from openeye import oechem
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
 
@@ -33,12 +34,12 @@ class GlideDock:
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
                       'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
-    def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
+    def __init__(self, prefix: str, glide_template: os.PathLike, cluster: Union[str, int] = None,
                  timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
-        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param cluster: Address to Dask scheduler for parallel processing via dask or number of cores to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         :param kwargs:
@@ -54,9 +55,18 @@ class GlideDock:
         self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
         self.timeout = float(timeout)
+        # Setup dask
         self.cluster = cluster
         if self.cluster is not None:
-            self.client = Client(self.cluster)
+            if isinstance(self.cluster, str):
+                self.client = Client(self.cluster)
+                print(f"Dask worker dashboard: {self.client.dashboard_link}")
+            elif int(self.cluster) > 1:
+                cluster = LocalCluster(n_workers=int(self.cluster), threads_per_worker=1)
+                self.client = Client(cluster)
+                print(f"Dask worker dashboard: {self.client.dashboard_link}")
+            else:
+                logger.error(f"Unknown parameter for cluster: {self.cluster}")
         self.variants = None
         self.docking_results = None
 
