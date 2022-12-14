@@ -39,7 +39,7 @@ class GlideDock:
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
-        :param cluster: Address to Dask scheduler for parallel processing via dask or number of cores to use
+        :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         :param kwargs:
@@ -55,6 +55,8 @@ class GlideDock:
         self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
         self.timeout = float(timeout)
+        self.variants = None
+        self.docking_results = None
         # Setup dask
         self.cluster = cluster
         if self.cluster is not None:
@@ -67,8 +69,6 @@ class GlideDock:
                 print(f"Dask worker dashboard: {self.client.dashboard_link}")
             else:
                 logger.error(f"Unknown parameter for cluster: {self.cluster}")
-        self.variants = None
-        self.docking_results = None
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible

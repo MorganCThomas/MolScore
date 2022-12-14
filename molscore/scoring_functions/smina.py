@@ -9,8 +9,9 @@ As well as pyscreener,
 import os
 import logging
 import glob
+from typing import Union
 from itertools import takewhile
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 
 from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
 from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
@@ -36,13 +37,13 @@ class SminaDock:
     return_metrics = ['docking_score', 'best_variant']
 
     def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cpus: int = 1,
-                 cluster: str = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
+                 cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param receptor: Path to receptor file (.pdbqt)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf/.pdb)
         :param cpus: Number of Smina CPUs to use per simulation
-        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         """
@@ -52,10 +53,19 @@ class SminaDock:
         self.file_names = None
         self.variants = None
         self.cpus = cpus
+        self.timeout = float(timeout)
+        # Setup dask
         self.cluster = cluster
         if self.cluster is not None:
-            self.client = Client(self.cluster)
-        self.timeout = timeout
+            if isinstance(self.cluster, str):
+                self.client = Client(self.cluster)
+                print(f"Dask worker dashboard: {self.client.dashboard_link}")
+            elif int(self.cluster) > 1:
+                cluster = LocalCluster(n_workers=int(self.cluster), threads_per_worker=1)
+                self.client = Client(cluster)
+                print(f"Dask worker dashboard: {self.client.dashboard_link}")
+            else:
+                logger.error(f"Unknown parameter for cluster: {self.cluster}")
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible

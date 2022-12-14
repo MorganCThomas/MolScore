@@ -75,7 +75,7 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
             prefix='test',
             glide_template=input_file,
             ligand_preparation='LigPrep',
-            cluster=5
+            cluster=4
         )
         # Call
         mg = MockGenerator(seed_no=123)
@@ -89,13 +89,12 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
-class TestSminaDock(BaseTests.TestScoringFunction):
+class TestSminaDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
         # Instantiate
         cls.obj = SminaDock
         cls.inst = SminaDock(
@@ -104,6 +103,34 @@ class TestSminaDock(BaseTests.TestScoringFunction):
             ref_ligand=test_files['SminaDock_ref_ligand'],
             cpus=8,
             ligand_preparation='GypsumDL',
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nSminaDock Output:\n{cls.output}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestSminaDockParallel(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+        # Clean output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = SminaDock
+        cls.inst = SminaDock(
+            prefix='test',
+            receptor=test_files['SminaDock_receptor'],
+            ref_ligand=test_files['SminaDock_ref_ligand'],
+            cpus=1,
+            ligand_preparation='GypsumDL',
+            cluster=4
         )
         # Call
         mg = MockGenerator(seed_no=123)
