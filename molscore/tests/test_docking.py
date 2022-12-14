@@ -116,5 +116,6 @@ class TestSminaDock(BaseTests.TestScoringFunction):
     def tearDownClass(cls):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
+
 if __name__ == '__main__':
     unittest.main()
