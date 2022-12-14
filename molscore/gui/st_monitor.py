@@ -1,6 +1,7 @@
 import sys
 import os
 import gzip
+import tempfile
 import pandas as pd
 import numpy as np
 from itertools import cycle, chain
@@ -219,6 +220,9 @@ def display_selected_data2(y, main_df, dock_path=None, selection=None, viewer=No
         return
     else:
         match_idx = selection['BOX_SELECT']['data']
+        if len(match_idx) > 100:
+           st.write("Warning: Limiting display to first 100")
+           match_idx = match_idx[:100]
         st.write(main_df.iloc[match_idx])
         smis = main_df.loc[match_idx, 'smiles'].tolist()
         mols = [Chem.MolFromSmiles(smi) for smi in smis]
@@ -388,12 +392,13 @@ class MetaViewer(py3Dmol.view):
         self.render()
 
         t = self.js()
-        f = open('viz.html', 'w')
-        f.write(t.startjs)
-        f.write(t.endjs)
-        f.close()
+        with tempfile.NamedTemporaryFile(mode='w+t', suffix='.html') as tfile:
+            f = open(tfile.name, 'w')
+            f.write(t.startjs)
+            f.write(t.endjs)
+            f.close()
 
-        st.components.v1.html(open('viz.html', 'r').read(), width=1200, height=800)
+            st.components.v1.html(open(tfile.name, 'r').read(), width=1200, height=800)
 
 
 def main():
@@ -564,7 +569,9 @@ def main():
             top_df = top_df.loc[top_df.unique == True, :]
             top_df = top_df.sort_values(by='gmean', ascending=False).iloc[:k, :]
 
-            for i, r in top_df.iterrows():
+            if k > 100:
+                st.write("Warning: Limiting display to first 100")
+            for i, r in top_df[:100].iterrows():
                 data = dict(x=x_variables,
                             y=r[x_variables].values,
                             ids=[f"{r['step']}_{r['batch_idx']}"]*len(x_variables),
