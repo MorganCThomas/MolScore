@@ -41,13 +41,20 @@ class SminaDock:
                  cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param receptor: Path to receptor file (.pdbqt)
-        :param ref_ligand: Path to ligand file for autobox generation (.sdf/.pdb)
+        :param receptor: Path to receptor file (.pdb, .pdbqt)
+        :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cpus: Number of Smina CPUs to use per simulation
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         """
+        # If receptor is pdb, convert
+        if receptor.endswith('.pdb'):
+            pdbqt_receptor = receptor.replace('.pdb', '.pdbqt')
+            self.subprocess.run(cmd=f"obabel {receptor} -O {pdbqt_receptor}")
+            receptor = pdbqt_receptor
+        
+        # Specify class attributes
         self.prefix = prefix.replace(" ", "_")
         self.receptor = os.path.abspath(receptor)
         self.ref = os.path.abspath(ref_ligand)
