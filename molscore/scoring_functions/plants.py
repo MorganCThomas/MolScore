@@ -134,10 +134,11 @@ class PLANTSDock:
 
         if self.cluster is not None:
             futures = self.client.map(p, plants_commands)
-            _ = self.client.gather(futures)
+            results = self.client.gather(futures)
         else:
-            _ = [p(command) for command in plants_commands]
+            results = [p(command) for command in plants_commands]
         logger.debug('PLANTS finished')
+        _ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
         return self
 
     def get_docking_scores(self, smiles: list, return_best_variant: bool = False):

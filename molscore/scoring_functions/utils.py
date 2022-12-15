@@ -66,7 +66,7 @@ class timedSubprocess(object):
             out, err = self.process.communicate(timeout=self.timeout)
         except subprocess.TimeoutExpired:
             print('Process timed out...')
-            out, err = '', f'Timed out at {self.timeout}'
+            out, err = ''.encode(), f'Timed out at {self.timeout}'.encode() # Encode for consistency
             if not self.shell:
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
             else:

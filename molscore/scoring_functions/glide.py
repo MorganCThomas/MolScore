@@ -131,10 +131,11 @@ class GlideDock:
 
         if self.cluster is not None:
             futures = self.client.map(p, glide_commands)
-            _ = self.client.gather(futures)
+            results = self.client.gather(futures)
         else:
-            _ = [p(command) for command in glide_commands]
+            results = [p(command) for command in glide_commands]
         logger.debug('Glide finished')
+        _ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
         return self
 
     def get_docking_scores(self, smiles: list, return_best_variant: bool = False):
