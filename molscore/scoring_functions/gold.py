@@ -1,4 +1,5 @@
 import os
+import ast
 import glob
 import logging
 import pandas as pd
@@ -11,7 +12,7 @@ from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
-logger = logging.getLogger('plants')
+logger = logging.getLogger('gold')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
@@ -19,37 +20,119 @@ ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
 
-class PLANTSDock:
+class GOLDDock:
     """
-    Score structures using PLANTS docking software
-    Korb, O.; Stützle, T.; Exner, T. E. "PLANTS: Application of Ant Colony Optimization to Structure-Based Drug Design" Lecture Notes in Computer Science 4150, 247-258 (2006).
-    http://www.tcd.uni-konstanz.de/plants_download/
+    Score structures using GOLD docking software (by defualt this class uses ChemPLP scoring function)
+    1. Jones G, Willett P, Glen RC. Molecular recognition of receptor sites using a genetic algorithm with a description of desolvation. J Mol Biol. 1995 Jan 6;245(1):43-53. doi: 10.1016/s0022-2836(95)80037-9
+    2. Jones G, Willett P, Glen RC, Leach AR, Taylor R. Development and validation of a genetic algorithm for flexible docking. J Mol Biol. 1997 Apr 4;267(3):727-48. doi: 10.1006/jmbi.1996.0897
+    https://www.ccdc.cam.ac.uk/solutions/csd-discovery/components/gold/
     """
-    return_metrics = [
-        'TOTAL_SCORE', 'SCORE_RB_PEN', 'SCORE_NORM_HEVATOMS', 'SCORE_NORM_CRT_HEVATOMS', 'SCORE_NORM_WEIGHT',
-        'SCORE_NORM_CRT_WEIGHT', 'SCORE_RB_PEN_NORM_CRT_HEVATOMS', 'SCORE_NORM_CONTACT', 'EVAL', 'TIME', 
-        'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant'
-        ]
+    # TODO Seperate into Subclasses
+    generic_metrics = ['NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
+    # This class should run PLP by default
+    return_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'time'] + generic_metrics
+    docking_metric = 'Score'
+    #goldscore_metrics = ['Fitness', 'S(hb_ext)', 'S(vdw_ext)', 'S(hb_int)', 'S(int)', 'intcor', 'time']
+    #chemscore_metrics = ['Score', 'DG', 'S(hbond)', 'S(metal)', 'S(lipo)', 'H(rot)', 'DE(clash)', 'DE(int)', 'intcor', 'time']
+    #asp_metrics = ['Score', 'ASP', 'S(Map)', 'DE(clash)', 'DE(int)', 'intcor', 'time']
+    #chemplp_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'intcor', 'time']
 
-    def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cluster: Union[str, int] = None,
-                 timeout: float = 120.0, ligand_preparation: str = 'GypsumDL',
-                 **kwargs):
+    # Can additionally add WATER DATA and WRITE OPTIONS
+    default_config = {
+        'GOLD CONFIGURATION FILE': {},
+        'AUTOMATIC SETTINGS': {
+            'autoscale': '1'
+        },
+        'POPULATION': {
+            'popsiz': 'auto',
+            'select_pressure': 'auto',
+            'n_islands': 'auto',
+            'maxops': 'auto',
+            'niche_siz': 'auto'
+        },
+        'GENETIC OPERATORS': {
+            'pt_crosswt': 'auto',
+            'allele_mutatewt': 'auto',
+            'migratewt': 'auto'},
+        'FLOOD FILL': {  # Binding site
+            'radius': '10',   # Box size
+            'origin': '0 0 0',  # In relation to center
+            'do_cavity': '1',
+            'floodfill_atom_no': '0', # Turn off
+            'cavity_file': 'ligand.mol2',  # Place holder for ref ligand file 
+            'floodfill_center': 'cavity_from_ligand'
+        },
+        'DATA FILES': {
+            'ligand_data_file': 'ligand.mol2 10',  # Placeholder for query ligand and n. times docked by GA
+            'param_file': 'DEFAULT',
+            'set_ligand_atom_types': '1',
+            'set_protein_atom_types': '0',
+            'directory': 'output',  # Placeholder for output directory
+            'tordist_file': 'DEFAULT',
+            'make_subdirs': '0',
+            'save_lone_pairs': '0',  # Don't save lone pairs, can't read files
+            'fit_points_file': 'fit_pts.mol2',
+            'read_fitpts': '0'
+        },
+        'FLAGS': {
+            'internal_ligand_h_bonds': '1',  # Allow internal H bonds
+            'flip_free_corners': '1',  # Allow limited acyclic ring conformational search
+            'match_ring_templates': '0',
+            'flip_amide_bonds': '0',
+            'flip_planar_n': '1 flip_ring_NRR flip_ring_NHR',
+            'flip_pyramidal_n': '0',
+            'rotate_carboxylic_oh': 'flip',
+            'use_tordist': '1',
+            'postprocess_bonds': '1',
+            'rotatable_bond_override_file': 'DEFAULT',
+            'solvate_all': '1'
+        },
+        'TERMINATION': {
+            'early_termination': '1',  # Enable early stopping based on n_top_solutions and rms_tolerance
+            'n_top_solutions': '1',
+            'rms_tolerance': '1.5'
+        },
+        'CONSTRAINTS': {
+            'force_constraints': '0'
+        },
+            'COVALENT BONDING': {
+            'covalent': '0'
+        },
+        'SAVE OPTIONS': {
+            'save_score_in_file': '1',
+            'save_protein_torsions': '1',
+        },
+        'WRITE OPTIONS': {
+            'write_options': 'NO_LOG_FILES NO_GOLD_LIGAND_MOL2_FILE NO_GOLD_PROTEIN_MOL2_FILE NO_LGFNAME_FILE NO_PLP_MOL2_FILES NO_PID_FILE NO_SEED_LOG_FILE NO_GOLD_ERR_FILE NO_FIT_PTS_FILES NO_ASP_MOL2_FILES NO_GOLD_LOG_FILE'
+        },
+        'FITNESS FUNCTION SETTINGS': {
+            'initial_virtual_pt_match_max': '3',
+            'relative_ligand_energy': '0',
+            'gold_fitfunc_path': 'plp',  # goldscore, chemscore, asp, plp (plp best by CASF-2016)
+            'score_param_file': 'DEFAULT'
+        },
+        'PROTEIN DATA': {
+            'protein_datafile': 'protein.mol2'
+        }
+    }
+
+    def __init__(
+        self, prefix: str, gold_template: os.PathLike = None, receptor: os.PathLike = None,  ref_ligand: os.PathLike = None,
+        cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL', **kwargs
+        ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param gold_template: Template config file, otherwise use default values specified at source
         :param receptor: Protein receptor (.pdb, .mol2)
         :param ref_ligand: Reference ligand for identifying binding site (.sdf, .pdb, .mol2)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout before killing an individual docking simulation (seconds)
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         :param kwargs:
-        """        
-        # Convert necessary file formats
+        """
+        assert (gold_template is not None) or ((receptor is not None) and (ref_ligand is not None)), "Must specify gold template config, or both receptor and ref_ligand" 
+        # Convert any necessary file formats
         self.subprocess = timedSubprocess(timeout=timeout, shell=True)
-        if receptor.endswith('.pdb'):
-            mol2_receptor = receptor.replace('.pdb', '.mol2')
-            self.subprocess.run(cmd=f"obabel {receptor} -O {mol2_receptor} --partialcharge none")
-            receptor = mol2_receptor
-
         if ref_ligand.endswith('.pdb') or ref_ligand.endswith('.sdf'):
             ext = '.' + ref_ligand.split(".")[-1]
             mol2_ligand = ref_ligand.replace(ext, '.mol2')
@@ -58,9 +141,10 @@ class PLANTSDock:
 
         # Specify class attributes
         self.prefix = prefix.replace(" ", "_")
-        self.plants_metrics = self.return_metrics
-        self.plants_env = os.environ['PLANTS']
+        self.gold_metrics = self.return_metrics
+        self.gold_env = os.environ['GOLD']
         self.timeout = float(timeout)
+        self.gold_template = gold_template
         self.receptor = os.path.abspath(receptor)
         self.ref_ligand = os.path.abspath(ref_ligand)
         self.temp_dir = TemporaryDirectory()
@@ -72,24 +156,13 @@ class PLANTSDock:
         self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
         if self.client is None: self.cluster = None
 
-        # Set default PLANTS params & find binding site center
-        self.params = {
-            'scoring_function': 'chemplp',
-            'search_speed': 'speed1',
-            'write_multi_mol2': 1,
-            'cluster_structures': 1,
-            'cluster_rmsd': 2,
-            'bindingsite_radius': 12,
-            'protein_file': receptor
-        }
-        # Find binding site
-        self.subprocess.run(cmd=f"cd {self.temp_dir.name} ; {self.plants_env} --mode bind {self.ref_ligand} {self.params['bindingsite_radius']} {self.receptor}")
-        with open(os.path.join(self.temp_dir.name, 'bindingsite.def'), 'r') as f:
-            for line in f.readlines():
-                bs_args = line.strip("\n").split(" ")
-                if bs_args[0] == 'bindingsite_center':
-                    self.params['bindingsite_center'] = " ".join([str(x) for x in bs_args[1:]])
-                    break
+        # Set GOLD params
+        if self.gold_template is not None:
+            self.params = self.read_gold_config(self.gold_template)
+        else:
+            self.params = self.default_config
+        if self.receptor is not None: self.params['PROTEIN DATA']['protein_datafile'] = self.receptor
+        if self.ref_ligand is not None: self.params['FLOOD FILL']['cavity_file'] = self.ref_ligand
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
@@ -97,6 +170,49 @@ class PLANTSDock:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
+
+    @staticmethod
+    def read_gold_config(gold_config):
+        with open(gold_config, 'rt') as f:
+            configs = {}
+            lines = f.read().splitlines()
+            for line in lines:
+                if line.startswith(' '):
+                    current_configs = line.strip()
+                    configs[current_configs] = {}
+                else:
+                    if line != '':
+                        if '=' in line:
+                            param = line.split('=')
+                        else:
+                            param = line.split(' ')
+                        configs[current_configs][param[0].strip()] = ' '.join([p.strip() for p in param[1:]])
+        return configs
+
+    @staticmethod
+    def write_gold_config(params, output_file):
+        join_exceptions = ['ligand_data_file']
+        with open(output_file, 'wt') as f:
+            for key1 in params.keys():
+                f.write(f'  {key1}\n')
+                for key2 in params[key1]:
+                    if key2 in join_exceptions:
+                        f.write(f'{key2} {params[key1][key2]}\n')
+                    else:
+                        f.write(f'{key2} = {params[key1][key2]}\n')
+                f.write('\n')
+
+    @staticmethod
+    def read_gold_bestranking(input_file):
+        with open(input_file, 'rt') as f:
+            output = f.read().splitlines()
+            last_comment = [line for i, line in enumerate(output) if line.startswith('#')][-1]
+            keys = [k for k in last_comment.strip('#').split(' ') if k != '']
+            values = [v for v in output[-1].split(' ') if v != '']
+            results = {k: ast.literal_eval(v) for k, v in zip(keys, values)}
+            results.pop('File')
+            results.pop('name')
+        return results
 
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .mol2"""
@@ -107,43 +223,45 @@ class PLANTSDock:
             new_varient_files.append(new_vfile)
         return varients, new_varient_files
 
-    def run_plants(self):
+    def run_gold(self):
         """
-        Write new input files and submit each to PLANTS
+        Write new config files and submit each to GOLD
         """
-        plants_commands = []
+        gold_commands = []
         for name in self.file_names:
             for variant in self.variants[name]:
                 # Write config file
                 params = self.params.copy()
-                params["ligand_file"] = os.path.join(self.directory, f'{name}-{variant}_prepared.mol2')
-                params["output_dir"] = os.path.join(self.directory, f'{name}-{variant}')
-                config_file = os.path.join(self.directory, f'{name}-{variant}_config')
-                with open(config_file, 'wt') as f:
-                    f.write("\n".join([f'{k} {v}' for k, v in params.items()]))
+                params["DATA FILES"]["ligand_data_file"] = os.path.join(self.directory, f'{name}-{variant}_prepared.mol2') + ' 10'  # Number of docking poses to return
+                params["DATA FILES"]["directory"] = os.path.join(self.directory, f'{name}-{variant}')
+                config_file = os.path.join(self.directory, f'{name}-{variant}.conf')
+                self.write_gold_config(params=params, output_file=config_file)
 
-                # Run PLANTS with  {plants_env} --mode screen {config}
-                command = f'{self.plants_env} --mode screen {config_file}'
-                plants_commands.append(command)
+                # Prepare GOLD with {gold_env} {config}
+                command = f'{self.gold_env} {config_file}'
+                gold_commands.append(command)
 
         # Initialize subprocess
-        logger.debug('PLANTS called')
+        logger.debug('GOLD called')
         p = timedSubprocess(timeout=self.timeout).run
 
+        # Submit docking subprocesses
         if self.cluster is not None:
-            futures = self.client.map(p, plants_commands)
+            futures = self.client.map(p, gold_commands)
             results = self.client.gather(futures)
         else:
-            results = [p(command) for command in plants_commands]
-        logger.debug('PLANTS finished')
-        _ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
+            results = [p(command) for command in gold_commands]
+        logger.debug('GOLD finished')
+        #errors = list(set([err.decode() for out, err in results if err != ''.encode()]))
+        #logger.debug('\n'.join(errors))
+        #_ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
         return self
 
-    def get_docking_scores(self, smiles: list, return_best_variant: bool = False):
+    def get_docking_scores(self, smiles, return_best_variant=True):
         """
         Extract docking scores from the results
         """
-        # Read in docked file
+        # Iterate over variants
         best_variants = self.file_names.copy()
         best_score = {name: None for name in self.file_names}
 
@@ -158,25 +276,24 @@ class PLANTSDock:
 
             # For each variant
             for variant in self.variants[name]:
-                out_file = os.path.join(self.directory, f'{name}-{variant}', f'ranking.csv')
+                out_file = os.path.join(self.directory, f'{name}-{variant}', f'bestranking.lst')
                 if os.path.exists(out_file):
                     try:
                         # Try to load it in, and grab the first line score
-                        plants_out = pd.read_csv(out_file).to_dict('records')[0]
-                        plants_out.pop('LIGAND_ENTRY')
-                        dscore = plants_out['TOTAL_SCORE']
+                        gold_results = self.read_gold_bestranking(out_file)
+                        dscore = gold_results[self.docking_metric]  # This is a fitness metric so we pose with maximum value
 
                         # If molecule doesn't have a score yet append it and the variant
-                        if (best_score[name] is None) or (dscore < best_score[name]):
+                        if (best_score[name] is None) or (dscore > best_score[name]):
                             best_score[name] = dscore
                             best_variants[i] = f'{name}-{variant}'
-                            docking_result.update({f'{self.prefix}_' + k: v for k, v in plants_out.items() if k in self.return_metrics})
+                            docking_result.update({f'{self.prefix}_' + k: v for k, v in gold_results.items() if k in self.return_metrics})
                             logger.debug(f'Best score for {name}-{variant}: {dscore}')
                             # Add charge info
                             try:
-                                mol_file = os.path.join(self.directory, f'{name}-{variant}', 'docked_ligands.mol2')
-                                self.subprocess.run(f'obabel {mol_file} -O {mol_file.replace(".mol2", ".sdf")}')
-                                mol_file = mol_file.replace(".mol2", ".sdf")
+                                mol_file = os.path.join(self.directory, f'{name}-{variant}', f'ranked_{name}-{variant}_prepared_m1_1.mol2')
+                                self.subprocess.run(f'obabel {mol_file} -O {mol_file.replace(".mol2", ".sdf").replace("prepared", "docked")}')
+                                mol_file = mol_file.replace(".mol2", ".sdf").replace("prepared", "docked")
                                 mol = next(Chem.SDMolSupplier(mol_file))
                                 net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
                                 docking_result.update({
@@ -224,7 +341,7 @@ class PLANTSDock:
         if (parallel is True) and (self.cluster is None):
             parallel = False
 
-        keep_files = [os.path.join(k, 'docked_ligands.sdf') for k in keep] + [os.path.join(k, 'ranking.csv') for k in keep]
+        keep_files = [os.path.join(k, f'ranked_{k}_docked_m1_1.sdf') for k in keep] + [os.path.join(k, 'bestranking.lst') for k in keep]
         keep_dirs = keep
         logger.debug(f'Keeping pose files: {keep_files}')
         del_files = []
@@ -272,7 +389,7 @@ class PLANTSDock:
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'PLANTSDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), 'GOLDDock', step)
         os.makedirs(self.directory, exist_ok=True)
         self.file_names = file_names
         self.docking_results = []  # make sure no carry over
@@ -292,7 +409,7 @@ class PLANTSDock:
         # Run protocol
         self.variants, variant_files = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=file_names)
         self.variants, variant_files = self.reformat_ligands(self.variants, variant_files)
-        self.run_plants()
+        self.run_gold()
         best_variants = self.get_docking_scores(smiles=smiles, return_best_variant=True)
 
         # Cleanup
@@ -307,3 +424,4 @@ class PLANTSDock:
         assert len(smiles) == len(self.docking_results)
 
         return self.docking_results
+

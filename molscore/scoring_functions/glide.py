@@ -3,14 +3,11 @@ import os
 import glob
 import gzip
 import logging
-import subprocess
 from typing import Union
 from tempfile import TemporaryDirectory
 
 from openeye import oechem
-from dask.distributed import Client, LocalCluster
 from rdkit.Chem import AllChem as Chem
-from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
 
 from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.descriptors import MolecularDescriptors
@@ -101,7 +98,7 @@ class GlideDock:
 
     def run_glide(self):
         """
-        Write GLIDE new input files and submit each to Glide
+        Write new input files and submit each to Glide
         """
         glide_commands = []
         for name in self.file_names:
