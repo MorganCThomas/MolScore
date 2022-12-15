@@ -42,7 +42,7 @@ class TestGlideDockSerial(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nGlideDock Output:\n{cls.output}\n")
+        print(f"\nGlideDock Output:\n{json.dump(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -83,7 +83,7 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nGlideDock Output:\n{cls.output}\n")
+        print(f"\nGlideDock Output:\n{json.dump(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -112,7 +112,7 @@ class TestSminaDockSerial(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nSminaDock Output:\n{cls.output}\n")
+        print(f"\nSminaDock Output:\n{json.dump(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -140,7 +140,7 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nSminaDock Output:\n{cls.output}\n")
+        print(f"\nSminaDock Output:\n{json.dump(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -173,7 +173,7 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nPLANTSDock Output:\n{cls.output}\n")
+        print(f"\nPLANTSDock Output:\n{json.dump(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -205,7 +205,7 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nPLANTSDock Output:\n{cls.output}\n")
+        print(f"\nPLANTSDock Output:\n{json.dump(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
