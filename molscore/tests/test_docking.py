@@ -213,6 +213,7 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
         cls.inst.client.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
+
 class TestGOLDDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
@@ -241,6 +242,40 @@ class TestGOLDDockSerial(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestGOLDDockParallel(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = GOLDDock
+        cls.inst = GOLDDock(
+            prefix='test',
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            cluster=4,
+            ligand_preparation='GypsumDL'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
