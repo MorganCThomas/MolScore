@@ -456,7 +456,7 @@ with col1:
             os.makedirs(os.path.dirname(out_file))
             st.write('Creating directory')
         with open(out_file, 'w') as f:
-            json.dump(config, f)
+            json.dump(config, f, indent=2)
             st.write('File saved')
 with col2:
     if st.button(label='Exit'):

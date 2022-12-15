@@ -94,7 +94,7 @@ class MolScore:
 
         # Write out config
         with open(os.path.join(self.save_dir, f"{self.run_name}_config.json"), "w") as config_f:
-            json.dump(self.configs, config_f)
+            json.dump(self.configs, config_f, indent=2)
 
         # Setup scoring functions
         self.scoring_functions = []
@@ -454,7 +454,7 @@ class MolScore:
             elif k == 'scoring_functions':
                 with open(os.path.join(dir, k), 'wt') as f:
                     nv = [str(i.__class__) for i in v]
-                    json.dump(nv, f)
+                    json.dump(nv, f, indent=2)
             # Convert functions to string
             elif k == 'diversity_filter':
                 prims.update({k: v.__class__})
@@ -465,7 +465,7 @@ class MolScore:
             # Else do it on type
             elif isinstance(v, (list, dict)):
                 with open(os.path.join(dir, k), 'wt') as f:
-                    json.dump(v, f)
+                    json.dump(v, f, indent=2)
             elif isinstance(v, pd.core.frame.DataFrame):
                 with open(os.path.join(dir, k), 'wt') as f:
                     v.to_csv(f)
