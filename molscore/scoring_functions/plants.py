@@ -24,7 +24,6 @@ class PLANTSDock:
     Score structures using PLANTS docking software
     Korb, O.; Stützle, T.; Exner, T. E. "PLANTS: Application of Ant Colony Optimization to Structure-Based Drug Design" Lecture Notes in Computer Science 4150, 247-258 (2006).
     http://www.tcd.uni-konstanz.de/plants_download/
-    http://www.tcd.uni-konstanz.de/plants_download/download/manual1.2.pdf
     """
     return_metrics = [
         'TOTAL_SCORE', 'SCORE_RB_PEN', 'SCORE_NORM_HEVATOMS', 'SCORE_NORM_CRT_HEVATOMS', 'SCORE_NORM_WEIGHT',
