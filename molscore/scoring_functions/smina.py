@@ -11,6 +11,7 @@ import logging
 import glob
 from typing import Union
 from itertools import takewhile
+from tempfile import TemporaryDirectory
 from dask.distributed import Client, LocalCluster
 
 from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
@@ -20,7 +21,7 @@ from molscore.scoring_functions._ligand_preparation import ligand_preparation_pr
 
 from rdkit import Chem
 
-from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 
 logger = logging.getLogger('smina')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -54,18 +55,12 @@ class SminaDock:
         self.variants = None
         self.cpus = cpus
         self.timeout = float(timeout)
+        self.temp_dir = TemporaryDirectory()
+
         # Setup dask
         self.cluster = cluster
-        if self.cluster is not None:
-            if isinstance(self.cluster, str):
-                self.client = Client(self.cluster)
-                print(f"Dask worker dashboard: {self.client.dashboard_link}")
-            elif int(self.cluster) > 1:
-                cluster = LocalCluster(n_workers=int(self.cluster), threads_per_worker=1)
-                self.client = Client(cluster)
-                print(f"Dask worker dashboard: {self.client.dashboard_link}")
-            else:
-                logger.error(f"Unknown parameter for cluster: {self.cluster}")
+        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        if self.client is None: self.cluster = None
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible

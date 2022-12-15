@@ -10,6 +10,7 @@ from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors, rdmolops, DataStructs
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Avalon import pyAvalonTools
+from dask.distributed import Client, LocalCluster
 
 
 class timedThread(object):
@@ -65,11 +66,38 @@ class timedSubprocess(object):
             out, err = self.process.communicate(timeout=self.timeout)
         except subprocess.TimeoutExpired:
             print('Process timed out...')
+            out, err = '', f'Timed out at {self.timeout}'
             if not self.shell:
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
             else:
                 self.process.kill()
-        return
+        return out, err
+
+
+class DaskUtils:
+
+    # TODO add dask-jobqueue templates
+
+    @classmethod
+    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, logger=None):
+        client = None
+
+        # Check if it's a string
+        if isinstance(cluster_address_or_n_workers, str):
+            client = Client(cluster_address_or_n_workers)
+            print(f"Dask worker dashboard: {client.dashboard_link}")
+        # Or a number
+        elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
+            if int(cluster_address_or_n_workers) > 1:
+                cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), threads_per_worker=1, local_directory=local_directory)
+                client = Client(cluster)
+                print(f"Dask worker dashboard: {client.dashboard_link}")
+        # Or is unrecognized
+        else:
+            if logger is not None:
+                logger.warning(f"Unrecognized dask input {cluster_address_or_n_workers}")
+
+        return client
 
 
 def disable_rdkit_logging():

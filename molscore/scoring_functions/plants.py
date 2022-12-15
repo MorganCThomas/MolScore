@@ -3,12 +3,13 @@ import glob
 import logging
 import pandas as pd
 from typing import Union
+from tempfile import TemporaryDirectory
 
 from dask.distributed import Client, LocalCluster
 from rdkit.Chem import AllChem as Chem
 
 from molscore.scoring_functions.descriptors import MolecularDescriptors
-from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('plants')
@@ -44,7 +45,7 @@ class PLANTSDock:
         :param kwargs:
         """        
         # Convert necessary file formats
-        self.subprocess = timedSubprocess(timeout=timeout)
+        self.subprocess = timedSubprocess(timeout=timeout, shell=True)
         if receptor.endswith('.pdb'):
             mol2_receptor = receptor.replace('.pdb', '.mol2')
             self.subprocess.run(cmd=f"obabel {receptor} -O {mol2_receptor} --partialcharge none")
@@ -63,21 +64,14 @@ class PLANTSDock:
         self.timeout = float(timeout)
         self.receptor = receptor
         self.ref_ligand = ref_ligand
+        self.temp_dir = TemporaryDirectory()
         self.variants = None
         self.docking_results = None
 
         # Setup dask
         self.cluster = cluster
-        if self.cluster is not None:
-            if isinstance(self.cluster, str):
-                self.client = Client(self.cluster)
-                print(f"Dask worker dashboard: {self.client.dashboard_link}")
-            elif int(self.cluster) > 1:
-                cluster = LocalCluster(n_workers=int(self.cluster), threads_per_worker=1)
-                self.client = Client(cluster)
-                print(f"Dask worker dashboard: {self.client.dashboard_link}")
-            else:
-                logger.error(f"Unknown parameter for cluster: {self.cluster}")
+        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        if self.client is None: self.cluster = None
 
         # Set default PLANTS params & find binding site center
         self.params = {
@@ -90,14 +84,13 @@ class PLANTSDock:
             'protein_file': receptor
         }
         # Find binding site
-        self.subprocess.run(cmd=f"{self.plants_env} --mode bind {self.ref_ligand} {self.params['bindingsite_radius']} {self.receptor}")
-        with open('bindingsite.def', 'r') as f:
+        self.subprocess.run(cmd=f"cd {self.temp_dir.name} ; {self.plants_env} --mode bind {os.path.abspath(self.ref_ligand)} {self.params['bindingsite_radius']} {os.path.abspath(self.receptor)}")
+        with open(os.path.join(self.temp_dir.name, 'bindingsite.def'), 'r') as f:
             for line in f.readlines():
                 bs_args = line.strip("\n").split(" ")
                 if bs_args[0] == 'bindingsite_center':
                     self.params['bindingsite_center'] = " ".join([str(x) for x in bs_args[1:]])
                     break
-        os.remove('bindingsite.def')
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible

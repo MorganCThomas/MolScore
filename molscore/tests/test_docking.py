@@ -86,6 +86,8 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -141,7 +143,10 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
 
 class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
@@ -171,7 +176,40 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        pass
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('PLANTS' in list(os.environ.keys())):
+            raise unittest.SkipTest("PLANTS installation not found, please install and add to os environment (e.g., export PLANTS=<path_to_plants_exe>)")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = PLANTSDock
+        cls.inst = PLANTSDock(
+            prefix='test',
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            cluster=4,
+            ligand_preparation='GypsumDL'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nPLANTSDock Output:\n{cls.output}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
