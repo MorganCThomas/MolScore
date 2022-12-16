@@ -378,7 +378,7 @@ class TestChemScoreGOLDDock(BaseTests.TestScoringFunction):
     def tearDownClass(cls):
         cls.inst.client.cluster.close()
         cls.inst.client.close()
-        #os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
 class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):

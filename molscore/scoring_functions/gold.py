@@ -249,9 +249,6 @@ class GOLDDock:
         else:
             results = [p(command) for command in gold_commands]
         logger.debug('GOLD finished')
-        #errors = list(set([err.decode() for out, err in results if err != ''.encode()]))
-        #logger.debug('\n'.join(errors))
-        #_ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
         return self
 
     def get_docking_scores(self, smiles, return_best_variant=True):
