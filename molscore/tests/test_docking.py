@@ -6,7 +6,7 @@ import subprocess
 from molscore.tests import test_files
 from molscore.tests.base_tests import BaseTests
 from molscore.tests.mock_generator import MockGenerator
-from molscore.scoring_functions import GlideDock, SminaDock, PLANTSDock, GOLDDock
+from molscore.scoring_functions import GlideDock, SminaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
 
 
 class TestGlideDockSerial(BaseTests.TestScoringFunction):
@@ -259,6 +259,142 @@ class TestGOLDDockParallel(BaseTests.TestScoringFunction):
         # Instantiate
         cls.obj = GOLDDock
         cls.inst = GOLDDock(
+            prefix='test',
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            cluster=4,
+            ligand_preparation='GypsumDL'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestChemPLPGOLDDock(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = ChemPLPGOLDDock
+        cls.inst = ChemPLPGOLDDock(
+            prefix='test',
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            cluster=4,
+            ligand_preparation='GypsumDL'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestASPGOLDDock(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = ASPGOLDDock
+        cls.inst = ASPGOLDDock(
+            prefix='test',
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            cluster=4,
+            ligand_preparation='GypsumDL'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestChemScoreGOLDDock(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = ChemScoreGOLDDock
+        cls.inst = ChemScoreGOLDDock(
+            prefix='test',
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            cluster=4,
+            ligand_preparation='GypsumDL'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
+        #os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = GoldScoreGOLDDock
+        cls.inst = GoldScoreGOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],

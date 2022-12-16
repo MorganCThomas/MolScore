@@ -713,11 +713,16 @@ class ProtSubstructFuncs:
 
         pwd = os.path.dirname(os.path.realpath(__file__))
         site_structures_file = "{}/{}".format(pwd, "site_substructures.smarts")
-        lines = [
-            l
-            for l in open(site_structures_file, "r")
-            if l.strip() != "" and not l.startswith("#")
-        ]
+        # Modified from original by Morgan Thomas December 2022
+        # ----- New
+        with open(site_structures_file, "r") as f:
+            lines = [l for l in f.read().splitlines() if l.strip() != "" and not l.startswith("#")]
+        # ----- Old
+        #lines = [
+        #    l
+        #    for l in open(site_structures_file, "r")
+        #    if l.strip() != "" and not l.startswith("#")
+        #]
 
         return lines
 

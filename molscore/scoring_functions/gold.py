@@ -3,6 +3,7 @@ import ast
 import glob
 import logging
 import pandas as pd
+from copy import deepcopy
 from typing import Union
 from tempfile import TemporaryDirectory
 
@@ -27,15 +28,10 @@ class GOLDDock:
     2. Jones G, Willett P, Glen RC, Leach AR, Taylor R. Development and validation of a genetic algorithm for flexible docking. J Mol Biol. 1997 Apr 4;267(3):727-48. doi: 10.1006/jmbi.1996.0897
     https://www.ccdc.cam.ac.uk/solutions/csd-discovery/components/gold/
     """
-    # TODO Seperate into Subclasses
     generic_metrics = ['NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
-    # This class should run PLP by default
+    # This class is ChemPLP by default
     return_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'time'] + generic_metrics
     docking_metric = 'Score'
-    #goldscore_metrics = ['Fitness', 'S(hb_ext)', 'S(vdw_ext)', 'S(hb_int)', 'S(int)', 'intcor', 'time']
-    #chemscore_metrics = ['Score', 'DG', 'S(hbond)', 'S(metal)', 'S(lipo)', 'H(rot)', 'DE(clash)', 'DE(int)', 'intcor', 'time']
-    #asp_metrics = ['Score', 'ASP', 'S(Map)', 'DE(clash)', 'DE(int)', 'intcor', 'time']
-    #chemplp_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'intcor', 'time']
 
     # Can additionally add WATER DATA and WRITE OPTIONS
     default_config = {
@@ -210,8 +206,9 @@ class GOLDDock:
             keys = [k for k in last_comment.strip('#').split(' ') if k != '']
             values = [v for v in output[-1].split(' ') if v != '']
             results = {k: ast.literal_eval(v) for k, v in zip(keys, values)}
-            results.pop('File')
-            results.pop('name')
+            for k in ['File', 'name', 'File name', 'Ligand name']:
+                if k in results.keys():
+                    results.pop(k)
         return results
 
     def reformat_ligands(self, varients, varient_files):
@@ -425,3 +422,30 @@ class GOLDDock:
 
         return self.docking_results
 
+
+class ChemPLPGOLDDock(GOLDDock):
+    return_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'time'] + GOLDDock.generic_metrics
+    docking_metric = 'Score'
+    default_config = deepcopy(GOLDDock.default_config)
+    default_config["FITNESS FUNCTION SETTINGS"]["gold_fitfunc_path"] = 'plp'
+
+
+class ASPGOLDDock(GOLDDock):
+    return_metrics = ['Score', 'ASP', 'S(Map)', 'DE(clash)', 'DE(int)', 'time'] + GOLDDock.generic_metrics
+    docking_metric = 'Score'
+    default_config = deepcopy(GOLDDock.default_config)
+    default_config["FITNESS FUNCTION SETTINGS"]["gold_fitfunc_path"] = 'asp'
+
+
+class ChemScoreGOLDDock(GOLDDock):
+    return_metrics = ['Score', 'DG', 'S(hbond)', 'S(metal)', 'S(lipo)', 'H(rot)', 'DE(clash)', 'DE(int)', 'time'] + GOLDDock.generic_metrics
+    docking_metric = 'Score'
+    default_config = deepcopy(GOLDDock.default_config)
+    default_config["FITNESS FUNCTION SETTINGS"]['gold_fitfunc_path'] = 'chemscore'
+
+
+class GoldScoreGOLDDock(GOLDDock):
+    return_metrics = ['Fitness', 'S(hb_ext)', 'S(vdw_ext)', 'S(hb_int)', 'S(int)', 'time'] + GOLDDock.generic_metrics
+    docking_metric = 'Fitness' 
+    default_config = deepcopy(GOLDDock.default_config)
+    default_config["FITNESS FUNCTION SETTINGS"]['gold_fitfunc_path'] = 'goldscore'

@@ -1,6 +1,6 @@
 from molscore.scoring_functions.glide import GlideDock, GlideDockFromROCS
 from molscore.scoring_functions.plants import PLANTSDock
-from molscore.scoring_functions.gold import GOLDDock
+from molscore.scoring_functions.gold import GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
 from molscore.scoring_functions.smina import SminaDock
 from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.oedock import FRED
@@ -31,6 +31,10 @@ all_scoring_functions = [
     SminaDock,
     PLANTSDock,
     GOLDDock,
+    ChemPLPGOLDDock,
+    ASPGOLDDock,
+    ChemScoreGOLDDock,
+    GoldScoreGOLDDock,
     FRED
 #    ChemPropModel
 ]
