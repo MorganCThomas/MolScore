@@ -1,0 +1,63 @@
+- Functionality
+  - IFP rescoring    # Add n_poses and IFP to __init__ of each docking program, need to pre-select binding site residues ... 
+    - ICHEM IFP http://bioinfo-pharma.u-strasbg.fr/labwebsite/download.html # Same as PLIF, academicly free but need a license X
+    - PLIF  http://bioinfo-pharma.u-strasbg.fr/labwebsite/download.html  # Free but relies on openeye X
+    - PROLIF https://prolif.readthedocs.io/en/latest/source/installation.html # Nice python API for FPs, residue-based interactions
+    - SPLIF https://pubs.acs.org/doi/full/10.1021/ci500319f # PLIF + substructure, i.e., specific interaction encoded
+    - PyPLIF https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3607193/ # Command line & Python?
+    - PyPLIFHIPPOS https://pubs.acs.org/doi/full/10.1021/acs.jcim.0c00305 # Uses PyPLIF
+    - BINANA https://pubs.acs.org/doi/10.1021/acs.jcim.1c01461  # Not necessarily FP based, just ligand interactions  X
+    - 2D SIFT https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00545-9  # Includes 1D fingerprint representation, seems to rely on schrodinger X
+  - Shape-it/align-it open-source shape matching
+    - https://iwatobipen.wordpress.com/2021/03/17/comparison-between-native-implemented-shape-align-method-of-rdkit-and-rdkit-shape-it-chemoinformatics-rdkit-shape-based-align/
+    - https://squonk.it/docs/cells/RDKit%20Open3D%20Align/
+    - https://chemrxiv.org/engage/api-gateway/chemrxiv/assets/orp/resource/item/628c60215d9485a206cc8ecc/original/vs-flow-an-open-source-ligand-based-virtual-screening-tool.pdf 
+  - Implement pareto pair and pareto fronts
+  - Adapt st_monitor to save PLANTS and GOLD mol files
+  - Applicability domain filters
+  - Implement PIDGIN models
+  - AttentiveFP
+
+- MolScore
+  - Have filters as any scoring function / diversity filter, multiplying aggregated function?
+  - Move diversity filter to cluster df, are we doing it twice?
+  - Move reading configs to a seperate method, then can do it adaptively?
+
+- MolScore I/O
+  - Accept smiles or rdkit mols -> pass mols to docking, conformations etc.
+  - Multiple score output mode e.g., MPO scores
+  - Write json schema to validate config files
+
+- MolScore GUI
+  - Change scoring functions to dropdown menu
+  - Choose to add or delete individual SFs
+  - Sidebar to navigate conf?
+  - Adapt st_monitor to save PLANTS and GOLD mol files
+  - Extra page to filter generated compounds?
+  - Functionality to assess multiple runs?
+
+- MolScore tests
+ - Write unit tests
+ - Test and ligand preparation for oedock ... wait for license
+
+- Adaptive rewards
+  - Adaptive rewards, app write new configs, molscore read new configs, keep trace of reward shaping over time, monitor out-params.json at each step in __call__
+  - Alternating rewards (MoleGuLaR, Curriculum learning), list / directory of configs upfront along with steps to make change? Just show changes or completely update configs? Exceptions, what is and isn't allowed to change?
+
+- Benchmarking mode, do several config files by directory? Bash template file? Path to preset tasks? 
+
+- AiZynthFinder
+
+- Refactor
+  - Move generative models to seperate folder
+  - Move MolEval to seperate folder?
+  - Implement some other generative models, CharGNN, HierG2G, PS, STONED, JTVAE, GCPN, molDQN^ etc.? (From PMO?)
+  - Setup versioning / releases
+
+- MolEval
+  - Check pre-computation of statistics ... it may be helpful to be able to run this with moses FCD?
+
+- Nice to have
+  - Add template dask-jobqueue for HPC? https://jobqueue.dask.org/en/latest/
+
+- Move automatic starting of streamlit (???)
