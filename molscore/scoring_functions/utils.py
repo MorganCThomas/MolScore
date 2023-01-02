@@ -76,7 +76,7 @@ class timedSubprocess(object):
 
 class DaskUtils:
 
-    # TODO add dask-jobqueue templates
+    # TODO add dask-jobqueue templates https://jobqueue.dask.org/en/latest/
 
     @classmethod
     def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, logger=None):
