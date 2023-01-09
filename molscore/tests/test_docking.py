@@ -6,7 +6,7 @@ import subprocess
 from molscore.tests import test_files
 from molscore.tests.base_tests import BaseTests
 from molscore.tests.mock_generator import MockGenerator
-from molscore.scoring_functions import GlideDock, SminaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
+from molscore.scoring_functions import GlideDock, SminaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock, OEDock
 
 
 class TestGlideDockSerial(BaseTests.TestScoringFunction):
@@ -42,7 +42,7 @@ class TestGlideDockSerial(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nGlideDock Output:\n{json.dump(cls.output, indent=2)}\n")
+        print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -83,7 +83,7 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nGlideDock Output:\n{json.dump(cls.output, indent=2)}\n")
+        print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -112,7 +112,7 @@ class TestSminaDockSerial(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nSminaDock Output:\n{json.dump(cls.output, indent=2)}\n")
+        print(f"\nSminaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -140,7 +140,7 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nSminaDock Output:\n{json.dump(cls.output, indent=2)}\n")
+        print(f"\nSminaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -205,7 +205,7 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nPLANTSDock Output:\n{json.dump(cls.output, indent=2)}\n")
+        print(f"\nPLANTSDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -407,6 +407,71 @@ class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.cluster.close()
+        cls.inst.client.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestOEDockSerial(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('OE_LICENSE' in list(os.environ.keys())):
+            raise unittest.SkipTest("OpenEye license not found, please install license and export to \'OE_LICENSE\'")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = OEDock
+        cls.inst = OEDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            ligand_preparation='GypsumDL',
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestOEDockParallel(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+
+        # Check installation
+        if not ('OE_LICENSE' in list(os.environ.keys())):
+            raise unittest.SkipTest("OpenEye license not found, please install license and export to \'OE_LICENSE\'")
+
+        # Clean the output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = OEDock
+        cls.inst = OEDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            ligand_preparation='GypsumDL',
+            cluster=4
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
