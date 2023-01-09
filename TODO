@@ -1,5 +1,5 @@
 - Functionality
-  - IFP rescoring    # Add n_poses and IFP to __init__ of each docking program, need to pre-select binding site residues ... 
+  - IFP rescoring    # Add n_poses and IFP type to __init__ of each docking program, need to pre-select binding site residues ... 
     - ICHEM IFP http://bioinfo-pharma.u-strasbg.fr/labwebsite/download.html # Same as PLIF, academicly free but need a license X
     - PLIF  http://bioinfo-pharma.u-strasbg.fr/labwebsite/download.html  # Free but relies on openeye X
     - PROLIF https://prolif.readthedocs.io/en/latest/source/installation.html # Nice python API for FPs, residue-based interactions
@@ -18,6 +18,10 @@
   - Implement PIDGIN models
   - AttentiveFP
 
+- Scoring functions
+  - Move __call__() to score()
+  - Docking functions: Add prepared smiles to return metrics
+
 - MolScore
   - Have filters as any scoring function / diversity filter, multiplying aggregated function?
   - Move diversity filter to cluster df, are we doing it twice?
@@ -35,6 +39,7 @@
   - Adapt st_monitor to save PLANTS and GOLD mol files
   - Extra page to filter generated compounds?
   - Functionality to assess multiple runs?
+  - Create bash files that can be called by python package
 
 - MolScore tests
  - Write unit tests
@@ -45,8 +50,6 @@
   - Alternating rewards (MoleGuLaR, Curriculum learning), list / directory of configs upfront along with steps to make change? Just show changes or completely update configs? Exceptions, what is and isn't allowed to change?
 
 - Benchmarking mode, do several config files by directory? Bash template file? Path to preset tasks? 
-
-- AiZynthFinder
 
 - Refactor
   - Move generative models to seperate folder
@@ -59,5 +62,6 @@
 
 - Nice to have
   - Add template dask-jobqueue for HPC? https://jobqueue.dask.org/en/latest/
+  - AiZynthFinder
 
 - Move automatic starting of streamlit (???)
