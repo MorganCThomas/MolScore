@@ -13,7 +13,8 @@
     - https://squonk.it/docs/cells/RDKit%20Open3D%20Align/
     - https://chemrxiv.org/engage/api-gateway/chemrxiv/assets/orp/resource/item/628c60215d9485a206cc8ecc/original/vs-flow-an-open-source-ligand-based-virtual-screening-tool.pdf 
   - Implement pareto pair and pareto fronts
-  - Adapt st_monitor to save PLANTS and GOLD mol files
+  - Adapt st_monitor to save PLANTS, GOLD, OEDock mol files
+  - OEDock POSIT with rescoring
   - Applicability domain filters
   - Implement PIDGIN models
   - AttentiveFP
