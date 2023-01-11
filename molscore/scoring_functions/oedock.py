@@ -375,6 +375,3 @@ class OEDock:
         """
         logger.warning("__call__() will be deprecated in future versions, please use score() instead.")
         return self.score(smiles=smiles, directory=directory, file_names=file_names)
-
-
-# TODO seperate class for posit with rescoring
