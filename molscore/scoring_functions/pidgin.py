@@ -151,6 +151,7 @@ class PIDGIN:
         return results
 
     def __call__(self, smiles: list, **kwargs):
+        logger.warning("__call__() will be deprecated in future versions, please use score() instead.")
         return self.score(smiles=smiles)
 
     
