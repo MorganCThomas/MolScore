@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 from functools import partial
 from multiprocessing import Pool
-from typing import Union
 from zenodo_client import Zenodo
 
 from molscore.scoring_functions.utils import Fingerprints
@@ -34,27 +33,36 @@ class PIDGIN:
     uniprots_path = zenodo.download_latest(record_id=pidgin_record_id, path='uniprots.json')
     with open(uniprots_path, 'rt') as f:
         uniprots = json.load(f)
-    # Download uniprot sets
-    classification_path = zenodo.download_latest(record_id=pidgin_record_id, path='uniprots_classification.csv')
-    uni_df = pd.read_csv(classification_path)
-    uni_classes = uni_df.groupby(['pref_name', 'class_level'])['accession'].count().reset_index().sort_values(['class_level', 'pref_name'])
-    uni_classes = uni_classes.astype(str)[['class_level', 'pref_name', 'accession']].agg(' - '.join, axis=1).tolist()
-    # TODO sort this out, class level doesn't include child classes ... uniprot count isn't unique, need to sort original file out
+    uniprots = ['None'] + uniprots
 
+    # Download uniprot groups
+    uniprot_groups = {'None': None}
+    groups_path = zenodo.download_latest(record_id=pidgin_record_id, path='uniprots_groups.json')
+    with open(groups_path, 'rt') as f:
+        uniprot_groups.update(json.load(f))
+
+    # Set init docstring here as it's not a string literal
+    init_docstring = f"""
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param uniprot: Uniprot accession for classifier to use [{', '.join(uniprots)}]
+        :param uniprots: List of uniprot accessions for classifier to use
+        :param uniprot_set: Set of uniprots based on protein class (level - name - size) [{', '.join(uniprot_groups.keys())}]
+        :param thresh: Concentration threshold of classifier [100 uM, 10 uM, 1 uM, 0.1 uM]
+        :param method: How to aggregate the positive prediction probabilities accross classifiers [mean, median, max, min]
+        :param binarise: Binarise predicted probability and return ratio of actives based on optimal predictive thresholds (GHOST)
+        :param kwargs:
+        """
 
     def __init__(
-        self, prefix: str, uniprots: Union[str, list] = None, uniprot_set: str = None, thresh: str = '100 uM',
-        n_jobs: int = 1, method: str = 'mean', binarise=False
-        ):
-        f"""
-        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param uniprots: Uniprot accession of classifier to use [{', '.join(self.uniprots)}]
-        :param uniprot_set: Set of uniprots based on protein class (level - name - size) [{', '.join(self.uni_classes)}]
-        :param thresh: Concentration threshold of classifier [100 uM, 10 uM, 1 uM, 0.1 uM]
-        :param method: How to aggregate the positive predictions accross classifiers [mean, median, max, min]
-        :param binarise: Binarise predicted probability and return ratio of actives based on optimal predictive thresholds (GHOST)
-        """
-        assert (uniprots is not None) or (uniprot_set is not None), "Either uniprots or uniprot set must be specified"
+        self, prefix: str, uniprot: str = None, uniprots: list = None, uniprot_set: str = None, thresh: str = '100 uM',
+        n_jobs: int = 1, method: str = 'mean', binarise=False, **kwargs):
+        """This docstring is replaced outside this method."""
+        # Make sure something is selected
+        self.uniprot = uniprot if uniprot != 'None' else None
+        self.uniprots = uniprots if uniprots is not None else []
+        self.uniprot_set = uniprot_set if uniprot_set != 'None' else None
+        assert (self.uniprot is not None) or (len(self.uniprots) > 0) or (self.uniprot_set is not None), "Either uniprot, uniprots or uniprot set must be specified"
+        # Set other attributes
         self.prefix = prefix.replace(" ", "_")
         self.thresh = thresh.replace(" ", "").replace(".", "")
         self.n_jobs = n_jobs
@@ -64,26 +72,13 @@ class PIDGIN:
         self.nBits = 2048
         self.agg = getattr(np, method)
         self.binarise = binarise
-        if uniprots:
-            if isinstance(uniprots, str):
-                self.uniprots = [uniprots]
-            else:
-                self.uniprots = uniprots
-
-        # Get uniprot set
-        if uniprot_set:
-            try:
-                pref_name = uniprot_set.split(" - ")[1]  # Assume level - name - size
-            except ValueError:
-                pref_name = uniprot_set.split(" - ")[0]  # Assume name
-            # Get associated uniprots
-            set_uniprots = list(self.uni_df.loc[self.uni_df.pref_name == pref_name, 'accession'].unique())
-            if uniprots:
-                # Add to uniprots if also specified
-                self.uniprots += set_uniprots
-                self.uniprots = list(set(self.uniprots)) # De-duplicate
-            else:
-                self.uniprots = set_uniprots
+        # Curate uniprot set
+        if self.uniprot:
+            self.uniprots += self.uniprot
+        if self.uniprot_set:
+            self.uniprots += self.uniprot_groups[self.uniprot_set]
+        # De-duplicate
+        self.uniprots = list(set(self.uniprots))
 
         # Download PIDGIN
         logger.warning('If not downloaded, PIDGIN will be downloaded which is a large file ~ 11GB and may take some several minutes')
@@ -105,38 +100,14 @@ class PIDGIN:
                     logger.warning(f'{uni} model at {thresh} not found, omitting')
                     continue
 
-        # Download models
-        if False:
-            for uni in self.uniprots:
-                # Download it
-                try:
-                    uni_zip = self.zenodo.download_latest(record_id=self.pidgin_record_id, path=f'{uni.upper()}.zip')
-                except FileNotFoundError:
-                    logger.warning(f'{uni} models not found, omitting')
-                    continue
-                # Load it
-                try:
-                    with zipfile.ZipFile(uni_zip, 'r') as zip_file:
-                        # Load .json to get ghost thresh
-                        with zip_file.open(f'{uni}.json') as meta_file:
-                                metadata = json.load(meta_file)
-                                opt_thresh = metadata[thresh]['train']['params']['opt_threshold']
-                                self.ghost_thresholds.append(opt_thresh)
-                        # Load classifier
-                        with zip_file.open(f'{uni}_{self.thresh}.pkl.gz') as model_file:
-                            with gzip.open(model_file, 'rb') as f:
-                                clf = pkl.load(f)
-                                self.models.append(clf)
-                except (FileNotFoundError, KeyError):
-                    logger.warning(f'{uni} model at {thresh} not found, omitting')
-                    continue
-
         # Run some checks
         assert len(self.models) != 0, "No models were found"
         if self.binarise:
             logger.info('Running with binarise=True so setting method=mean')
             self.agg = np.mean
             assert len(self.ghost_thresholds) == len(self.models), "Mismatch between models and thresholds"
+
+    setattr(__init__, '__doc__', init_docstring)
 
     def score(self, smiles: list, **kwargs):
         """
