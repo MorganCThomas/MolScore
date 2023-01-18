@@ -6,6 +6,7 @@ from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.oedock import OEDock
 from molscore.scoring_functions.similarity import MolecularSimilarity, TanimotoSimilarity
 #from molscore.scoring_functions.reinvent_svm import ActivityModel
+from molscore.scoring_functions.pidgin import PIDGIN
 from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors
 from molscore.scoring_functions.isomer import Isomer
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
@@ -24,6 +25,7 @@ all_scoring_functions = [
     SubstructureMatch,
     SKLearnModel,
     EnsembleSKLearnModel,
+    PIDGIN,
     RAScore_XGB,
     ROCS,
     GlideDock,

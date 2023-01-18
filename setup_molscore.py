@@ -10,5 +10,6 @@ setup(
     description='A scoring framework for goal directed generative models',
     include_package_data=True,
     package_data={'molscore': ['data/sample.smi',
-                               'data/models/RAScore/*/*.pkl']},
+                               'data/models/RAScore/*/*.pkl',
+                               'data/models/pidgin/*']},
 )
