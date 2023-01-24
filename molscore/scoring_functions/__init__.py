@@ -5,6 +5,7 @@ from molscore.scoring_functions.smina import SminaDock
 from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.oedock import OEDock
 from molscore.scoring_functions.similarity import MolecularSimilarity, TanimotoSimilarity
+from molscore.scoring_functions.applicability_domain import ApplicabilityDomain
 from molscore.scoring_functions.align3d import Align3D
 #from molscore.scoring_functions.reinvent_svm import ActivityModel
 from molscore.scoring_functions.pidgin import PIDGIN
