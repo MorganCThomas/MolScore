@@ -19,44 +19,56 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
-
-class PIDGIN:
+class PIDGIN():
     """
     Download and run PIDGIN classification models (~11GB) via Zenodo to return the positive predictions
     """
     return_metrics = ['pred_proba']
 
     zenodo = Zenodo()
-    pidgin_record_id = zenodo.get_latest_record('7504135')
+    #metadata = PIDGINMetadata(zenodo_client=zenodo)
+    
+    @classmethod
+    def get_pidgin_record_id(cls):
+        return cls.zenodo.get_latest_record('7504135')
 
     # Download list of uniprots
-    uniprots_path = zenodo.download_latest(record_id=pidgin_record_id, path='uniprots.json')
-    with open(uniprots_path, 'rt') as f:
-        uniprots = json.load(f)
-    uniprots = ['None'] + uniprots
+    @classmethod
+    def get_uniprot_list(cls):
+        uniprots_path = cls.zenodo.download_latest(record_id=cls.get_pidgin_record_id(), path='uniprots.json')
+        with open(uniprots_path, 'rt') as f:
+            uniprots = json.load(f)
+        uniprots = ['None'] + uniprots
+        return uniprots
 
     # Download uniprot groups
-    uniprot_groups = {'None': None}
-    groups_path = zenodo.download_latest(record_id=pidgin_record_id, path='uniprots_groups.json')
-    with open(groups_path, 'rt') as f:
-        uniprot_groups.update(json.load(f))
+    @classmethod
+    def get_uniprot_groups(cls):
+        groups = {'None': None}
+        groups_path = cls.zenodo.download_latest(record_id=cls.get_pidgin_record_id(), path='uniprots_groups.json')
+        with open(groups_path, 'rt') as f:
+            groups.update(json.load(f))
+        return groups
 
     # Set init docstring here as it's not a string literal
-    init_docstring = f"""
-        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param uniprot: Uniprot accession for classifier to use [{', '.join(uniprots)}]
-        :param uniprots: List of uniprot accessions for classifier to use
-        :param uniprot_set: Set of uniprots based on protein class (level - name - size) [{', '.join(uniprot_groups.keys())}]
-        :param thresh: Concentration threshold of classifier [100 uM, 10 uM, 1 uM, 0.1 uM]
-        :param method: How to aggregate the positive prediction probabilities accross classifiers [mean, median, max, min]
-        :param binarise: Binarise predicted probability and return ratio of actives based on optimal predictive thresholds (GHOST)
-        :param kwargs:
-        """
+    @classmethod
+    def set_docstring(cls):
+        init_docstring = f"""
+            :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+            :param uniprot: Uniprot accession for classifier to use [{', '.join(cls.get_uniprot_list())}]
+            :param uniprots: List of uniprot accessions for classifier to use
+            :param uniprot_set: Set of uniprots based on protein class (level - name - size) [{', '.join(cls.get_uniprot_groups().keys())}]
+            :param thresh: Concentration threshold of classifier [100 uM, 10 uM, 1 uM, 0.1 uM]
+            :param method: How to aggregate the positive prediction probabilities accross classifiers [mean, median, max, min]
+            :param binarise: Binarise predicted probability and return ratio of actives based on optimal predictive thresholds (GHOST)
+            :param kwargs:
+            """
+        setattr(cls.__init__, '__doc__', init_docstring)
 
     def __init__(
         self, prefix: str, uniprot: str = None, uniprots: list = None, uniprot_set: str = None, thresh: str = '100 uM',
         n_jobs: int = 1, method: str = 'mean', binarise=False, **kwargs):
-        """This docstring is replaced outside this method."""
+        """This docstring is must be populated by calling PIDGIN.set_docstring() first."""
         # Make sure something is selected
         self.uniprot = uniprot if uniprot != 'None' else None
         self.uniprots = uniprots if uniprots is not None else []
@@ -107,8 +119,6 @@ class PIDGIN:
             self.agg = np.mean
             assert len(self.ghost_thresholds) == len(self.models), "Mismatch between models and thresholds"
 
-    setattr(__init__, '__doc__', init_docstring)
-
     def score(self, smiles: list, **kwargs):
         """
         Calculate scores for an sklearn model given a list of SMILES, if a smiles is abberant or invalid,
@@ -153,9 +163,3 @@ class PIDGIN:
     def __call__(self, smiles: list, **kwargs):
         logger.warning("__call__() will be deprecated in future versions, please use score() instead.")
         return self.score(smiles=smiles)
-
-    
-
-    
-
-
