@@ -14,8 +14,8 @@
     - https://chemrxiv.org/engage/api-gateway/chemrxiv/assets/orp/resource/item/628c60215d9485a206cc8ecc/original/vs-flow-an-open-source-ligand-based-virtual-screening-tool.pdf 
   - Implement pareto pair and pareto fronts
   - Applicability domain filters
-  - Implement PIDGIN models
   - AttentiveFP
+  - PIDGIN is causing hanging on import -> move to @property in class?
 
 - Scoring functions
   - Move __call__() to score()
