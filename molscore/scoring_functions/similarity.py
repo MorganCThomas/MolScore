@@ -24,7 +24,7 @@ class MolecularSimilarity:
     return_metrics = ['Sim']
 
     def __init__(self, prefix: str, ref_smiles: Union[list, os.PathLike],
-                 fp: str = 'ECFP4', bits: int = 1024, similarity_measure: str = 'Tanimoto', method: str = 'mean',
+                 fp: str = 'ECFP4', bits: int = 1024, similarity_measure: str = 'Tanimoto',  thresh: float = None, method: str = 'mean',
                  n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
@@ -40,6 +40,7 @@ class MolecularSimilarity:
         assert method in ['max', 'mean']
         self.fp = fp
         self.similarity_measure = similarity_measure
+        self.thresh = thresh
         self.method = method
         self.nBits = bits
         self.n_jobs = n_jobs
@@ -62,7 +63,7 @@ class MolecularSimilarity:
         self.ref_fps = [Fingerprints.get(mol, self.fp, self.nBits, asarray=False) for mol in self.ref_mols]
 
     @staticmethod
-    def calculate_sim(smi: str, ref_fps: np.ndarray, fp: int, nBits: int, similarity_measure: str, method: str):
+    def calculate_sim(smi: str, ref_fps: np.ndarray, fp: int, nBits: int, similarity_measure: str, thresh: float, method: str):
         """
         Calculate the Tanimoto coefficient given a SMILES string and list of
          reference fps
@@ -71,6 +72,7 @@ class MolecularSimilarity:
         :param fp: Type of fingerprint used to featurize the molecule
         :param nBits: Number of Morgan fingerprint bits
         :param similarity_measure: Type of measurement used to calculate similarity
+        :param thresh: If provided check if similarity is above threshold binarising the similarity coefficients
         :param method: 'mean' or 'max'
         :return: (SMILES, Tanimoto coefficient)
         """
@@ -80,11 +82,13 @@ class MolecularSimilarity:
         if mol is not None:
             fp = Fingerprints.get(mol, fp, nBits, asarray=False)
             sim_vec = similarity_measure(fp, ref_fps)
+            if thresh:
+                sim_vec = [sim >= thresh for sim in sim_vec]
 
             if method == 'mean':
-                sim = np.mean(sim_vec)
+                sim = float(np.mean(sim_vec))
             elif method == 'max':
-                sim = np.max(sim_vec)
+                sim = float(np.max(sim_vec))
             else:
                 sim = 0.0
         else:
@@ -100,7 +104,7 @@ class MolecularSimilarity:
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
         with Pool(self.n_jobs) as pool:
-            calculate_sim_p = partial(self.calculate_sim, ref_fps=self.ref_fps, fp=self.fp, nBits=self.nBits, similarity_measure=self.similarity_measure, method=self.method)
+            calculate_sim_p = partial(self.calculate_sim, ref_fps=self.ref_fps, fp=self.fp, nBits=self.nBits, thresh=self.thresh, similarity_measure=self.similarity_measure, method=self.method)
             results = [{'smiles': smi, f'{self.prefix}_Sim': sim} for smi, sim in pool.imap(calculate_sim_p, smiles)]
         return results
 
