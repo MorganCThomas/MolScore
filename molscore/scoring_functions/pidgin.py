@@ -85,10 +85,12 @@ class PIDGIN():
         self.agg = getattr(np, method)
         self.binarise = binarise
         # Curate uniprot set
+        self.pidgin_record_id = self.get_pidgin_record_id()
+        self.groups = self.get_uniprot_groups()
         if self.uniprot:
-            self.uniprots += self.uniprot
+            self.uniprots += [self.uniprot]
         if self.uniprot_set:
-            self.uniprots += self.uniprot_groups[self.uniprot_set]
+            self.uniprots += self.groups[self.uniprot_set]
         # De-duplicate
         self.uniprots = list(set(self.uniprots))
 
