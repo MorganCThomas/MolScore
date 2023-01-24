@@ -1,1 +1,9 @@
 *__pycache__*
+**viz.html
+**.ipynb_checkpoints
+.idea
+.vscode
+build
+dist
+**.egg-info
+**generative_models
