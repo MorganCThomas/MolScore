@@ -1,5 +1,5 @@
 from molscore.utils.transformation_functions import raw, norm, step, gauss, lin_thresh
-from molscore.utils.aggregation_functions import single, wsum, gmean, amean, ParetoFront
+from molscore.utils.aggregation_functions import single, wsum, gmean, amean, ParetoFront, DynamicSum
 
 all_score_modifiers = [
     raw,
@@ -14,5 +14,6 @@ all_score_methods = [
     amean,
     gmean,
     wsum,
-    ParetoFront.pareto_front
+    DynamicSum.dynamic_wsum,
+    ParetoFront.pareto_front,
 ]

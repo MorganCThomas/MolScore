@@ -28,6 +28,34 @@ def wsum(x, w, **kwargs):
     return sum(y)
 
 
+class DynamicSum:
+    """
+    Weight sum according to DrugEx v2
+    https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9
+    """
+    X = None
+    
+    @classmethod
+    def dynamic_wsum(cls, x, X: np.ndarray, thresh: int = 0.5, **kwargs):
+        """
+        Dynamic weights based on intra feature scores from 'DrugEx v2 - de novo design of drug molecules by 
+            Pareto-based multi-objective reinforcement learning in polypharmacology'
+        :param x: Vector of scores
+        :param X: Scores for all molecules within a batch
+        :return: Aggregate score bound between [0, 1]
+        """
+        # Update class to avoid computing weights every query x in the same batch
+        if (cls.X is None) or (cls.X != X).any():
+            cls.X = X
+        # Compute weights as ratio of below threshold / above threshold for each feature
+        w = np.mean(X < thresh, axis=0) / np.mean(X >= thresh, axis=0)
+        # Normalize
+        w = w / w.sum()
+        # Score
+        y = x.dot(w)
+        return y
+
+
 def gmean(x, **kwargs):
     """
     Geometric mean

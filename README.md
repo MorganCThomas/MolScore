@@ -59,6 +59,7 @@ This code here was in the following publications:
   * Arithmetic mean
   * Geometric mean
   * Weighted sum
+  * [Dynamic weighted sum](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
   * [Pareto Front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
   
 * Filters
