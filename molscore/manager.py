@@ -358,7 +358,11 @@ class MolScore:
 
         # Compute final score (df not used by mpo_method except for Pareto pair [not implemented])
         df[self.configs['scoring']['method']] = df.loc[:, mpo_columns['names']].apply(
-            lambda x: self.mpo_method(X=x, W=mpo_columns['weights'], df=self.main_df), axis=1
+            lambda x: self.mpo_method(
+                x=x,
+                w=mpo_columns['weights'],
+                X=df.loc[:, mpo_columns['names']].to_numpy()),
+            axis=1
         )
 
         return df
