@@ -30,21 +30,24 @@ This code here was in the following publications:
     * Glide docking \[licence required]
     * Glide docking from a ROCS overlay \[licence required]
     * Smina docking \[open-source]
-    * Openeye-FRED docking (not tested) \[licence required]
-    * GOLD (coming soon ...)
-    * PLANTS (coming soon ...)
+    * Openeye-FRED docking \[licence required]
+    * GOLD \[license required]
+    * PLANTS \[license required]
   * Shape
     * ROCS shape overlay \[licence required]
+    * Open 3D align \[open-source]
   * Ligand preparation
     * RDKit stereoenumeration and Epik \[licence required]
     * Moka and Corina \[licence required]
     * Ligprep \[licence required]
     * Gypsum-DL \[open-source]
-  * Scikit-learn classification models 
+  * Scikit-learn classification models (including pre-trained RF classifiers for ~2,300 ChEMBL31 targets PIDGINv5) 
   * Substructure matches
   * Substructure filters
   * Fingerprint similarity
   * RDKit Descriptors
+  * [Retrosynthetic accessability score](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc05401a)
+  * [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)
   
 * Score modifiers
   * Linear transformation
@@ -56,7 +59,7 @@ This code here was in the following publications:
   * Arithmetic mean
   * Geometric mean
   * Weighted sum
-  * [Pareto pairs](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00517) (coming soon ...)
+  * [Pareto Front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
   
 * Filters
   * Unique
