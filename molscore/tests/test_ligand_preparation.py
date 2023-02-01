@@ -10,8 +10,14 @@ from molscore.scoring_functions._ligand_preparation import LigPrep, Epik, Moka, 
 
 class TestLigPrep(BaseTests.TestLigandPreparation):
     def setUp(self):
+            # Check installation
             if not ('SCHRODINGER' in list(os.environ.keys())):
-                self.skipTest('Schrodinger installation not found')
+                raise unittest.SkipTest('Schrodinger installation not found')
+            # Check license
+            license_check = subprocess.run("$SCHRODINGER/licadmin STAT", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode().split("\n")
+            for line in license_check:
+                if 'Error getting status:' in line:
+                    raise unittest.SkipTest(line)
             mg = MockGenerator(seed_no=123)
             self.obj = LigPrep
             logger = logging.getLogger('test')
@@ -30,8 +36,14 @@ class TestLigPrep(BaseTests.TestLigandPreparation):
 
 class TestEpik(BaseTests.TestLigandPreparation):
     def setUp(self):
+            # Check installation
             if not 'SCHRODINGER' in list(os.environ.keys()):
-                    self.skipTest('Schrodinger installation not found')
+                    raise unittest.SkipTest('Schrodinger installation not found')
+            # Check license
+            license_check = subprocess.run("$SCHRODINGER/licadmin STAT", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode().split("\n")
+            for line in license_check:
+                if 'Error getting status:' in line:
+                    raise unittest.SkipTest(line)
             mg = MockGenerator(seed_no=123)
             self.obj = Epik
             logger = logging.getLogger('test')
@@ -50,10 +62,11 @@ class TestEpik(BaseTests.TestLigandPreparation):
 
 class TestMoka(BaseTests.TestLigandPreparation):
     def setUp(self):
+            # Check installation
             moka_env = subprocess.run(args=['which', 'blabber_sd'], stdout=subprocess.PIPE).stdout.decode().strip('\n')
             corina_env = subprocess.run(args=['which', 'corina'], stdout=subprocess.PIPE).stdout.decode().strip('\n')
             if (moka_env == '') or (corina_env == ''):
-                self.skipTest('Moka or Corina installation not found')
+                raise unittest.SkipTest('Moka or Corina installation not found')
             mg = MockGenerator(seed_no=123)
             self.obj = Moka
             logger = logging.getLogger('test')
