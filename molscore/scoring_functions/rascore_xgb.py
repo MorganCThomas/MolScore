@@ -1,17 +1,22 @@
 """
 Adapted from https://github.com/reymond-group/RAscore published https://doi.org/10.1039/d0sc05401a
 """
-
-import os
+import logging
 import numpy as np
 import pickle as pkl
-import importlib_resources as resources
+from importlib import resources
 from multiprocessing import Pool
 
 
-from rdkit import Chem, DataStructs
+from rdkit import Chem
 from rdkit.Chem import AllChem
-from rdkit.DataStructs import cDataStructs
+
+logger = logging.getLogger('rascore_xgb')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+logger.addHandler(ch)
 
 
 class RAScore_XGB:
@@ -65,7 +70,7 @@ class RAScore_XGB:
         else:
             return None
 
-    def __call__(self, smiles: list, **kwargs):
+    def score(self, smiles: list, **kwargs):
         """
         Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
         should return 0.0
@@ -86,3 +91,15 @@ class RAScore_XGB:
             results[i].update({f'{self.prefix}_pred_proba': prob})
 
         return results
+
+    def __call__(self, smiles: list, **kwargs):
+        """
+        Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
+        should return 0.0
+
+        :param smiles: List of SMILES strings
+        :param kwargs: Ignored
+        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        """
+        logger.warning("__call__() will be deprecated in future versions, please use score() instead.")
+        return self.score(smiles=smiles)
