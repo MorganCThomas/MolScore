@@ -18,18 +18,10 @@ def fcd_statistics(SMILES, n_jobs, gpu, out, canonicalize=False):
     :return:
     """
     print('Building model')
-    fcd = FCD(device=f'cuda:{gpu}', n_jobs=n_jobs, canonize=False)
+    fcd = FCD(device=f'cuda:{gpu}', n_jobs=n_jobs, canonize=canonicalize)
 
-    if canonicalize:
-        can_SMILES = []
-        for smi in SMILES:
-            if Chem.MolFromSmiles(smi):
-                can_SMILES.append(Chem.MolToSmiles(Chem.MolFromSmiles(smi)))
-        print('Calculating FCD')
-        results = fcd.precalc(can_SMILES)
-    else:
-        print('Calculating FCD')
-        results = fcd.precalc(SMILES)
+    print('Calculating FCD')
+    results = fcd.precalc(SMILES)
 
     print('Saving pre-statistics')
     if not os.path.exists(os.path.dirname(out)):
