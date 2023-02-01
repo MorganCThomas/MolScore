@@ -1,8 +1,8 @@
+import warnings
 try:
-    from rdkit import Chem
+    from rdkit.Chem import AllChem as Chem
     _rdkit_available = True
 except ImportError as e:
-    import warnings
     warnings.warn("RDKit is not installed. Canonization won't work.\n"
                   "Original Import Error below:\n" + str(e))
     _rdkit_available = False
@@ -96,7 +96,7 @@ class SmilesDataset(Dataset):
 
     def __init__(self, smiles_list, canonize=True):
         super().__init__()
-        self.smiles_list = smiles_list
+        self.smiles_list = []
         self.canonize = canonize
         if not _rdkit_available and canonize:
             raise ValueError("Can't canonize SMILES without installed RDKit")
@@ -107,8 +107,9 @@ class SmilesDataset(Dataset):
                 mol = Chem.MolFromSmiles(smi)
                 if mol:
                     self.smiles_list.append(Chem.MolToSmiles(mol))
-                if len(self.smiles_list) < len(smiles_list):
-                    warnings.warn(f"{len(smiles_list) - len(self.smiles)} invalid smiles will be ignored")
+            if len(self.smiles_list) < len(smiles_list):
+                msg = f"{len(smiles_list) - len(self.smiles_list)} invalid smiles will be ignored"
+                warnings.warn(msg)
         else:
             self.smiles_list = smiles_list
         # ----
