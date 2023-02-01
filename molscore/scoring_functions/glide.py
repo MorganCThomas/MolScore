@@ -6,10 +6,8 @@ import logging
 from typing import Union
 from tempfile import TemporaryDirectory
 
-from openeye import oechem
 from rdkit.Chem import AllChem as Chem
 
-from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
@@ -315,120 +313,6 @@ class GlideDock:
         assert len(smiles) == len(self.docking_results)
 
         return self.docking_results
-
-
-class GlideDockFromROCS(GlideDock, ROCS):
-    """
-    Score structures based on Glide docking score with LigPrep ligand preparation,
-     but using ROCS to align to a reference molecule and score in place
-    """
-    return_metrics = GlideDock.return_metrics + ROCS.return_metrics
-
-    def __init__(self, prefix: str, glide_template: os.PathLike, ref_file: os.PathLike, cluster: str = None,
-                 timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
-        """
-        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param glide_template: Path to a template docking file (.in)
-        :param ref_file: Path to reference file to overlay query to (.pdb)
-        :param cluster: Address to Dask scheduler for parallel processing via dask
-        :param timeout: Timeout (seconds) before killing an individual docking simulation
-        :param ligand_preparation: Whether to use 'ligprep' with limited default functionality, or 'epik' to protonate
-        only the most probable state
-        :param kwargs:
-        """
-        GlideDock.__init__(self, prefix=prefix, glide_template=glide_template, cluster=cluster, timeout=timeout,
-                           ligand_preparation=ligand_preparation)
-        ROCS.__init__(self, prefix=prefix, ref_file=ref_file)
-
-        self.prefix = prefix.replace(" ", "")
-        # Make sure glide template contains 'mininplace' method
-        self.glide_options = self.modify_glide_in(self.glide_options, 'DOCKING_METHOD', 'mininplace')
-
-    def __call__(self, smiles: list, directory: str, file_names: list, **kwargs):
-        """
-        Calculate scores for GlideDockFromROCS based on a list of SMILES
-        :param smiles: List of SMILES strings
-        :param directory: Directory to save files and logs into
-        :param file_names: List of corresponding file names for SMILES to match files to index
-        :param kwargs: Ignored
-        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
-        """
-
-        # Assign some attributes
-        step = file_names[0].split("_")[0]  # Assume first Prefix is step
-        self.directory = os.path.join(os.path.abspath(directory), 'GlideDock', step)
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
-        self.file_names = file_names
-        self.docking_results = []
-
-        # Add logging file handler
-        fh = logging.FileHandler(os.path.join(self.directory, f'{step}_log.txt'))
-        fh.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-
-        # Refresh Dask every few hundred iterations
-        if self.cluster is not None:
-            if int(step) % 250 == 0:
-                self.client.restart()
-
-        # Prepare ligands
-        self.prepare(smiles)
-
-        # Read sdf files and run ROCS and write for docking
-        results = []
-        rocs_results = {}
-        self.variants = {name: [] for name in self.file_names}
-        for name in self.file_names:
-            out_file = os.path.join(self.directory, f'{name}_ligprep.sdf')
-            if os.path.exists(out_file):
-                supp = Chem.rdmolfiles.ForwardSDMolSupplier(os.path.join(self.directory, f'{name}_ligprep.sdf'))
-                for mol in supp:
-                    if mol:
-                        variant = mol.GetPropsAsDict()['s_lp_Variant'].split("-")[1]
-                        self.variants[name].append(variant)
-                        self.setup_smi(Chem.MolToSmiles(mol, isomericSmiles=True))
-                        self.run_omega()
-
-                        # Hack to catch 'valid molecules' that have no coordinates after omega init
-                        if len(self.fitmol.GetCoords()) == 0:
-                            rocs_results[f'{name}_{variant}'] = {f'{self.prefix}_{m}': 0.0 for m in self.rocs_metrics}
-                            continue
-
-                        # Run ROCS and write each variants best overlay
-                        self.run_ROCS()
-                        rocs_results[f'{name}_{variant}'] = {m: getattr(self.rocs_results, m)()
-                                                             for m in self.rocs_metrics}
-                        self.get_best_overlay()
-                        ofs = oechem.oemolostream(os.path.join(self.directory, f'{name}-{variant}_ligprep.sdf'))
-                        if oechem.OEAddExplicitHydrogens(self.best_overlay):
-                            oechem.OEWriteMolecule(ofs, self.best_overlay)
-                        ofs.close()
-                        logger.debug(f'Split and aligned {name} -> {name}-{variant}')
-
-        self.run_glide()
-        best_variants = self.get_docking_scores(smiles, return_best_variant=True)
-        for result, best_variant in zip(self.docking_results, best_variants):
-            result.update(rocs_results[best_variant])
-            results.append(result)
-
-        # Cleanup
-        self.remove_files(keep=best_variants, parallel=True)
-        fh.close()
-        logger.removeHandler(fh)
-        self.directory = None
-        self.file_names = None
-        self.variants = None
-        self.fitmol = None
-        self.rocs_results = None
-        self.best_overlay = None
-        self.docking_results = None
-
-        # Check
-        assert len(smiles) == len(results)
-        return results
 
 
 #class GlideDockFromGlide(GlideDock):
