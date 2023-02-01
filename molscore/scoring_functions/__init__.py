@@ -50,7 +50,7 @@ try:
     from molscore.scoring_functions.chemprop import ChemPropModel
     all_scoring_functions += [ChemPropModel]
 except ImportError as e:
-    print(f"{e}\nTo use ChemProp please install the relevant version of PyTorch")
+    print(f"{e}\nTo use ChemProp please install the relevant version of PyTorch and ChemProp")
 
 # ----- To load the classical DRD2 test case requires an old version of Scikit-learn
 #from molscore.scoring_functions.reinvent_svm import ActivityModel
