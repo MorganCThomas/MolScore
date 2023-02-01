@@ -1,9 +1,15 @@
 from molscore.scoring_functions.glide import GlideDock, GlideDockFromROCS
+from molscore.scoring_functions.plants import PLANTSDock
+from molscore.scoring_functions.gold import GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
 from molscore.scoring_functions.smina import SminaDock
 from molscore.scoring_functions.rocs import ROCS
-from molscore.scoring_functions.oedock import FRED
+from molscore.scoring_functions.oedock import OEDock
 from molscore.scoring_functions.similarity import MolecularSimilarity, TanimotoSimilarity
+from molscore.scoring_functions.applicability_domain import ApplicabilityDomain
+from molscore.scoring_functions.external_server import POSTServer
+from molscore.scoring_functions.align3d import Align3D
 #from molscore.scoring_functions.reinvent_svm import ActivityModel
+from molscore.scoring_functions.pidgin import PIDGIN
 from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors
 from molscore.scoring_functions.isomer import Isomer
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
@@ -17,16 +23,26 @@ all_scoring_functions = [
     TanimotoSimilarity, # Back compatability
     MolecularDescriptors,
     RDKitDescriptors, # Back compatability
+    ApplicabilityDomain,
     Isomer,
     SubstructureFilters,
     SubstructureMatch,
     SKLearnModel,
     EnsembleSKLearnModel,
+    POSTServer,
+    PIDGIN,
     RAScore_XGB,
     ROCS,
+    Align3D,
     GlideDock,
     GlideDockFromROCS,
     SminaDock,
-    FRED
+    PLANTSDock,
+    GOLDDock,
+    ChemPLPGOLDDock,
+    ASPGOLDDock,
+    ChemScoreGOLDDock,
+    GoldScoreGOLDDock,
+    OEDock
 #    ChemPropModel
 ]

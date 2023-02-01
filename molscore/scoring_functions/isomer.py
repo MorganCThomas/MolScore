@@ -1,8 +1,9 @@
 import re
 from rdkit.Chem import Descriptors, QED, Crippen, GetPeriodicTable
 from rdkit.Chem import AllChem as Chem
+from scipy.stats import gmean
+
 from molscore.utils.transformation_functions import gauss
-from molscore.utils.aggregation_functions import gmean
 
 
 class Isomer:
@@ -83,7 +84,7 @@ class Isomer:
 
 
 if __name__ == '__main__':
-    from molscore.test import MockGenerator
+    from molscore.tests import MockGenerator
     mg = MockGenerator()
     iso = Isomer('C12H24', 'C12H24')
     iso(mg.sample(5))

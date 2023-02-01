@@ -249,6 +249,7 @@ def getsfconfig(key_i=0):
         # Get (class/function) from name ...
         sf_obj = [s for s in scoring_functions.all_scoring_functions if s.__name__ == sf_config['name']][0]
         # Write doc of class (not instance)
+        if sf_config['name'] == 'PIDGIN': sf_obj.set_docstring() # Populate PIDGIN docstring which takes a few seconds
         sf_doc = inspect.getdoc(sf_obj)
         if sf_doc is not None:
             st.write(sf_doc)
@@ -456,7 +457,7 @@ with col1:
             os.makedirs(os.path.dirname(out_file))
             st.write('Creating directory')
         with open(out_file, 'w') as f:
-            json.dump(config, f)
+            json.dump(config, f, indent=2)
             st.write('File saved')
 with col2:
     if st.button(label='Exit'):

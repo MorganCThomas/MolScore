@@ -77,9 +77,10 @@ class GetMosesMetrics(object):
         self.train = train
         self.target = target
         # Clean up if necessary
+        print('Cleaning up reference smiles')
         for att in ['test', 'test_scaffolds', 'target', 'train']:
             if getattr(self, att) is not None:
-                setattr(self, att, remove_invalid(getattr(self, att), canonize=True))
+                setattr(self, att, remove_invalid(getattr(self, att), canonize=True, n_jobs=self.n_jobs))
         # FCD pre-statistics
         self.ptest = ptest
         self.ptest_scaffolds = ptest_scaffolds
@@ -100,7 +101,7 @@ class GetMosesMetrics(object):
                 self.close_pool = True
             else:
                 self.pool = 1
-        self.kwargs = {'n_jobs': 1, 'device': self.device, 'batch_size': self.batch_size}
+        self.kwargs = {'n_jobs': self.n_jobs, 'device': self.device, 'batch_size': self.batch_size}
         self.kwargs_fcd = {'n_jobs': self.n_jobs, 'device': self.device, 'batch_size': self.batch_size,
                            'canonize': False}
 
@@ -121,25 +122,28 @@ class GetMosesMetrics(object):
                                                               device=self.device, batch_size=self.batch_size,
                                                               pool=self.pool)
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, verbose=False):
         metrics = {}
         metrics['#'] = len(gen)
 
         # Calculate validity
+        if verbose: print("Calculating Validity")
         if calc_valid:
             metrics['Validity'] = fraction_valid(gen, self.pool)
 
-        gen = remove_invalid(gen, canonize=True)
+        gen = remove_invalid(gen, canonize=True, n_jobs=self.n_jobs)
         #mols = mapper(self.pool)(get_mol, gen)
         metrics['# valid'] = len(gen)
 
         # Calculate Uniqueness
+        if verbose: print("Calculating Uniqueness")
         if calc_unique:
             metrics['Uniqueness'] = fraction_unique(gen=gen, k=None, n_jobs=self.pool)
             if unique_k is not None:
                 metrics[f'Unique@{unique_k/1000:.0f}k'] = fraction_unique(gen=gen, k=unique_k, n_jobs=self.pool)
 
         # Now subset only unique molecules
+        if verbose: print("Computing pre-statistics")
         gen = list(set(gen))
         mols = mapper(self.pool)(get_mol, gen)
         # Precalculate some things
@@ -152,8 +156,10 @@ class GetMosesMetrics(object):
         metrics['# valid & unique'] = len(gen)
 
         # Calculate diversity related metrics
+        if verbose: print("Calculating Novelty")
         if self.train is not None:
             metrics['Novelty'] = novelty(gen, self.train, self.pool)
+        if verbose: print("Calculating Diversity")
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
         metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
@@ -166,9 +172,11 @@ class GetMosesMetrics(object):
         metrics['FG'] = len(list(fgs.keys()))/len(gen)
         metrics['RS'] = len(list(rss.keys()))/len(gen)
         # Calculate % pass filters
+        if verbose: print("Calculating Filters")
         metrics['Filters'] = fraction_passes_filters(mols, self.pool)
 
         # Calculate FCD
+        if verbose: print("Calculating FCD")
         pgen = FCDMetric(**self.kwargs_fcd).precalc(gen)
         if self.ptrain:
             metrics['FCD_train'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptrain)
@@ -181,6 +189,7 @@ class GetMosesMetrics(object):
 
         # Test metrics
         if self.test_int is not None:
+            if verbose: print("Calculating Test metrics")
             metrics['Novelty_test'] = novelty(gen, self.test, self.pool)
             metrics['AnalogueSimilarity_test'], metrics['AnalogueCoverage_test'] = \
                 FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'])
@@ -198,12 +207,14 @@ class GetMosesMetrics(object):
 
         # Test scaff metrics
         if self.test_scaffolds_int is not None:
+            if verbose: print("Calculating Scaff metrics")
             metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
             metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
             metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
 
         # Target metrics
         if self.target_int is not None:
+            if verbose: print("Calculating Target metrics")
             metrics['Novelty_target'] = novelty(gen, self.target, self.pool)
             metrics['AnalogueSimilarity_target'], metrics['AnalogueCoverage_target'] = \
                 FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'])
@@ -230,7 +241,7 @@ class GetMosesMetrics(object):
             for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
                 metrics[f'{name}_test'] = self.target_int[name]['values']
 
-        gen = remove_invalid(gen, canonize=True)
+        gen = remove_invalid(gen, canonize=True, n_jobs=self.n_jobs)
         gen = list(set(gen))
         mols = mapper(self.pool)(get_mol, gen)
         for name, func in [('logP', logP),

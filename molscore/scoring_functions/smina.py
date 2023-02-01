@@ -9,17 +9,15 @@ As well as pyscreener,
 import os
 import logging
 import glob
+from typing import Union
 from itertools import takewhile
-from dask.distributed import Client
+from tempfile import TemporaryDirectory
 
-from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
-from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
-from molscore.utils.gypsum_dl.MolContainer import MolContainer
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 from rdkit import Chem
 
-from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 
 logger = logging.getLogger('smina')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -36,26 +34,36 @@ class SminaDock:
     return_metrics = ['docking_score', 'best_variant']
 
     def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cpus: int = 1,
-                 cluster: str = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
+                 cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param receptor: Path to receptor file (.pdbqt)
-        :param ref_ligand: Path to ligand file for autobox generation (.sdf/.pdb)
+        :param receptor: Path to receptor file (.pdb, .pdbqt)
+        :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cpus: Number of Smina CPUs to use per simulation
-        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         """
+        # If receptor is pdb, convert
+        if receptor.endswith('.pdb'):
+            pdbqt_receptor = receptor.replace('.pdb', '.pdbqt')
+            self.subprocess.run(cmd=f"obabel {receptor} -O {pdbqt_receptor}")
+            receptor = pdbqt_receptor
+        
+        # Specify class attributes
         self.prefix = prefix.replace(" ", "_")
         self.receptor = os.path.abspath(receptor)
         self.ref = os.path.abspath(ref_ligand)
         self.file_names = None
         self.variants = None
         self.cpus = cpus
+        self.timeout = float(timeout)
+        self.temp_dir = TemporaryDirectory()
+
+        # Setup dask
         self.cluster = cluster
-        if self.cluster is not None:
-            self.client = Client(self.cluster)
-        self.timeout = timeout
+        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        if self.client is None: self.cluster = None
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
@@ -82,10 +90,11 @@ class SminaDock:
 
         if self.cluster is not None:
             futures = self.client.map(p, smina_commands)
-            _ = self.client.gather(futures)
+            results = self.client.gather(futures)
         else:
-            _ = [p(command) for command in smina_commands]
+            results = [p(command) for command in smina_commands]
         logger.debug('Smina finished')
+        _ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
         return log_paths
 
     @staticmethod

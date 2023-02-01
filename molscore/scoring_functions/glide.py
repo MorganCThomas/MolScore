@@ -3,16 +3,15 @@ import os
 import glob
 import gzip
 import logging
-import subprocess
+from typing import Union
+from tempfile import TemporaryDirectory
 
 from openeye import oechem
-from dask.distributed import Client
 from rdkit.Chem import AllChem as Chem
-from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
 
 from molscore.scoring_functions.rocs import ROCS
 from molscore.scoring_functions.descriptors import MolecularDescriptors
-from molscore.scoring_functions.utils import timedSubprocess
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('glide')
@@ -33,12 +32,12 @@ class GlideDock:
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
                       'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
-    def __init__(self, prefix: str, glide_template: os.PathLike, cluster: str = None,
+    def __init__(self, prefix: str, glide_template: os.PathLike, cluster: Union[str, int] = None,
                  timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
-        :param cluster: Address to Dask scheduler for parallel processing via dask
+        :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
         :param kwargs:
@@ -54,11 +53,14 @@ class GlideDock:
         self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
         self.timeout = float(timeout)
-        self.cluster = cluster
-        if self.cluster is not None:
-            self.client = Client(self.cluster)
         self.variants = None
         self.docking_results = None
+        self.temp_dir = TemporaryDirectory()
+
+        # Setup dask
+        self.cluster = cluster
+        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        if self.client is None: self.cluster = None
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
@@ -96,7 +98,7 @@ class GlideDock:
 
     def run_glide(self):
         """
-        Write GLIDE new input files and submit each to Glide
+        Write new input files and submit each to Glide
         """
         glide_commands = []
         for name in self.file_names:
@@ -116,20 +118,21 @@ class GlideDock:
                     [f.write(line) for line in glide_in]
 
                 # Prepare command line command
-                command = self.glide_env + ' -WAIT -NOJOBID -NOLOCAL ' + \
+                command = f'cd {self.temp_dir.name} ; ' + self.glide_env + ' -WAIT -NOJOBID -NOLOCAL ' + \
                           os.path.join(self.directory, f'{name}-{variant}.in')
                 glide_commands.append(command)
 
         # Initialize subprocess
         logger.debug('Glide called')
-        p = timedSubprocess(timeout=self.timeout).run
+        p = timedSubprocess(timeout=self.timeout, shell=True).run
 
         if self.cluster is not None:
             futures = self.client.map(p, glide_commands)
-            _ = self.client.gather(futures)
+            results = self.client.gather(futures)
         else:
-            _ = [p(command) for command in glide_commands]
+            results = [p(command) for command in glide_commands]
         logger.debug('Glide finished')
+        _ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
         return self
 
     def get_docking_scores(self, smiles: list, return_best_variant: bool = False):

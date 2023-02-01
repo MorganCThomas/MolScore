@@ -336,17 +336,20 @@ class GypsumDL(LigandPreparation):
         https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3
         https://durrantlab.pitt.edu/gypsum-dl/
     """
-    def __init__(self, logger=None, n_jobs: int = -1, pH: float = 7.0, pHt: float = 1.0):
+    def __init__(self, dask_client=None, logger=None, pH: float = 7.0, pHt: float = 1.0, **kwargs):
         """
         Initialize LigPrep ligand preparation
-        :param dask_client: Scheduler address for dask parallelization
+        :param dask_client: Scheduler address for dask parallelization or number of workers
         :param timeout: Timeout for subprocess before killing
         :param logger: Currently used logger if present
-        :param n_jobs: Number of multiprocessing cores to use
         :param pH: pH at which to protonate molecules at
         :param pHt: pH Tolerance
         """
         # Note here we use GypsumDL' in-built parallelizer
+        if dask_client is not None:
+            n_jobs = len(dask_client.ncores())
+        else:
+            n_jobs = -1
         super().__init__(logger=logger)
         self.gypsum_params = {
             "source": "",
