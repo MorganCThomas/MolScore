@@ -1,7 +1,6 @@
 import argparse
 import os
 import pickle as pkl
-from rdkit import Chem
 from moleval.metrics.fcd_torch import FCD
 from moleval.metrics.utils import disable_rdkit_log
 
