@@ -1,5 +1,5 @@
 import random
-import importlib_resources as resources
+from importlib import resources
 
 
 class MockGenerator:
