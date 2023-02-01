@@ -4,7 +4,6 @@ import json
 import zipfile
 import logging
 import pickle as pkl
-import pandas as pd
 import numpy as np
 from functools import partial
 from multiprocessing import Pool
@@ -58,6 +57,8 @@ class PIDGIN():
             :param uniprot: Uniprot accession for classifier to use [{', '.join(cls.get_uniprot_list())}]
             :param uniprots: List of uniprot accessions for classifier to use
             :param uniprot_set: Set of uniprots based on protein class (level - name - size) [{', '.join(cls.get_uniprot_groups().keys())}]
+            :param exclude_uniprot: Uniprot to exclude (useful to remove from a uniprot set) [{', '.join(cls.get_uniprot_list())}]
+            :param exclude_uniprots: Uniprot list to exclude (useful to remove from a uniprot set)
             :param thresh: Concentration threshold of classifier [100 uM, 10 uM, 1 uM, 0.1 uM]
             :param method: How to aggregate the positive prediction probabilities accross classifiers [mean, median, max, min]
             :param binarise: Binarise predicted probability and return ratio of actives based on optimal predictive thresholds (GHOST)
@@ -67,12 +68,15 @@ class PIDGIN():
 
     def __init__(
         self, prefix: str, uniprot: str = None, uniprots: list = None, uniprot_set: str = None, thresh: str = '100 uM',
+        exclude_uniprot: str = None, exclude_uniprots: list = None,
         n_jobs: int = 1, method: str = 'mean', binarise=False, **kwargs):
         """This docstring is must be populated by calling PIDGIN.set_docstring() first."""
         # Make sure something is selected
         self.uniprot = uniprot if uniprot != 'None' else None
         self.uniprots = uniprots if uniprots is not None else []
         self.uniprot_set = uniprot_set if uniprot_set != 'None' else None
+        self.exclude_uniprot = exclude_uniprot if exclude_uniprot != 'None' else None
+        self.exclude_uniprots = exclude_uniprots if exclude_uniprots is not None else []
         assert (self.uniprot is not None) or (len(self.uniprots) > 0) or (self.uniprot_set is not None), "Either uniprot, uniprots or uniprot set must be specified"
         # Set other attributes
         self.prefix = prefix.replace(" ", "_")
@@ -91,6 +95,10 @@ class PIDGIN():
             self.uniprots += [self.uniprot]
         if self.uniprot_set:
             self.uniprots += self.groups[self.uniprot_set]
+        if self.exclude_uniprot:
+            self.exclude_uniprots += [self.exclude_uniprot]
+        for uni in self.exclude_uniprots:
+            self.uniprots.remove(uni)
         # De-duplicate
         self.uniprots = list(set(self.uniprots))
 
