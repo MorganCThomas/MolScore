@@ -76,6 +76,9 @@ class GetMetrics(object):
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
                  test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
                  target=None, ptarget=None, run_fcd=True):
+        """
+        Prepare to calculate metrics by declaring reference datasets and running pre-statistics
+        """
         self.n_jobs = n_jobs
         self.device = device
         self.batch_size = batch_size
@@ -130,6 +133,16 @@ class GetMetrics(object):
             if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
     def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, verbose=False):
+        """
+        Calculate metrics for a generate de novo dataset
+        :param gen: List of de novo generate smiles
+        :param calc_valid: Return validity ratio
+        :param calc_unique: Return unique ratio
+        :param unique_k: Return unique ratio for a subset of size k
+        :param se_k: Sub-sample size for sphere exclusion diversity
+        :param verbose: Print updates
+        """
+        
         metrics = {}
         metrics['#'] = len(gen)
 
