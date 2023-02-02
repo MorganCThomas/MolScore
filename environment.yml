@@ -18,6 +18,7 @@ dependencies:
   - pytorch-mutex=1.0
   - torchaudio=0.13.1
   - torchvision=0.14.1
+  - streamlit=1.17.0
   - pip
   - pip:
     - zenodo-client==0.2.0
