@@ -7,7 +7,7 @@ from molscore.utils.utils import ParetoFrontRank
 from molscore.scoring_functions.utils import Fingerprints
 
 
-def single(x, **kwargs):
+def single(x: np.ndarray, **kwargs):
     """
     Dummy function for single property optimization
     :param x: Vector of scores
@@ -16,16 +16,43 @@ def single(x, **kwargs):
     return x
 
 
-def wsum(x, w, **kwargs):
+def wsum(x: np.ndarray, w: np.ndarray, **kwargs):
     """
     Weighted sum
     :param x: Vector of scores
     :param w: Vector of weights that should sum to 1
     :return: Aggregate score bound between [0, 1]
     """
-    assert sum(w) == 1.0, "Weights must sum to 1"
-    y = [xi*wi for xi, wi in zip(x, w)]
-    return sum(y)
+    assert w.sum() > 0, "Weights must be provided"
+    # Normalize weights
+    w = w / w.sum()
+    # Score
+    y = x.dot(w)
+    return y
+
+
+def prod(x: np.ndarray, **kwargs):
+    """
+    Product
+    :param x: Vector of score
+    :return: Vector product
+    """
+    y = np.prod(x)
+    return y
+
+
+def wprod(x: np.ndarray, w: np.ndarray, **kwargs):
+    """
+    Weighted product
+    :param x: Vector of scores
+    :param w: Vector of weights that should sum to 1
+    :return: Aggregate score bound between [0, 1]
+    """
+    # Compute weighted product
+    y = np.prod(np.power(x, w))
+    # Normalize
+    y = np.power(y, 1/w.sum())
+    return y
 
 
 class DynamicSum:
@@ -35,7 +62,7 @@ class DynamicSum:
     X = None
     
     @classmethod
-    def auto_wsum(cls, x, X: np.ndarray, thresh: int = 0.5, **kwargs):
+    def auto_wsum(cls, x: np.ndarray, X: np.ndarray, thresh: int = 0.5, **kwargs):
         """
         Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9)
         :param x: Vector of scores
@@ -52,9 +79,35 @@ class DynamicSum:
         # Score
         y = x.dot(w)
         return y
+    
+
+class DynamicProd:
+    """
+     Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9) (https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
+    """
+    X = None
+    
+    @classmethod
+    def auto_wprod(cls, x: np.ndarray, X: np.ndarray, thresh: int = 0.5, **kwargs):
+        """
+         Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9)
+        :param x: Vector of scores
+        :param X: Scores for all molecules within a batch
+        :return: Aggregate score bound between [0, 1]
+        """
+        # Update class to avoid computing weights every query x in the same batch
+        if (cls.X is None) or (cls.X != X).any():
+            cls.X = X
+        # Compute weights as ratio of below threshold / above threshold for each feature
+        w = np.mean(X < thresh, axis=0) / np.mean(X >= thresh, axis=0)
+        # Compute weighted product
+        y = np.prod(np.power(x, w))
+        # Normalize
+        y = np.power(y, 1 / w.sum())
+        return y
 
 
-def gmean(x, **kwargs):
+def gmean(x: np.ndarray, **kwargs):
     """
     Geometric mean
     :param x: Vector of scores
@@ -64,7 +117,7 @@ def gmean(x, **kwargs):
     return y
 
 
-def amean(x, **kwargs):
+def amean(x: np.ndarray, **kwargs):
     """
     Arithmetic mean
     :param x: Vector of scores
@@ -73,7 +126,7 @@ def amean(x, **kwargs):
     return stats.mean(x)
 
 
-def pareto_pair(x, X, **kwargs):
+def pareto_pair(x: np.ndarray, X: np.ndarray, **kwargs):
     """
     Inspired from - 'De Novo Drug Design of Targeted Chemical Libraries Based on
     Artificial Intelligence and Pair-Based Multiobjective Optimization'
@@ -132,7 +185,7 @@ class ParetoFront:
     rank = None
 
     @classmethod
-    def pareto_front(cls, x, X: np.ndarray, batch_smiles: list, thresh: float = 0.5, **kwargs):
+    def pareto_front(cls, x: np.ndarray, X: np.ndarray, batch_smiles: list, thresh: float = 0.5, **kwargs):
         """
         Implementation of Pareto Front from 'DrugEx v2' (10.1186/s13321-021-00561-9)
         :param x: Vector of scores

@@ -299,7 +299,7 @@ def getspconfig(options, key_i, tab):
                                         key=f'{key_i}: sp_name')
         if sp_config['name'] is None:
             return
-        with st.expander(label='Weight (only applicable if using wsum)'):
+        with st.expander(label='Weight (only applicable if using wsum or wprod)'):
             sp_config['weight'] = st.number_input(
                 label='weight', value=1.0, key=f'{key_i}: sp_weight'
                 )
