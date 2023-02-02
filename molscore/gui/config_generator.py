@@ -293,9 +293,6 @@ def getspconfig(options, key_i, tab):
     sp_config = {}
     # Do it within a tab
     with tab:
-        # Inset it slightly
-        #col1, col2 = st.columns([1, 9])
-        #with col2:
         sp_config['name'] = st.selectbox(label='Ouput name',
                                         options=options,
                                         index=0,
@@ -347,8 +344,6 @@ def getspconfig(options, key_i, tab):
         except:
             pass
 
-        #col1, col2 = st.columns([1, 9])
-        #with col2:
         st.markdown('**Config format**')
         with st.expander(label='Check parsing'):
             st.write(sp_config)
