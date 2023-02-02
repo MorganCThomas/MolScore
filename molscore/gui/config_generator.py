@@ -288,69 +288,70 @@ def getspconfig(options, key_i, tab):
     :param key_i: Key identifier
     :return: dict
     """
+    # TODO undo col and change parameters for range/min/max to only those available
     global ss
     sp_config = {}
     # Do it within a tab
     with tab:
         # Inset it slightly
-        col1, col2 = st.columns([1, 9])
-        with col2:
-            sp_config['name'] = st.selectbox(label='Ouput name',
-                                            options=options,
+        #col1, col2 = st.columns([1, 9])
+        #with col2:
+        sp_config['name'] = st.selectbox(label='Ouput name',
+                                        options=options,
+                                        index=0,
+                                        key=f'{key_i}: sp_name')
+        if sp_config['name'] is None:
+            return
+        with st.expander(label='Weight (only applicable if using wsum)'):
+            sp_config['weight'] = st.number_input(
+                label='weight', value=1.0, key=f'{key_i}: sp_weight'
+                )
+        # Get (class/function) for transformation/modification from name and print doc ...
+        sp_config['modifier'] = st.selectbox(label='Modifier',
+                                            options=[m.__name__ for m in utils.all_score_modifiers],
                                             index=0,
-                                            key=f'{key_i}: sp_name')
-            if sp_config['name'] is None:
-                return
-            with st.expander(label='Weight (only applicable if using wsum)'):
-                sp_config['weight'] = st.number_input(
-                    label='weight', value=1.0, key=f'{key_i}: sp_weight'
-                    )
-            # Get (class/function) for transformation/modification from name and print doc ...
-            sp_config['modifier'] = st.selectbox(label='Modifier',
-                                                options=[m.__name__ for m in utils.all_score_modifiers],
-                                                index=0,
-                                                key=f'{key_i}: sp_modifier')
-            smod_obj = [m for m in utils.all_score_modifiers if m.__name__ == sp_config['modifier']][0]
-            # Write doc for func
-            smod_doc = inspect.getdoc(smod_obj).split(':')[0]
-            st.markdown('**Description**')
-            if smod_doc is not None:
-                st.write(smod_doc)
-            else:
-                st.write('No documentation')
+                                            key=f'{key_i}: sp_modifier')
+        smod_obj = [m for m in utils.all_score_modifiers if m.__name__ == sp_config['modifier']][0]
+        # Write doc for func
+        smod_doc = inspect.getdoc(smod_obj).split(':')[0]
+        st.markdown('**Description**')
+        if smod_doc is not None:
+            st.write(smod_doc)
+        else:
+            st.write('No documentation')
 
-            # If norm, optional specification of max/min
-            st.markdown('**Parameters**')
-            if smod_obj.__name__ == 'norm':
-                # Buttons
-                if st.button(label='Specify max/min') or ss.maxmin:
-                    ss.maxmin = True
-                if st.button(label='Don\'t specify max/min') or not ss.maxmin:
-                    ss.maxmin = False
-                # Grab parameters and plot
-                if ss.maxmin:
-                    sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
-                else:
-                    sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x', 'max', 'min'])
-
-            # Otherwise just do it
-            else:
+        # If norm, optional specification of max/min
+        st.markdown('**Parameters**')
+        if smod_obj.__name__ == 'norm':
+            # Buttons
+            if st.button(label='Specify max/min') or ss.maxmin:
+                ss.maxmin = True
+            if st.button(label='Don\'t specify max/min') or not ss.maxmin:
+                ss.maxmin = False
+            # Grab parameters and plot
+            if ss.maxmin:
                 sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
+            else:
+                sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x', 'max', 'min'])
 
-        col1, col2, col3 = st.columns([1, 0.5, 1])
+        # Otherwise just do it
+        else:
+            sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
+
+        col1, col2, col3 = st.columns([1, 1, 1])
         try:
-            with col2:
+            with col1:
                 st.write('Example')
-            with col3:
+            with col2:
                 st.write(utils.transformation_functions.plot_mod(smod_obj, sp_config['parameters']))
         except:
             pass
 
-        col1, col2 = st.columns([1, 9])
-        with col2:
-            st.markdown('**Config format**')
-            with st.expander(label='Check parsing'):
-                st.write(sp_config)
+        #col1, col2 = st.columns([1, 9])
+        #with col2:
+        st.markdown('**Config format**')
+        with st.expander(label='Check parsing'):
+            st.write(sp_config)
     return sp_config
 
 
