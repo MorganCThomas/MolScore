@@ -10,10 +10,10 @@ from Levenshtein import distance as levenshtein
 
 from rdkit import Chem, SimDivFilters, DataStructs
 from rdkit.Chem import AllChem, rdMolDescriptors, rdmolops, Scaffolds
+from rdkit.Chem.MolStandardize import Standardizer
 from rdkit.Avalon import pyAvalonTools
 from rdkit.ML.Cluster import Butina
 from rdkit import rdBase
-from molvs.standardize import Standardizer
 
 
 from moleval.metrics.metrics_utils import mol_passes_filters
