@@ -15,7 +15,6 @@ from rdkit.Avalon import pyAvalonTools
 from rdkit.ML.Cluster import Butina
 from rdkit import rdBase
 
-
 from moleval.metrics.metrics_utils import mol_passes_filters
 
 

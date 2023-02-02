@@ -19,54 +19,63 @@ from moleval.metrics.metrics_utils import compute_fragments, average_agg_tanimot
     get_mol, canonic_smiles, mol_passes_filters, analogues_tanimoto, compute_functional_groups, compute_ring_systems
 
 
-# Modify this function so that it doesn't depend on metrics dataset
-class GetMosesMetrics(object):
+class GetMetrics(object):
     """
-        Computes all available metrics between test (scaffold test)
-        and generated sets of SMILES.
-        Parameters:
-            gen: list of generated SMILES
-            n: Chunk size to calculate intermediate statistics
-            n_col: Alternatively column name of batch/step variable e.g. "step"
-            n_jobs: number of workers for parallel processing
-            device: 'cpu' or 'cuda:n', where n is GPU device number
-            batch_size: batch size for FCD metric
-            pool: optional multiprocessing pool to use for parallelization
-            test (None or list): test SMILES. If None, will not compare to test statistics
-            test_scaffolds (None or list): scaffold test SMILES. If None, will not compare to
-                scaffold test statistics
-            ptest (None or dict): precalculated statistics of the test set. If
-                None, will not run comparitive statistics. If you specified a custom
-                test set, default test statistics will be ignored
-            ptest_scaffolds (None or dict): precalculated statistics of the
-                scaffold test set If None, will load default scaffold test
-                statistics. If you specified a custom test set, default test
-                statistics will be ignored
-            ptarget (None or dict): precalculated statistics of the target set. If
-                None, will not run comparitive statistics
-            train (None or list): train SMILES. If None, will not run comparative statistics
-            target (None or list): target SMILES. If none, will not run comparative statistics
-        Available metrics:
-            * %valid # Tracked by molscore and so unneccesary
-            * Frechet ChemNet Distance (FCD)
-            * Fragment similarity (Frag)
-            * Scaffold similarity (Scaf)
-            * Similarity to nearest neighbour (SNN)
-            * Internal diversity (IntDiv)
-            * Internal diversity 2: using square root of mean squared
-                Tanimoto similarity (IntDiv2)
-            * %passes filters (Filters)
-            * Distribution difference for logP, SA, QED, weight
-            * Novelty (molecules not present in train)
-        """
-    # TODO add KL divergence?
-    # TODO FG / RS inside / outside training data / reference dataset?
-    #  https://chemrxiv.org/articles/preprint/Comparative_Study_of_Deep_Generative_Models_on_Chemical_Space_Coverage/13234289
-    #  + most common scaff, unique_fg, unique_rs? train_fg_recoverd, test_fg_recovered, test etc.
-
+    Computes all available metrics between test (scaffold test)
+    and generated sets of SMILES.
+    Parameters:
+        gen: list of generated SMILES
+        n: Chunk size to calculate intermediate statistics
+        n_col: Alternatively column name of batch/step variable e.g. "step"
+        n_jobs: number of workers for parallel processing
+        device: 'cpu' or 'cuda:n', where n is GPU device number
+        batch_size: batch size for FCD metric
+        pool: optional multiprocessing pool to use for parallelization
+        test (None or list): test SMILES. If None, will not compare to test statistics
+        test_scaffolds (None or list): scaffold test SMILES. If None, will not compare to
+            scaffold test statistics
+        ptest (None or dict): precalculated statistics of the test set. If
+            None, will not run comparitive statistics. If you specified a custom
+            test set, default test statistics will be ignored
+        ptest_scaffolds (None or dict): precalculated statistics of the
+            scaffold test set If None, will load default scaffold test
+            statistics. If you specified a custom test set, default test
+            statistics will be ignored
+        ptarget (None or dict): precalculated statistics of the target set. If
+            None, will not run comparitive statistics
+        train (None or list): train SMILES. Only compute novelty as this is usually a very large dataset, to run comparative statistics, submit a sample as test
+        target (None or list): target SMILES. If none, will not run comparative statistics
+        fcd (bool): Whether to compute FCD if pre-statistics aren't supplied
+    Available metrics:
+        ----- Intrinsic metrics ----
+        * # - Number of molecules
+        * Validity - Ratio of valid molecules
+        * # Valid - Number of valid molecules
+        * Uniqueness - Ratio of valid unique molecules
+        * # Valid & Unique - Number of valid unique molecules
+        * Internal diversity (IntDiv1) - Average average Tanimoto similarity
+        * Internal diversity 2 (IntDiv2) - Square root of mean squared Tanimoto similarity
+        * Sphere exclusion diversity (SEDiv) - Ratio of diverse molecules in a 1k sub-sample according to sphere exclusion at a Tanimoto distance of 0.65
+        * Scaffold diversity (ScaffDiv) - Internal diversity calculate on Bemis-Murcko scaffolds
+        * Scaffold uniqueness - Ratio of unique scaffolds within valid unique molecules
+        * Functional groups (FG) - Ratio of unique functional groups (Ertl, J. Cheminform (2017) 9:36) within valid unique molecules
+        * Ring systems (RS) - Ratio of the unique ring systems within valid unique molecules
+        * Filters - Ratio of molecules that pass MOSES filters (MCF & PAINS)
+        ----- Extrinsic/relative metrics -----
+        * Frechet ChemNet Distance (FCD) - Distance between the final layer of Molecule Net (Preuer et al. J. Chem. Inf. Model. 2018, 58, 9)
+        * Novelty - Ratio of valid unique molecules not found within reference dataset
+        * AnalogueSimilarity (AnSim) - Ratio of valid unique molecules with a Tanimoto similarity > 0.4 to any in the reference dataset
+        * AnalogueCoverage (AnCov) - Ratio of refernce dataset molecules with a Tanimoto similarity > 0.4 to any valid unique molecule
+        * Functional groups (FG) - Cosine similarity between the count vector of functional groups
+        * Ring systems (RS) - Cosine similarity between the count vector of ring systems
+        * Single nearest neighbour (SNN) - Average nearest neighbour similarity of valid unique molecules to the reference dataset
+        * Fragment similarity (Frag) - Cosine similarity between the count vector of fragments
+        * Scaffold similarity (Scaf) - Cosine similarity between the count vector of scaffolds
+        * Properties (logP, NP, SA, QED, weight) - Wasserstain distance between the generated (valid unique) and reference distribution
+    """
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
                  test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
-                 target=None, ptarget=None):
+                 target=None, ptarget=None, run_fcd=True):
         self.n_jobs = n_jobs
         self.device = device
         self.batch_size = batch_size
@@ -76,7 +85,8 @@ class GetMosesMetrics(object):
         self.test_scaffolds = test_scaffolds
         self.train = train
         self.target = target
-        # Clean up if necessary
+        self.run_fcd = run_fcd
+        # Clean up invalid smiles if necessary
         print('Cleaning up reference smiles')
         for att in ['test', 'test_scaffolds', 'target', 'train']:
             if getattr(self, att) is not None:
@@ -103,28 +113,27 @@ class GetMosesMetrics(object):
                 self.pool = 1
         self.kwargs = {'n_jobs': self.n_jobs, 'device': self.device, 'batch_size': self.batch_size}
         self.kwargs_fcd = {'n_jobs': self.n_jobs, 'device': self.device, 'batch_size': self.batch_size,
-                           'canonize': False}
+                           'canonize': False} # Canonicalized already
 
         # If test and test_scaffolds provided calculate intermediate statistics
         if self.test is not None:
             print('Computing test pre-statistics')
-            self.test_int = compute_intermediate_statistics(self.test, n_jobs=self.n_jobs,
-                                                            device=self.device, batch_size=self.batch_size,
-                                                            pool=self.pool)
+            self.test_int = compute_intermediate_statistics(self.test, pool=self.pool, run_fcd=self.run_fcd, **self.kwargs)
+            if not self.ptest: self.ptest = self.test_int.get('FCD')
         if self.test_scaffolds is not None:
             print('Computing test scaffold pre-statistics')
-            self.test_scaffolds_int = compute_intermediate_statistics(self.test_scaffolds, n_jobs=self.n_jobs,
-                                                                      device=self.device, batch_size=self.batch_size,
-                                                                      pool=self.pool)
+            self.test_scaffolds_int = compute_intermediate_statistics(self.test_scaffolds, pool=self.pool, run_fcd=self.run_fcd, **self.kwargs)
+            if not self.ptest_scaffolds: self.ptest_scaffolds = self.test_scaffolds_int.get('FCD')
         if self.target is not None:
             print('Computing target pre-statistics')
-            self.target_int = compute_intermediate_statistics(self.target, n_jobs=self.n_jobs,
-                                                              device=self.device, batch_size=self.batch_size,
-                                                              pool=self.pool)
+            self.target_int = compute_intermediate_statistics(self.target, pool=self.pool, run_fcd=self.run_fcd, **self.kwargs)
+            if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
     def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, verbose=False):
         metrics = {}
         metrics['#'] = len(gen)
+
+        # ----- Intrinsic properties -----
 
         # Calculate validity
         if verbose: print("Calculating Validity")
@@ -132,7 +141,6 @@ class GetMosesMetrics(object):
             metrics['Validity'] = fraction_valid(gen, self.pool)
 
         gen = remove_invalid(gen, canonize=True, n_jobs=self.n_jobs)
-        #mols = mapper(self.pool)(get_mol, gen)
         metrics['# valid'] = len(gen)
 
         # Calculate Uniqueness
@@ -175,23 +183,26 @@ class GetMosesMetrics(object):
         if verbose: print("Calculating Filters")
         metrics['Filters'] = fraction_passes_filters(mols, self.pool)
 
+        # ---- Extrinsic properties ---- 
+
         # Calculate FCD
-        if verbose: print("Calculating FCD")
-        pgen = FCDMetric(**self.kwargs_fcd).precalc(gen)
-        if self.ptrain:
-            metrics['FCD_train'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptrain)
-        if self.ptest:
-            metrics['FCD_test'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest)
-        if self.ptest_scaffolds:
-            metrics['FCD_testSF'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds)
-        if self.ptarget:
-            metrics['FCD_target'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget)
+        if self.run_fcd:
+            if verbose: print("Calculating FCD")
+            pgen = FCDMetric(**self.kwargs_fcd).precalc(gen)
+            if self.ptrain:
+                metrics['FCD_train'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptrain)
+            if self.ptest:
+                metrics['FCD_test'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest)
+            if self.ptest_scaffolds:
+                metrics['FCD_testSF'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds)
+            if self.ptarget:
+                metrics['FCD_target'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget)
 
         # Test metrics
         if self.test_int is not None:
             if verbose: print("Calculating Test metrics")
             metrics['Novelty_test'] = novelty(gen, self.test, self.pool)
-            metrics['AnalogueSimilarity_test'], metrics['AnalogueCoverage_test'] = \
+            metrics['AnSim_test'], metrics['AnCov_test'] = \
                 FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'])
             metrics['FG_test'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.test_int['FG'])
             metrics['RS_test'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.test_int['RS'])
@@ -216,7 +227,7 @@ class GetMosesMetrics(object):
         if self.target_int is not None:
             if verbose: print("Calculating Target metrics")
             metrics['Novelty_target'] = novelty(gen, self.target, self.pool)
-            metrics['AnalogueSimilarity_target'], metrics['AnalogueCoverage_target'] = \
+            metrics['AnSim_target'], metrics['AnCov_target'] = \
                 FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'])
             metrics['FG_target'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.target_int['FG'])
             metrics['RS_target'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.target_int['RS'])
@@ -262,7 +273,7 @@ class GetMosesMetrics(object):
 
 
 def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
-                                    batch_size=512, pool=None):
+                                    batch_size=512, pool=None, run_fcd=True):
     """
     The function precomputes statistics such as mean and variance for FCD, etc.
     It is useful to compute the statistics for test and scaffold test sets to
@@ -278,8 +289,9 @@ def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
     statistics = {}
     mols = mapper(pool)(get_mol, smiles)
     kwargs = {'n_jobs': pool, 'device': device, 'batch_size': batch_size}
-    #kwargs_fcd = {'n_jobs': n_jobs, 'device': device, 'batch_size': batch_size}
-    #statistics['FCD'] = FCDMetric(**kwargs_fcd).precalc(smiles)
+    kwargs_fcd = {'n_jobs': n_jobs, 'device': device, 'batch_size': batch_size}
+    if run_fcd:
+        statistics['FCD'] = FCDMetric(**kwargs_fcd).precalc(smiles)
     statistics['SNN'] = SNNMetric(**kwargs).precalc(mols)
     statistics['Frag'] = FragMetric(**kwargs).precalc(mols)
     statistics['Scaf'] = ScafMetric(**kwargs).precalc(mols)

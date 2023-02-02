@@ -1,4 +1,5 @@
 import os
+from multiprocessing import Pool
 from collections import Counter, defaultdict
 from itertools import combinations
 from functools import partial
@@ -6,6 +7,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse
 import torch
+
 from rdkit import Chem, SimDivFilters
 from rdkit.Chem import AllChem
 from rdkit.Chem import MACCSkeys
