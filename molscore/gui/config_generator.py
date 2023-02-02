@@ -4,7 +4,7 @@ import json
 import inspect
 
 import streamlit as st
-from molscore.utils.streamlit.SessionState import get
+#from molscore.utils.streamlit.SessionState import get
 
 from molscore import utils
 import molscore.scaffold_memory as scaffold_memory
@@ -12,19 +12,29 @@ import molscore.scoring_functions as scoring_functions
 
 # Persisting parameters that don't get re-run by streamlit with widget interactions
 # TODO I think streamlit has updated versions, use those instead?
-ss = get(key='ss', input_path='configs', n_sf=1, n_sp=1, maxmin=False)
+#ss = get(key='ss', input_path='configs', n_sf=1, n_sp=1, maxmin=False)
+# Set session variables, persistent on re-runs
+ss = st.session_state
+if 'configs' not in ss:
+    ss.input_path = 'configs'
+if 'n_sf' not in ss:
+    ss.n_sf=1
+if 'n_sp' not in ss:
+    ss.n_sp=1
+if 'maxmin' not in ss:
+    ss.maxmin=False
 
 
 # Functions
-def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...'):
+def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...', counter=1):
     """
     Code for a file selector widget which remembers where you are...
     """
     # get base path (directory)
-    base_path = '.' if path is None or path is '' else path
+    base_path = '.' if (path is None) or (path == '') else path
     base_path = base_path if os.path.isdir(
         base_path) else os.path.dirname(base_path)
-    base_path = '.' if base_path is None or base_path is '' else base_path
+    base_path = '.' if (base_path is None) or (base_path == '') else base_path
     # list files in base path directory
     files = os.listdir(base_path)
     files.insert(0, '..')
@@ -32,11 +42,16 @@ def st_file_selector(st_placeholder, key, path='.', label='Please, select a file
     selected_file = st_placeholder.selectbox(
         label=label, options=files, key=key)
     selected_path = os.path.normpath(os.path.join(base_path, selected_file))
-    if selected_file is '.':
+    if selected_file == '.':
         return selected_path
     if os.path.isdir(selected_path):
+        # ----
+        counter += 1
+        key = key + str(counter)
+        # ----
         selected_path = st_file_selector(st_placeholder=st_placeholder,
-                                         path=selected_path, label=label, key=key)
+                                         path=selected_path, label=label,
+                                         key=key, counter=counter)
     return os.path.abspath(selected_path)
 
 
@@ -96,17 +111,16 @@ def type2widget(ptype, label, key, default=None, options=None):
             widget = st.text_input(label=label, key=key)
         if ptype == os.PathLike:
             if default is not None and os.path.exists(default):
-                wss = get(key=key, input_path=default)
-                wss.input_path = st_file_selector(label=label, path=wss.input_path,
-                                                st_placeholder=st.empty(), key=key)
-                st.write(f"Selected: {wss.input_path}")
-                widget = wss.input_path
+                session_key = f'{key}_input_path'
+                ss[session_key] = default
+                
             else:
-                wss = get(key=key, input_path='configs')
-                wss.input_path = st_file_selector(label=label, path=wss.input_path,
-                                                st_placeholder=st.empty(), key=key)
-                st.write(f"Selected: {wss.input_path}")
-                widget = wss.input_path
+                session_key = f'{key}_input_path'
+                ss[session_key] = 'configs'
+            ss[session_key] = st_file_selector(label=label, path=ss[session_key],
+                                                  st_placeholder=st.empty(), key=key)
+            st.write(f"Selected: {ss[session_key]}")
+            widget = ss[session_key]
     return widget
 
 
@@ -345,12 +359,12 @@ config['load_from_previous'] = st.checkbox(label='Continue from previous directo
 if config['load_from_previous']:
     col1, col2 = st.columns([1, 9])
     with col2:
-        previous_dir_ss = get(key='previous_dir', input_path='configs')
-        previous_dir_ss.input_path = st_file_selector(label='Select a previously used folder',
-                                                    st_placeholder=st.empty(),
-                                                    path=previous_dir_ss.input_path,
-                                                    key='previous_dir')
-        config['previous_dir'] = previous_dir_ss.input_path
+        ss.previous_dir = 'configs'
+        ss.previous_dir = st_file_selector(label='Select a previously used folder',
+                                           st_placeholder=st.empty(),
+                                           path=ss.previous_dir,
+                                           key='previous_dir_selector')
+        config['previous_dir'] = ss.previous_dir
         st.write(f"Selected: {config['previous_dir']}")
 
 # ------ Logging ------

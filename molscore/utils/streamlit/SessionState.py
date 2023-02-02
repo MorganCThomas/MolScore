@@ -21,12 +21,16 @@ session_state.user_name
 
 """
 try:
-    import streamlit.ReportThread as ReportThread
-    from streamlit.server.Server import Server
-except Exception:
-    # Streamlit >= 0.65.0
-    import streamlit.report_thread as ReportThread
+    from streamlit.script_runner import get_script_run_ctx as get_report_ctx
     from streamlit.server.server import Server
+except ModuleNotFoundError:
+    try:
+        from streamlit.ReportThread import get_report_ctx
+        from streamlit.server.Server import Server
+    except ModuleNotFoundError:
+        # Streamlit >= 0.65.0
+        from streamlit.report_thread import get_report_ctx
+        from streamlit.server.server import Server
 
 
 class SessionState(object):
