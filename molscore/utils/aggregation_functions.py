@@ -30,16 +30,14 @@ def wsum(x, w, **kwargs):
 
 class DynamicSum:
     """
-    Weight sum according to DrugEx v2
-    https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9
+    Weight sum according to DrugEx v2 (https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
     """
     X = None
     
     @classmethod
-    def dynamic_wsum(cls, x, X: np.ndarray, thresh: int = 0.5, **kwargs):
+    def auto_wsum(cls, x, X: np.ndarray, thresh: int = 0.5, **kwargs):
         """
-        Dynamic weights based on intra feature scores from 'DrugEx v2 - de novo design of drug molecules by 
-            Pareto-based multi-objective reinforcement learning in polypharmacology'
+        Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9)
         :param x: Vector of scores
         :param X: Scores for all molecules within a batch
         :return: Aggregate score bound between [0, 1]
@@ -136,8 +134,7 @@ class ParetoFront:
     @classmethod
     def pareto_front(cls, x, X: np.ndarray, batch_smiles: list, thresh: float = 0.5, **kwargs):
         """
-        Implementation of Pareto Front score from 'DrugEx v2 - de novo design of drug molecules by 
-        Pareto-based multi-objective reinforcement learning in polypharmacology'
+        Implementation of Pareto Front from 'DrugEx v2' (10.1186/s13321-021-00561-9)
         :param x: Vector of scores
         :param X: Scores for all molecules within a batch
         :param thresh: Threshold to define desirable or undesirable molecules

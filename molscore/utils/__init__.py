@@ -14,6 +14,6 @@ all_score_methods = [
     amean,
     gmean,
     wsum,
-    DynamicSum.dynamic_wsum,
+    DynamicSum.auto_wsum,
     ParetoFront.pareto_front,
 ]

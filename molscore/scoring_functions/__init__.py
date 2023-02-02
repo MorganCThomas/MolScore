@@ -43,14 +43,14 @@ try:
     from molscore.scoring_functions.rocs import ROCS, GlideDockFromROCS
     from molscore.scoring_functions.oedock import OEDock
     all_scoring_functions += [ROCS, GlideDockFromROCS, OEDock]
-except ImportError as e:
-    print(f"{e}\nTo use openeye scoring functions please install openeye and acquire a license")
+except ImportError:
+    print("To use openeye scoring functions please install openeye and acquire a license")
 
 try:
     from molscore.scoring_functions.chemprop import ChemPropModel
     all_scoring_functions += [ChemPropModel]
-except ImportError as e:
-    print(f"{e}\nTo use ChemProp please install the relevant version of PyTorch and ChemProp")
+except ImportError:
+    print("To use ChemProp please install the relevant version of PyTorch and ChemProp")
 
 # ----- To load the classical DRD2 test case requires an old version of Scikit-learn
 #from molscore.scoring_functions.reinvent_svm import ActivityModel

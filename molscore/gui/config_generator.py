@@ -23,6 +23,8 @@ if 'n_sp' not in ss:
     ss.n_sp=1
 if 'maxmin' not in ss:
     ss.maxmin=False
+if 'pidgin_docstring' not in ss:
+    ss.pidgin_docstring=False
 
 
 # Functions
@@ -242,40 +244,44 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
     return result_dict
 
 
-def getsfconfig(key_i=0):
+def getsfconfig(key_i, tab):
     """
     Get configs for scoring functions
     :param key_i: Key identifier for widgets
     :return: dict
     """
     sf_config = {}
-    # Inset it slightly
-    col1, col2 = st.columns([1, 9])
-    with col2:
+    # Do it in the tab
+    with tab:
         # Choose scoring functions
-        sf_config['name'] = st.radio(label='Name',
-                                     options=[s.__name__ for s in
-                                              scoring_functions.all_scoring_functions
-                                              if not (s.__name__ in ['TanimotoSimilarity', 'RDKitDescriptors'])], # Remove these as only present for backwards compatability
-                                     index=0,
-                                     key=f'{key_i}: sf_name')
+        sf_config['name'] = st.selectbox(
+            label='Type',
+            options=[s.__name__ for s in scoring_functions.all_scoring_functions if not (s.__name__ in ['TanimotoSimilarity', 'RDKitDescriptors'])], # Remove these as only present for backwards compatability
+            index=0,
+            key=f'{key_i}: sf_name')
         sf_config['run'] = True
         # Get (class/function) from name ...
         sf_obj = [s for s in scoring_functions.all_scoring_functions if s.__name__ == sf_config['name']][0]
         # Write doc of class (not instance)
-        if sf_config['name'] == 'PIDGIN': sf_obj.set_docstring() # Populate PIDGIN docstring which takes a few seconds
+        if (sf_config['name'] == 'PIDGIN') and not ss.pidgin_docstring: 
+            st.write('Populating options, please wait a minute or two ...')
+            sf_obj.set_docstring() # Populate PIDGIN docstring which takes a few seconds
+            ss.pidgin_docstring=True
         sf_doc = inspect.getdoc(sf_obj)
+        st.markdown('**Description**')
         if sf_doc is not None:
             st.write(sf_doc)
         else:
             st.write('No documentation')
+        st.markdown('**Parameters**')
         sf_config['parameters'] = object2dictionary(sf_obj, key_i=key_i)
+        st.markdown('**Config format**')
         with st.expander(label='Check parsing'):
             st.write(sf_config)
     return sf_config
 
 
-def getspconfig(options, key_i=0):
+def getspconfig(options, key_i, tab):
     """
     Get configs for scoring parameters
     :param options: List of options taken from selected scoring functions
@@ -284,60 +290,67 @@ def getspconfig(options, key_i=0):
     """
     global ss
     sp_config = {}
-    # Inset it slightly
-    col1, col2 = st.columns([1, 9])
-    with col2:
-        sp_config['name'] = st.selectbox(label='Name',
-                                         options=options,
-                                         index=0,
-                                         key=f'{key_i}: sp_name')
-        if sp_config['name'] is None:
-            return
-        sp_config['weight'] = st.number_input(label='weight (only applicable if using wsum)',
-                                              value=1.0, key=f'{key_i}: sp_weight')
-        # Get (class/function) for transformation/modification from name and print doc ...
-        sp_config['modifier'] = st.selectbox(label='Modifier',
-                                             options=[m.__name__ for m in utils.all_score_modifiers],
-                                             index=0,
-                                             key=f'{key_i}: sp_modifier')
-        smod_obj = [m for m in utils.all_score_modifiers if m.__name__ == sp_config['modifier']][0]
-        # Write doc for func
-        smod_doc = inspect.getdoc(smod_obj).split(':')[0]
-        if smod_doc is not None:
-            st.write(smod_doc)
-        else:
-            st.write('No documentation')
-
-        # If norm, optional specification of max/min
-        if smod_obj.__name__ == 'norm':
-            # Buttons
-            if st.button(label='Specify max/min') or ss.maxmin:
-                ss.maxmin = True
-            if st.button(label='Don\'t specify max/min') or not ss.maxmin:
-                ss.maxmin = False
-            # Grab parameters and plot
-            if ss.maxmin:
-                sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
-            else:
-                sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x', 'max', 'min'])
-
-        # Otherwise just do it
-        else:
-            sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
-
-    col1, col2, col3 = st.columns([1, 0.5, 1])
-    try:
+    # Do it within a tab
+    with tab:
+        # Inset it slightly
+        col1, col2 = st.columns([1, 9])
         with col2:
-            st.write('Example')
-        with col3:
-            st.write(utils.transformation_functions.plot_mod(smod_obj, sp_config['parameters']))
-    except:
-        pass
+            sp_config['name'] = st.selectbox(label='Ouput name',
+                                            options=options,
+                                            index=0,
+                                            key=f'{key_i}: sp_name')
+            if sp_config['name'] is None:
+                return
+            with st.expander(label='Weight (only applicable if using wsum)'):
+                sp_config['weight'] = st.number_input(
+                    label='weight', value=1.0, key=f'{key_i}: sp_weight'
+                    )
+            # Get (class/function) for transformation/modification from name and print doc ...
+            sp_config['modifier'] = st.selectbox(label='Modifier',
+                                                options=[m.__name__ for m in utils.all_score_modifiers],
+                                                index=0,
+                                                key=f'{key_i}: sp_modifier')
+            smod_obj = [m for m in utils.all_score_modifiers if m.__name__ == sp_config['modifier']][0]
+            # Write doc for func
+            smod_doc = inspect.getdoc(smod_obj).split(':')[0]
+            st.markdown('**Description**')
+            if smod_doc is not None:
+                st.write(smod_doc)
+            else:
+                st.write('No documentation')
 
-    col1, col2 = st.columns([1, 9])
-    with col2:
-        with st.expander(label='Check parsing'):
-            st.write(sp_config)
+            # If norm, optional specification of max/min
+            st.markdown('**Parameters**')
+            if smod_obj.__name__ == 'norm':
+                # Buttons
+                if st.button(label='Specify max/min') or ss.maxmin:
+                    ss.maxmin = True
+                if st.button(label='Don\'t specify max/min') or not ss.maxmin:
+                    ss.maxmin = False
+                # Grab parameters and plot
+                if ss.maxmin:
+                    sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
+                else:
+                    sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x', 'max', 'min'])
+
+            # Otherwise just do it
+            else:
+                sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
+
+        col1, col2, col3 = st.columns([1, 0.5, 1])
+        try:
+            with col2:
+                st.write('Example')
+            with col3:
+                st.write(utils.transformation_functions.plot_mod(smod_obj, sp_config['parameters']))
+        except:
+            pass
+
+        col1, col2 = st.columns([1, 9])
+        with col2:
+            st.markdown('**Config format**')
+            with st.expander(label='Check parsing'):
+                st.write(sp_config)
     return sp_config
 
 
@@ -347,6 +360,8 @@ config = dict()
 
 
 # ------ Basic information ------
+st.markdown('#') # Add spacing
+st.subheader('Run parameters')
 config['task'] = st.text_input(label='Task name (for file naming)', value='QED').strip().replace(' ', '_')
 
 config['output_dir'] = st.text_input(label='Output directory', value='./')
@@ -374,6 +389,7 @@ config['logging'] = st.checkbox(label='Verbose logging')
 config['monitor_app'] = st.checkbox(label='Run live monitor app')
 
 # ----- Diversity filters -----
+st.markdown('#') # Add spacing
 st.subheader('Diversity filter')
 config['diversity_filter'] = {}
 config['diversity_filter']['run'] = st.checkbox(label='Run diversity filter')
@@ -383,10 +399,14 @@ if config['diversity_filter']['run']:
                                                           [s.__name__ for s in scaffold_memory.all_scaffold_filters],
                                                   index=0)
     if config['diversity_filter']['name'] == 'Unique':
+        st.markdown('**Description**')
         st.write('Penalize non-unique molecules by assigning a score of 0')
+        st.markdown('**Parameters**')
         config['diversity_filter']['parameters'] = {}
     elif config['diversity_filter']['name'] == 'Occurrence':
+        st.markdown('**Description**')
         st.write('Penalize non-unique molecules based on the number of occurrences')
+        st.markdown('**Parameters**')
         config['diversity_filter']['parameters'] = {'tolerance': st.number_input(label='Number of duplicates allowed'
                                                                                        ' before penalization',
                                                                                  min_value=0, value=5),
@@ -394,16 +414,21 @@ if config['diversity_filter']['run']:
                                                                                     ' until a reward of 0 is returned',
                                                                               min_value=0, value=5)}
     else:  # 'Memory-assisted' types:
+        st.markdown('**Description**')
         st.write('Use as dynamic memory: see https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0')
         # Get (class/function) from name ...
         dv_obj = [s
                   for s in scaffold_memory.all_scaffold_filters
                   if s.__name__ == config['diversity_filter']['name']][0]
+        st.markdown('**Parameters**')
         config['diversity_filter']['parameters'] = object2dictionary(dv_obj)
+    
+    st.markdown('**Config format**')
     with st.expander(label='Check parsing'):
         st.write(config['diversity_filter'])
 
 # ----- Scoring functions ------
+st.markdown('#') # Add spacing
 st.subheader('Scoring functions')
 # Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
 col1, col2 = st.columns(2)
@@ -413,24 +438,15 @@ with col1:
 with col2:
     if st.button(label='Delete scoring function'):
         ss.n_sf -= 1
+sf_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sf)])
 # Get user input parameters
-config['scoring_functions'] = [getsfconfig(i) for i in range(ss.n_sf)]
+config['scoring_functions'] = [getsfconfig(i, tab=t) for i, t in zip(range(ss.n_sf), sf_tabs)]
 
 
-# ----- Scoring -----
-st.subheader('Scoring')
+# ----- Scoring transformations -----
+st.markdown('#') # Add spacing
+st.subheader('Score transformation')
 config['scoring'] = {}
-config['scoring']['method'] = st.radio(label='Method',
-                                       options=[m.__name__ for m in utils.all_score_methods],
-                                       index=0,
-                                       key='Scoring method')
-# Get (class/function) from name and print doc ...
-sm_obj = [s for s in utils.all_score_methods if s.__name__ == config['scoring']['method']][0]
-sm_doc = inspect.getdoc(sm_obj)
-if sm_doc is not None:
-    st.write(sm_doc.split(':')[0])
-else:
-    st.write('No documentation')
 
 # Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
 col1, col2 = st.columns(2)
@@ -440,6 +456,7 @@ with col1:
 with col2:
     if st.button(label='Delete scoring parameter'):
         ss.n_sp -= 1
+sp_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sp)])
 # Get user input parameters if scoring functions have been defined
 if len(config['scoring_functions']) > 0:
     smetric_options = []
@@ -455,10 +472,29 @@ if len(config['scoring_functions']) > 0:
             st.write(f'WARNING: No return metrics found for {sf_name}')
             continue
     # Get parameter inputs
-    config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i) for i in range(ss.n_sp)]
+    config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
+
+# ----- Score aggregation -----
+st.markdown('#') # Add spacing
+st.subheader('Score aggregation')
+config['scoring']['method'] = st.radio(
+    label='Method',
+    options=[m.__name__ for m in utils.all_score_methods],
+    index=0,
+    key='Scoring method')
+
+# Get (class/function) from name and print doc ...
+sm_obj = [s for s in utils.all_score_methods if s.__name__ == config['scoring']['method']][0]
+sm_doc = inspect.getdoc(sm_obj)
+st.markdown('**Description**')
+if sm_doc is not None:
+    st.write(sm_doc.split(':')[0])
+else:
+    st.write('No documentation')
 
 
 # ----- Output -----
+st.markdown('#') # Add spacing
 st.subheader('Output json')
 with st.expander(label='Show'):
     st.write(config)
@@ -476,3 +512,12 @@ with col1:
 with col2:
     if st.button(label='Exit'):
         os._exit(0)
+
+# ----- Navigation Sidebar -----
+st.sidebar.header('Navigate')
+st.sidebar.markdown("[Run parameters](#run-parameters)")
+st.sidebar.markdown("[Diversity filter](#diversity-filter)")
+st.sidebar.markdown("[Scoring functions](#scoring-functions)")
+st.sidebar.markdown("[Score transformation](#score-transformation)")
+st.sidebar.markdown("[Score aggregation](#score-aggregation)")
+st.sidebar.markdown("[Output](#output-json)")
