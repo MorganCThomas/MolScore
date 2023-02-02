@@ -8,11 +8,11 @@ from multiprocessing import Pool
 import numpy as np
 import rdkit
 from scipy.spatial.distance import cosine as cos_distance
-from fcd_torch import FCD as FCDMetric
 from scipy.stats import wasserstein_distance
 
-from moleval.metrics.utils import mapper
-from moleval.metrics.utils import disable_rdkit_log, enable_rdkit_log
+from moleval.utils import disable_rdkit_log, enable_rdkit_log
+from moleval.metrics.fcd_torch import FCD as FCDMetric
+from moleval.metrics.metrics_utils import mapper
 from moleval.metrics.metrics_utils import SA, QED, NP, weight, logP
 from moleval.metrics.metrics_utils import compute_fragments, average_agg_tanimoto, \
     compute_scaffolds, fingerprints, numpy_fps_to_bitvectors, sphere_exclusion,\

@@ -18,7 +18,14 @@ from molvs.standardize import Standardizer
 
 from moleval.metrics.metrics_utils import mol_passes_filters
 
-rdBase.DisableLog('rdApp.*')
+
+def disable_rdkit_log():
+    rdBase.DisableLog('rdApp.*')
+disable_rdkit_log()
+
+
+def enable_rdkit_log():
+    rdBase.EnableLog('rdApp.*')
 
 
 def mapper(function, input: list, n_jobs: int = 1, progress_bar: bool = True):

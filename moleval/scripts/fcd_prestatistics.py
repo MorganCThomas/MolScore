@@ -2,7 +2,7 @@ import argparse
 import os
 import pickle as pkl
 from moleval.metrics.fcd_torch import FCD
-from moleval.metrics.utils import disable_rdkit_log
+from moleval.utils import disable_rdkit_log
 
 disable_rdkit_log()
 

@@ -13,9 +13,9 @@ from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect as Morgan
 from rdkit.Chem.QED import qed
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem import Descriptors
+
 from moleval.metrics.SA_Score import sascorer
 from moleval.metrics.NP_Score import npscorer
-from moleval.metrics.utils import mapper, get_mol
 from moleval.metrics.ifg import identify_functional_groups
 
 _base_dir = os.path.split(__file__)[0]
@@ -24,6 +24,53 @@ _pains = pd.read_csv(os.path.join(_base_dir, 'wehi_pains.csv'),
                      names=['smarts', 'names'])
 _filters = [Chem.MolFromSmarts(x) for x in
             _mcf.append(_pains, sort=True)['smarts'].values]
+
+
+def mapper(n_jobs):
+    '''
+    Returns function for map call.
+    If n_jobs == 1, will use standard map
+    If n_jobs > 1, will use multiprocessing pool
+    If n_jobs is a pool object, will return its map function
+    '''
+    if n_jobs == 1:
+        def _mapper(*args, **kwargs):
+            return list(map(*args, **kwargs))
+
+        return _mapper
+    if isinstance(n_jobs, int):
+        pool = Pool(n_jobs)
+
+        def _mapper(*args, **kwargs):
+            try:
+                result = pool.map(*args, **kwargs)
+            finally:
+                pool.terminate()
+            return result
+
+        return _mapper
+    return n_jobs.map
+
+
+def get_mol(smiles_or_mol):
+    '''
+    Loads SMILES/molecule into RDKit's object
+    '''
+    if isinstance(smiles_or_mol, str):
+        if len(smiles_or_mol) == 0:
+            return None
+        mol = Chem.MolFromSmiles(smiles_or_mol)
+        if mol is None:
+            return None
+        try:
+            Chem.SanitizeMol(mol)
+        except ValueError:
+            return None
+        return mol
+    elif isinstance(smiles_or_mol, Chem.rdchem.Mol):
+        return smiles_or_mol
+    else:
+        return None
 
 
 def canonic_smiles(smiles_or_mol):
