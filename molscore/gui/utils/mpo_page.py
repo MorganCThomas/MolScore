@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import gmean as geometricmean
 from sklearn.preprocessing import MinMaxScaler
 
 import streamlit as st
@@ -9,8 +8,11 @@ from molscore.utils.aggregation_functions import amean, gmean, prod, wsum, wprod
 
 import plotly.express as px
 
-from bokeh.plotting import figure, show, output_file, gridplot
-from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
+try:
+    from bokeh.plotting import figure
+    from bokeh.models import ColumnDataSource, BoxSelectTool
+except ImportError:
+    pass
 
 def plotly_parallel_plot(mdf):
     """ Draw parallel plots based on a melted df with columns 'x_var' and 'value'. """

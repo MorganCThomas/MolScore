@@ -1,26 +1,15 @@
 import sys
 import os
 import gzip
-import tempfile
 import pandas as pd
-import numpy as np
-from itertools import cycle, chain
+from itertools import cycle
 from glob import glob
-import matplotlib.colors as mcolors
-from scipy.stats import gmean as geometricmean
-from sklearn.preprocessing import MinMaxScaler
 
 import streamlit as st
-from streamlit_bokeh_events import streamlit_bokeh_events
-from streamlit_plotly_events import plotly_events
-
-from molscore.gui.utils.pymol_wrapper import PyMol
-
 import plotly.express as px
-from plotly.subplots import make_subplots
 
 try:
-    from bokeh.plotting import figure, show, output_file, gridplot
+    from bokeh.plotting import figure
     from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
 except ImportError:
     pass

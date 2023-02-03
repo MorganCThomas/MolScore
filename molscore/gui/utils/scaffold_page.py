@@ -1,5 +1,3 @@
-import os
-import sys
 import numpy as np
 import pandas as pd
 from itertools import cycle
@@ -9,8 +7,8 @@ from molscore.gui.utils import utils
 
 import plotly.express as px
 
-from bokeh.plotting import figure, show, output_file, gridplot
-from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource
 
 from rdkit.Chem import AllChem as Chem
 
