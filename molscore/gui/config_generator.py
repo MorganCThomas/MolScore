@@ -4,15 +4,11 @@ import json
 import inspect
 
 import streamlit as st
-#from molscore.utils.streamlit.SessionState import get
 
 from molscore import utils
 import molscore.scaffold_memory as scaffold_memory
 import molscore.scoring_functions as scoring_functions
 
-# Persisting parameters that don't get re-run by streamlit with widget interactions
-# TODO I think streamlit has updated versions, use those instead?
-#ss = get(key='ss', input_path='configs', n_sf=1, n_sp=1, maxmin=False)
 # Set session variables, persistent on re-runs
 ss = st.session_state
 if 'configs' not in ss:
@@ -27,7 +23,7 @@ if 'pidgin_docstring' not in ss:
     ss.pidgin_docstring=False
 
 
-# Functions
+# ----- Functions -----
 def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...', counter=1):
     """
     Code for a file selector widget which remembers where you are...

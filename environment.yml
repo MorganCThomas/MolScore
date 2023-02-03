@@ -23,3 +23,5 @@ dependencies:
   - pip:
     - zenodo-client==0.2.0
     - levenshtein==0.20.9
+#    - streamlit-bokeh-events
+    - streamlit-plotly-events
