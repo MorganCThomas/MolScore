@@ -3,6 +3,7 @@ import gzip
 import tempfile
 
 import streamlit as st
+from molscore.gui.utils.file_picker import st_file_selector
 
 import py3Dmol
 import parmed
@@ -96,4 +97,39 @@ class MetaViewer(py3Dmol.view):
             f.write(t.endjs)
             f.close()
 
-            st.components.v1.html(open(tfile.name, 'r').read(), width=1200, height=800)    
+            st.components.v1.html(open(tfile.name, 'r').read(), width=1200, height=800)
+
+def streamlit_3D_mols(mviewer, key):
+    st.subheader('Selected 3D poses')
+
+    # ---- User options -----
+    col1, col2 = st.columns(2)
+    input_structure = st_file_selector(
+        label='Input structure',
+        st_placeholder=col1.empty(),
+        path='./',
+        key=f'{key}_structure'
+        )
+    col1.write(f"Selected: {input_structure}")
+    mviewer.add_receptor(path=input_structure)
+
+    ref_path = st_file_selector(
+        label='Reference ligand',
+        st_placeholder=col2.empty(),
+        path='./',
+        key=f'{key}_ref'
+        )
+    col2.write(f"Selected: {ref_path}")
+
+    col1, col2, col3 = st.columns(3)
+    surface = col1.selectbox(label='Surface', options=[None, 'VDW', 'MS', 'SAS', 'SES'], key=f'{key}_surface')
+    mviewer.add_surface(surface)
+    show_residue_labels = col2.selectbox(label='Label residues', options=[True, False], index=1, key=f'{key}_label_residues')
+    if show_residue_labels:
+        mviewer.label_receptor()
+    show_residues = col3.multiselect(label='Show residues', options=mviewer.get_residues(), key=f'{key}_show_residues')
+    _ = [mviewer.show_residue(r) for r in show_residues]
+
+    mviewer.add_ligand(path=ref_path, color='orange')
+
+    mviewer.render2st()

@@ -1,98 +1,83 @@
 import sys
 import os
+import re
 import gzip
 import pandas as pd
+from time import sleep
+from tempfile import NamedTemporaryFile
+from typing import Union
 from itertools import cycle
 from glob import glob
 
-import streamlit as st
-import plotly.express as px
+from molscore.scoring_functions.utils import get_mol
 
-try:
-    from bokeh.plotting import figure
-    from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
-except ImportError:
-    pass
+import streamlit as st
+
+import plotly.express as px
+from streamlit_plotly_events import plotly_events
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from rdkit.Chem.Draw import MolsToGridImage, MolDraw2DSVG, MolDraw2DCairo
-import base64
-from io import BytesIO
-
-# ----- Load in iterations files -----
-#@st.cache(allow_output_mutation=True)
-def load_iterations(it_path):
-    it_path = os.path.join(os.path.abspath(sys.argv[1]), 'iterations')
-    it_files = glob(os.path.join(it_path, '*.csv'))
-    main_df = pd.DataFrame()
-    if len(it_files) > 0:
-        it_files = sorted(it_files)
-        for f in it_files:
-            main_df = pd.concat([main_df, pd.read_csv(f, index_col=0, dtype={'valid': object})], axis=0)
-    return main_df, it_files
+from rdkit.Chem.Draw import MolDraw2DSVG, MolDraw2DCairo
 
 
-# ----- Load in dock path if available -----
-@st.cache
-def check_dock_paths(path):
-    subdirectories = [x for x in os.walk(os.path.abspath(path))][0][1]
-    try:
-        # Find dock path
-        dock_sub = [d for d in subdirectories if ('Dock' in d) or ('ROCS' in d)][0]
-        dock_path = os.path.join(os.path.abspath(sys.argv[1]), dock_sub)
-    except (KeyError, IndexError):
-        dock_path = None
-    return dock_path
-
-
-def update_files(path, files, df):
-    # Check for new files
-    check_files = glob(os.path.join(path, '*.csv'))
-    if len(check_files) > 0:
-        check_files = sorted(check_files)
-        new_files = [f for f in check_files if (f not in files)]
-        if len(new_files) > 0:
-            # Append new files to df and files list
-            for new_file in new_files:
-                it_df = pd.read_csv(new_file, index_col=0, dtype={'valid': object, 'unique': object})
-                df = df.append(it_df)
-                files += [new_file]
-            return df, files
-        else:
-            return df, files
-
-
-def st_file_selector(st_placeholder, key, path='.', label='Please, select a file/folder...', counter=1):
+# ----- Load & update data -----
+def load(input_dir: os.PathLike, latest_idx: int=0):
     """
-    Code for a file selector widget which remembers where you are...
+    For an input directory load iteration files (if not then load score)
     """
-    # get base path (directory)
-    base_path = '.' if (path is None) or (path == '') else path
-    base_path = base_path if os.path.isdir(
-        base_path) else os.path.dirname(base_path)
-    base_path = '.' if (base_path is None) or (base_path == '') else base_path
-    # list files in base path directory
-    files = os.listdir(base_path)
-    files.insert(0, '..')
-    files.insert(0, '.')
-    selected_file = st_placeholder.selectbox(
-        label=label, options=files, key=key)
-    selected_path = os.path.normpath(os.path.join(base_path, selected_file))
-    if selected_file == '.':
-        return selected_path
-    if os.path.isdir(selected_path):
-        # ----
-        counter += 1
-        key = key + str(counter)
-        # ----
-        selected_path = st_file_selector(st_placeholder=st_placeholder,
-                                            path=selected_path, label=label,
-                                            key=key, counter=counter)
-    return os.path.abspath(selected_path)
+    it_path = os.path.join(input_dir, 'iterations')
+    scores_path = os.path.join(input_dir, 'scores.csv')
+    df = pd.DataFrame()
+    if os.path.exists(it_path):
+        it_files = sorted(glob(os.path.join(it_path, '*.csv')))
+        if len(it_files) > latest_idx+1:
+            for f in it_files[latest_idx+1:]:
+                df = pd.concat([df, pd.read_csv(f, index_col=0, dtype={'valid': object})], axis=0)
+            latest_idx = len(it_files)-1
+    elif scores_path:
+        df = pd.read_csv(scores_path, index_col=0, dtype={'valid': object})
+    else:
+        raise FileNotFoundError(f"Could not find iterations directory or scores.csv for {os.path.basename(input_dir)}")
+
+    # Add run and dock_path as columns
+    df['run'] = [os.path.basename(input_dir)] * len(df)
+    df['dock_path'] = [check_dock_paths(input_dir)] * len(df)
+    
+    return df, latest_idx
 
 
+def update(SS):
+    """
+    Update data for current inputs, mutates dataframe in session
+    """
+    for i, (curr_dir, curr_idx) in enumerate(zip(SS.input_dirs, SS.input_latest)):
+        # Load new iterations
+        df, new_idx = load(input_dir=curr_dir, latest_idx=curr_idx)
+        # Add it new df
+        if df is not None:
+            # Update latest idx
+            SS.input_latest[i] = new_idx
+            # First update mol index
+            df.reset_index(inplace=True)
+            df['idx'] = df['idx'] + len(SS.main_df.loc[SS.main_df.run == os.path.basename(curr_dir), :])
+            # Add to main_df
+            SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
+            # Sort
+            SS.main_df.sort_values(by=['run', 'idx'])
+
+
+def check_dock_paths(input_path):
+    subdirectories = [x for x in os.walk(os.path.abspath(input_path))][0][1]
+    for subd in subdirectories:
+        if re.search("Dock|ROCS|Align3D", subd):
+            st.write()
+            return os.path.join(input_path, subd)
+
+
+# ----- Plotting molecules -----
 def mol2svg(mol):
+    mol = get_mol(mol)
     try:
         AllChem.Compute2DCoords(mol)
         try:
@@ -109,6 +94,7 @@ def mol2svg(mol):
 
 
 def mol2png(mol):
+    mol = get_mol(mol)
     try:
         AllChem.Compute2DCoords(mol)
         try:
@@ -124,110 +110,8 @@ def mol2png(mol):
     return d2d.GetDrawingText()
 
 
-def bokeh_plot(y, main_df, size=(1000, 500), *args):
-    TOOLTIPS = """
-    <div>
-    Step_batch_idx: @ids<br>
-    </div>
-    """
-    # @img{safe}
-
-    if y == 'valid':
-        p = figure(plot_width=size[0], plot_height=size[1])
-        steps = main_df.step.unique().tolist()
-        ratios = main_df.groupby('step')[y].apply(lambda x: (x == 'true').mean()).tolist()
-        p.line(x=steps, y=ratios)
-
-    elif (y == 'unique') or (y == 'passes_diversity_filter'):
-        p = figure(plot_width=size[0], plot_height=size[1])
-        steps = main_df.step.unique().tolist()
-        ratios = main_df.groupby('step')[y].mean().tolist()
-        p.line(x=steps, y=ratios)
-
-    else:
-        data = dict(
-            x=main_df.step.tolist(),
-            y=main_df[y].tolist(),
-            y_mean=main_df[y].rolling(window=100).mean(),
-            y_median=main_df[y].rolling(window=100).median(),
-            ids=(main_df.step.map(str) + "_" + main_df.batch_idx.map(str)).tolist(),
-            # img=[mol2svg(m) if m else None for m in main_df.mol]
-        )
-        source = ColumnDataSource(data)
-
-        # Required for callback
-        source.selected.js_on_change(
-            "indices",
-            CustomJS(
-                args=dict(source=source),
-                code="""
-                document.dispatchEvent(
-                    new CustomEvent("BOX_SELECT", {detail: {data: source.selected.indices}})
-                )
-                """
-            )
-        )
-
-        p = figure(plot_width=size[0], plot_height=size[1], tooltips=TOOLTIPS)
-        p.add_tools(BoxSelectTool())
-        p.circle(x='x', y='y', size=8, source=source)
-        p.line(x='x', y='y_mean',
-                line_color='blue', legend_label='mean', source=source)
-        p.line(x='x', y='y_median',
-                line_color='red', legend_label='median', source=source)
-
-    p.xaxis[0].axis_label = 'Step'
-    p.yaxis[0].axis_label = y
-
-    return p
-
-@st.cache
-def plotly_plot(y, main_df, size=(1000, 500), x='step'):
-    # If validity show line plot
-    if y == 'valid':
-        steps = main_df.step.unique().tolist()
-        ratios = main_df.groupby('step')[y].apply(lambda x: (x == 'true').mean()).tolist()
-        fig = px.line(x=steps, y=ratios, range_y=(0, 1), template='plotly_white')
-    elif (y == 'unique') or (y == 'passes_diversity_filter'):
-        steps = main_df.step.unique().tolist()
-        ratios = main_df.groupby('step')[y].mean().tolist()
-        fig = px.line(x=steps, y=ratios, range_y=(0, 1), range_x=(0, None), template='plotly_white')
-    else:
-        x == 'index'
-        main_df = main_df.reset_index(drop=False)
-        fig = px.scatter(data_frame=main_df, x=x, y=y, trendline='rolling', trendline_options=dict(function='median', window=100), trendline_color_override='black', template='plotly_white')
-        #fig.update_traces(hovertemplate=None)
-        #fig.update_layout(hovermode="x unified")
-    return fig
-
-
-def display_selected_data_old(y, selection=None):
-    raise DeprecationWarning
-    max_structs = 24
-    structs_per_row = 4
-    empty_plot = "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA="
-    if selection is None:
-        return empty_plot
-    else:
-        match_idx = selection['BOX_SELECT']['data']
-        st.write(main_df.iloc[match_idx])
-        smis = main_df.loc[match_idx, 'smiles'].tolist()
-        mols = [Chem.MolFromSmiles(smi) for smi in smis]
-        name_list = list(main_df.iloc[match_idx][y])
-        batch_list = [f"{step}_{batch_idx}" for step, batch_idx in main_df.loc[match_idx, ['step', 'batch_idx']].values]
-        name_list = [f"{x:.02f}" if isinstance(x, float) else f"{x}" for x in name_list]
-        legends = [f"{idx}\n{y}: {name}" for idx, name in zip(batch_list, name_list)]
-        img = MolsToGridImage(mols[0:max_structs], molsPerRow=structs_per_row, legends=legends[0:max_structs],
-                                subImgSize=(300, 300))
-        buffered = BytesIO()
-        img.save(buffered, format="JPEG")
-        encoded_image = base64.b64encode(buffered.getvalue())
-        src_str = 'data:image/png;base64,{}'.format(encoded_image.decode())
-        return src_str
-
-
-def display_selected_data(y, main_df, dock_path=None, selection=None, viewer=None, pymol=None):
-
+def display_selected_data(main_df, key, y: Union[str, list, None]=None, selection=None, dock_path=None, viewer=None, pymol=None):
+    if isinstance(y, str): y = [y]
     if selection is None:
         return
     else:
@@ -237,91 +121,289 @@ def display_selected_data(y, main_df, dock_path=None, selection=None, viewer=Non
             match_idx = match_idx[:100]
         # Subset df
         st.write(main_df.iloc[match_idx])
-        smis = main_df.loc[match_idx, 'smiles'].tolist()
-        mols = [Chem.MolFromSmiles(smi) for smi in smis]
-        name_list = list(main_df.iloc[match_idx][y])
-        batch_list = [f"step: {step}\nbatch_index: {batch_idx}" for step, batch_idx in main_df.loc[match_idx, ['step', 'batch_idx']].values]
-        name_list = [f"{x:.02f}" if isinstance(x, float) else f"{x}" for x in name_list]
-        legends = [f"{idx}\n{y}: {name}" for idx, name in zip(batch_list, name_list)]
+        smis = main_df.iloc[match_idx]['smiles'].tolist()
+        leg_cols = ['run', 'step', 'batch_idx']+y if y else ['run', 'step', 'batch_idx']
+        tdf = main_df.iloc[match_idx][leg_cols]
+        legends = ["\n".join([f"{k}: {v:.02f}" if isinstance(v, float) else f"{k}: {v}" for k, v in rec.items()]) for rec in tdf.to_dict('records')]
         # Plot molecule graphs in columns
-        for mol, midx, legend, col in zip(mols, match_idx, legends, cycle(st.columns(5))):
-            col.image(mol2png(mol))
+        for smi, midx, legend, col in zip(smis, match_idx, legends, cycle(st.columns(5))):
+            col.image(mol2png(smi))
             col.text(legend)
             if dock_path is not None:
                 if viewer is not None:
-                    show_3D = col.button(label='Show 3D', key=f'{legend}_3D_button')
+                    show_3D = col.button(label='Show3D', key=f'{legend}_3D_button')
                     if show_3D:
                         # Grab best variants
-                        file_paths, _ = find_sdfs([midx], main_df, dock_path)
+                        file_paths, _ = find_sdfs([midx], main_df)
                         viewer.add_ligand(path=file_paths[0])
                 
                 if pymol is not None:
-                    show_pymol = col.button(label='send2pymol', key=f'{legend}_pymol_button')
+                    show_pymol = col.button(label='Send2PyMol', key=f'{legend}_pymol_button')
                     if show_pymol:
-                        file_paths, _ = find_sdfs([midx], main_df, dock_path)
-                        idx = '-'.join(legend.split("\n")[:2]).replace(' ', '')
-                        file_path = file_paths[0]
-                        if '.sdfgz' in file_path:
-                            new_file_path = os.path.join(os.path.dirname(file_path), os.path.basename(file_path).split(".")[0] + '.sdf.gz')
-                            os.system(f'cp {file_path} {new_file_path} && gunzip -f {new_file_path}')
-                            file_path = os.path.join(os.path.dirname(file_path), os.path.basename(file_path).split(".")[0] + '.sdf')
-                        if '.sdf.gz' in file_path:
-                            os.system(f'gunzip -f {file_path}')
-                            file_path = os.path.join(os.path.dirname(file_path), os.path.basename(file_path).split(".")[0] + '.sdf')
-                        pymol(f'load {file_path}, {idx}')
+                        file_paths, names = find_sdfs([midx], main_df)
+                        send2pymol(name=names[0], path=file_paths[0], pymol=pymol)
                 
-        if (dock_path is not None) and (viewer is not None):
-            show_all_3D = st.button('Show all 3D')
-            if show_all_3D:
-                file_paths, _ = find_sdfs(match_idx, main_df, dock_path)
-                for p in file_paths:
-                    viewer.add_ligand(path=p)
+        if dock_path is not None:
+            if viewer is not None:
+                if st.button(f'ShowAll3D', key=f'All3D_{key}'):
+                    paths, names = find_sdfs(match_idx, main_df)
+                    for p in paths:
+                        viewer.add_ligand(path=p)
+            if pymol is not None:
+                if st.button(f'SendAll2Pymol', key=f'AllPymol_{key}'):
+                    paths, names = find_sdfs(match_idx, main_df)
+                    for (p, n) in zip(paths, names):
+                        send2pymol(name=n, path=p, pymol=pymol)
+                    
     return
 
 
-def find_sdfs(match_idxs, main_df, dock_path, gz_only=False):
-    # Drop duplicate smiles
-    sel_smiles = main_df.loc[match_idxs, 'smiles'].drop_duplicates().tolist()
-    # Find first (potentially non-matching idx of first recorded unique smiles)
-    first_idxs = []
-    for smi in sel_smiles:
-        first_idx = main_df.loc[
-            main_df['smiles'] == smi,
-            ['step', 'batch_idx']].drop_duplicates().to_records(index=False)
-        first_idxs.append(first_idx[0])
+# ---- Exporting -----
+def send2pymol(name, path, pymol):
+    if path is None: 
+        return
+    # Load molecule
+    if path.endswith('gz'):
+        with gzip.open(path) as f:
+            mol = next(Chem.ForwardSDMolSupplier(f, removeHs=False))
+    else:
+        with open(path) as rf:
+            mol = next(Chem.ForwardSDMolSupplier(rf, removeHs=False))
+    # Save it to tempfile
+    if mol:
+        with NamedTemporaryFile(mode='w+t', suffix='.sdf') as tfile:
+            writer = AllChem.SDWriter(tfile.name)
+            writer.write(mol)
+            writer.flush()
+            writer.close()
+            pymol(f'load {tfile.name}, {name}')
+            sleep(0.1) # Give PyMol one hot 100th
+
+
+def _find_sdf(query_dir, step, batch_idx):
+    if query_dir is None:
+         return
+    # Search for an sdf file
+    possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sdf*'))
+    # Try another subdirectory
+    if len(possible_files) == 0:
+        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*', '*.sdf*'))
+    # Return first match (should be only match)
+    if len(possible_files) > 1:
+        # Likely different formats
+        if any([f.endswith('.sdf') for f in possible_files]):
+            return [f for f in possible_files if f.endswith('.sdf')][0]
+        else:
+            print(f'Ambiguous file {possible_files}')
+            return possible_files[0]
+    if len(possible_files) > 0:
+        return possible_files[0]
+
+
+def find_sdfs(match_idxs, main_df):
+    # Drop duplicate smiles per run
+    sel_smiles = main_df.loc[match_idxs, ['run', 'smiles']].drop_duplicates().to_records(index=False)
 
     # List names of matching index (drop duplicate smiles in selection)
-    idx_names = main_df.loc[
-        match_idxs,
-        ['smiles', 'step', 'batch_idx']].drop_duplicates(subset=['smiles']).to_records(index=False)
+    idx_names = main_df.loc[match_idxs, ['run', 'smiles', 'step', 'batch_idx']].drop_duplicates(subset=['run', 'smiles']).to_records(index=False)
+    
+    # Find first (potentially non-matching idx of first recorded unique smiles)
+    first_idxs = []
+    for run, smi in sel_smiles:
+        first_idx = main_df.loc[(main_df.run == run) & (main_df['smiles'] == smi), ['run', 'step', 'batch_idx', 'dock_path']].drop_duplicates().to_records(index=False)
+        first_idxs.append(first_idx[0])
 
-    if gz_only:
-        file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}-*sdfgz'))[0] for s, b in first_idxs]
-    else:
-        file_paths = [glob(os.path.join(dock_path, str(s), f'{s}_{b}-*sdf*'))[0] for s, b in first_idxs]
+    # Get file paths
+    file_paths = []
+    for _, s, bi, dp in first_idxs:
+        file_paths.append(_find_sdf(query_dir=dp, step=s, batch_idx=bi))
 
-    return file_paths, [f'Mol: {s}_{b}' for _, s, b in idx_names]
+    return file_paths, [f'Mol: {s}_{b}' for _, _, s, b in idx_names]
 
 
-def save_sdf(mol_paths, mol_names, out_name=''):
+def save_sdf(mol_paths, mol_names, out_file):
     # Setup writer
-    out_file = os.path.join(os.path.abspath(sys.argv[1]), f'{out_name}.sdf')
     writer = AllChem.SDWriter(out_file)
-
     for path, name in zip(mol_paths, mol_names):
-        if ('.sdfgz' in path) or ('.sdf.gz' in path):
+        if path.endswith('gz'):
             with gzip.open(path) as rf:
                 suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
-                mol = suppl.__next__() # Grab first mol
-                mol.SetProp('_Name', name)
-                writer.write(mol)
+                mol = suppl.__next__()
+                if mol:
+                    mol.SetProp('_Name', name)
+                    writer.write(mol)
         elif '.sdf' in path:
             with open(path) as rf:
                 suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
                 mol = suppl.__next__()
-                mol.SetProp('_Name', name)
-                writer.write(mol)
+                if mol:
+                    mol.SetProp('_Name', name)
+                    writer.write(mol)
     writer.flush()
     writer.close()
-    #st.write(f'Saved to: {out_file}')
-    return
+
+
+# ----- Plotting -----
+def plotly_plot(y, main_df, size=(1000, 500), x='step'):
+    if y == 'valid':
+        tdf = main_df.groupby(['run', 'step'])[y].agg(lambda x: (x == 'true').mean()).reset_index()
+        fig = px.line(data_frame=tdf, x='step', y=y, range_y=(0, 1), color='run', template='plotly_white')
+        fig.update_layout(
+            xaxis_title=x,
+            yaxis_title=y
+            )
+    elif (y == 'unique') or (y == 'passes_diversity_filter'):
+        tdf = main_df.groupby(['run', 'step'])[y].mean().reset_index()
+        fig = px.line(data_frame=tdf, x='step', y=y, range_y=(0, 1), color='run', template='plotly_white')
+        fig.update_layout(
+            xaxis_title=x,
+            yaxis_title=y
+            )
+    else:
+        fig = px.scatter(
+            data_frame=main_df, x=x, y=y, color='run',
+            hover_data=['run', 'step', 'batch_idx', y],
+            trendline='rolling', trendline_options=dict(function='median', window=100),
+            trendline_color_override='black',
+            opacity=0.4, template='plotly_white'
+            )
+    return fig
+
+try:
+    from bokeh.plotting import figure, gridplot
+    from bokeh.models import ColumnDataSource, CustomJS, BoxSelectTool
+    import streamlit_bokeh_events
+
+    def bokeh_plot(y, main_df, size=(1000, 500), *args):
+        TOOLTIPS = """
+        <div>
+        Step_batch_idx: @ids<br>
+        </div>
+        """
+        # @img{safe}
+
+        if y == 'valid':
+            p = figure(plot_width=size[0], plot_height=size[1])
+            steps = main_df.step.unique().tolist()
+            ratios = main_df.groupby('step')[y].apply(lambda x: (x == 'true').mean()).tolist()
+            p.line(x=steps, y=ratios)
+
+        elif (y == 'unique') or (y == 'passes_diversity_filter'):
+            p = figure(plot_width=size[0], plot_height=size[1])
+            steps = main_df.step.unique().tolist()
+            ratios = main_df.groupby('step')[y].mean().tolist()
+            p.line(x=steps, y=ratios)
+
+        else:
+            data = dict(
+                x=main_df.step.tolist(),
+                y=main_df[y].tolist(),
+                y_mean=main_df[y].rolling(window=100).mean(),
+                y_median=main_df[y].rolling(window=100).median(),
+                ids=(main_df.step.map(str) + "_" + main_df.batch_idx.map(str)).tolist(),
+                # img=[mol2svg(m) if m else None for m in main_df.mol]
+            )
+            source = ColumnDataSource(data)
+
+            # Required for callback
+            source.selected.js_on_change(
+                "indices",
+                CustomJS(
+                    args=dict(source=source),
+                    code="""
+                    document.dispatchEvent(
+                        new CustomEvent("BOX_SELECT", {detail: {data: source.selected.indices}})
+                    )
+                    """
+                )
+            )
+
+            p = figure(plot_width=size[0], plot_height=size[1], tooltips=TOOLTIPS)
+            p.add_tools(BoxSelectTool())
+            p.circle(x='x', y='y', size=8, source=source)
+            p.line(x='x', y='y_mean',
+                    line_color='blue', legend_label='mean', source=source)
+            p.line(x='x', y='y_median',
+                    line_color='red', legend_label='median', source=source)
+
+        p.xaxis[0].axis_label = 'Step'
+        p.yaxis[0].axis_label = y
+
+        return p
+
+    def bokeh_plot_events(df, y_axis):
+        p = bokeh_plot(y_axis, df)
+        st.bokeh_chart(p)
+        selection = streamlit_bokeh_events(
+                bokeh_plot=p,
+                events="BOX_SELECT",
+                key="main",
+                refresh_on_update=True,
+                override_height=None,
+                debounce_time=0)
+        selection = selection['BOX_SELECT']['data'] # Probably incorrect
+        return selection
+
+    def multi_bokeh_plot(df, y_variables):
+        plots = []
+        for y in y_variables:
+            p = bokeh_plot(y, df, size=(500, 300))
+            plots.append(p)
+        grid = gridplot(plots, ncols=3)
+        return grid
+
+    def bokeh_mpo_events(df, x_variables, step=None, k=None):
+        if step:
+            df = df.loc[df.step == step, :]
+        if k:
+            if k > 100: st.write("Warning: Limiting display to first 100")
+            # Subset top-k unique
+            df = df.iloc[:k, :]
+
+        p = figure(
+            plot_width=1000, plot_height=500, x_range=x_variables,
+            tooltips=
+            """
+            <div>
+            @img{safe}
+            Step_batch_idx: @ids<br>
+            </div>
+            """
+            )
+        p.add_tools(BoxSelectTool())
+        for i, r in df.iterrows():
+            data = dict(x=x_variables,
+                        y=r[x_variables].values,
+                        ids=[f"{r['step']}_{r['batch_idx']}"]*len(x_variables),
+                        img=[mol2svg(r['smiles'])]*len(x_variables))
+            source = ColumnDataSource(data)
+            p.circle(x='x', y='y', source=source)
+            p.line(x='x', y='y', source=source)
+        selection = streamlit_bokeh_events(bokeh_plot=p, events="BOX_SELECT", key="mpo",
+                                                    refresh_on_update=True, override_height=None, debounce_time=0)
+        selection = {"BOX_SELECT": {"data": df.index.to_list()}} # Probably incorrect
+        return selection
+
+    def scaffold_bokeh_plot(memory_list):
+            hist = figure(plot_width=1000, plot_height=400, tooltips="""
+            <div>
+            @img{safe}
+            </div>
+            """)
+            hist_data = dict(
+                x=[i for i in range(len(memory_list))],
+                top=[len(c['members']) for c in memory_list],
+                img=[mol2svg(Chem.MolFromSmiles(m['centroid']))
+                        if isinstance(m['centroid'], str) else mol2svg(Chem.MolFromSmiles(''))
+                        for m in memory_list]
+            )
+            hist_source = ColumnDataSource(hist_data)
+            hist.vbar(x='x',
+                        width=0.5, bottom=0,
+                        top='top',
+                        source=hist_source)
+            return hist
+
+
+except ImportError:
+    pass
