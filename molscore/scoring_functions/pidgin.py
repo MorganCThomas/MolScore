@@ -98,7 +98,8 @@ class PIDGIN():
         if self.exclude_uniprot:
             self.exclude_uniprots += [self.exclude_uniprot]
         for uni in self.exclude_uniprots:
-            self.uniprots.remove(uni)
+            if uni in self.uniprots:
+                self.uniprots.remove(uni)
         # De-duplicate
         self.uniprots = list(set(self.uniprots))
 
