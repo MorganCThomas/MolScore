@@ -100,7 +100,7 @@ def mpo_plot(main_df, SS, dock_path=None):
             x_weights = []
             for x in x_variables:
                 st.write(x)
-                col1, col2 = st.columns(2, gap='large')
+                col1, col2 = st.columns(2)
                 x_orders.append(col1.selectbox(label=f'Reverse',
                                              options=[True, False], index=1, key=f'{x}_order'))
                 x_weights.append(col2.number_input(label=f'Weight', value=1.0, key=f'{x}_weight'))

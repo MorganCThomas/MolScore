@@ -77,7 +77,7 @@ def scaffold_plot(main_df, SS, dock_path=None):
             memory_list.sort(key=lambda x: np.mean(x['step']), reverse=sort_order)
 
         # ---- Bar graph ----
-        col1, col2 = st.columns([3, 1], gap='large')
+        col1, col2 = st.columns([3, 1])
         with col1:
             st.subheader('Clusters histogram (click to show centroid)')
             selection = utils.plotly_events(px.bar(x=[i for i in range(len(memory_list))], y=[len(c['members']) for c in memory_list], width=1500, height=300, template='plotly_white'))
