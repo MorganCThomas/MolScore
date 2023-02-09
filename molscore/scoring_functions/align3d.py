@@ -322,5 +322,4 @@ class Align3D:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        logger.warning("__call__() will be deprecated in future versions, please use score() instead.")
         return self.score(smiles=smiles, directory=directory, file_names=file_names)
