@@ -281,7 +281,7 @@ class MolScore:
             if len(dup_idx) > 0:
                 self.exists_df.drop(index=dup_idx, inplace=True)
             # Append to results, assuming no duplicates in results_df...
-            self.results_df = self.results_df.append(self.exists_df, ignore_index=True, sort=False)
+            self.results_df = pd.concat([self.results_df, self.exists_df], axis=0, ignore_index=True, sort=False) # self.results_df.append(self.exists_df, ignore_index=True, sort=False)
             self.results_df = self.results_df.drop_duplicates(subset='smiles')
 
         # Merge with batch_df
@@ -613,7 +613,7 @@ class MolScore:
             if isinstance(self.main_df, pd.core.frame.DataFrame):
                 # update indexing based on most recent index
                 self.batch_df.index = self.batch_df.index + self.main_df.index[-1] + 1
-                self.main_df = self.main_df.append(self.batch_df)
+                self.main_df = pd.concat([self.main_df, self.batch_df], axis=0) # self.main_df.append(self.batch_df)
             else:
                 self.main_df = self.batch_df.copy()
 
