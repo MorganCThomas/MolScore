@@ -35,7 +35,7 @@ def load(input_dir: os.PathLike, latest_idx: int=0):
             for f in it_files[latest_idx:]:
                 df = pd.concat([df, pd.read_csv(f, index_col=0, dtype={'valid': object})], axis=0)
             latest_idx = len(it_files)
-    elif scores_path:
+    elif os.path.exists(scores_path):
         df = pd.read_csv(scores_path, index_col=0, dtype={'valid': object})
     else:
         raise FileNotFoundError(f"Could not find iterations directory or scores.csv for {os.path.basename(input_dir)}")

@@ -28,19 +28,22 @@ st.set_page_config(
 
 def add_run(input_dir, SS):
     if input_dir not in SS.input_dirs:
-        # Add input_dirs
-        SS.input_dirs.append(input_dir)
-        # Load iterations
-        df, latest_idx = utils.load(input_dir=input_dir, latest_idx=0)
-        SS.input_latest.append(latest_idx)
-        # Carry index over
-        df.reset_index(inplace=True)
-        df.rename(columns={'index': 'idx'}, inplace=True)
-        # Add main_df
-        if SS.main_df is None:
-            SS.main_df = df
-        else:
-            SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
+        try:
+            # Load iterations
+            df, latest_idx = utils.load(input_dir=input_dir, latest_idx=0)
+             # Add input_dirs
+            SS.input_dirs.append(input_dir)
+            SS.input_latest.append(latest_idx)
+            # Carry index over
+            df.reset_index(inplace=True)
+            df.rename(columns={'index': 'idx'}, inplace=True)
+            # Add main_df
+            if SS.main_df is None:
+                SS.main_df = df
+            else:
+                SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
+        except FileNotFoundError as e:
+            raise e 
 
 
 def main():
