@@ -83,6 +83,7 @@ class PIDGIN():
         self.thresh = thresh.replace(" ", "").replace(".", "")
         self.n_jobs = n_jobs
         self.models = []
+        self.model_names = []
         self.ghost_thresholds = []
         self.fp = 'ECFP4'
         self.nBits = 2048
@@ -119,6 +120,7 @@ class PIDGIN():
                         with gzip.open(model_file, 'rb') as f:
                             clf = pkl.load(f)
                             self.models.append(clf)
+                            self.model_names.append(f'{uni}@{self.thresh}')
                 except (FileNotFoundError, KeyError):
                     logger.warning(f'{uni} model at {thresh} not found, omitting')
                     continue
@@ -150,20 +152,32 @@ class PIDGIN():
             [(valid.append(i), fps.append(fp))
             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
             if fp is not None]
+
+        # Return early if there's no results
+        if len(fps) == 0:
+            for r in results:
+                r.update({f'{self.prefix}_{name}': 0.0 for name in self.model_names})
+                r.update({f'{self.prefix}_pred_proba': 0.0})
+            return results
         
         # Predict
         for clf in self.models:
-            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
+            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]  # (smiles, bits)
             predictions.append(prediction)
-        predictions = np.asarray(predictions)
+        predictions = np.asarray(predictions).reshape(len(fps), -1)  # (smiles, models)
 
         # Binarise
         if self.binarise:
-            thresh = np.asarray(self.ghost_thresholds).reshape(-1, 1)
+            thresh = np.asarray(self.ghost_thresholds)
             predictions = (predictions >= thresh)
 
+        # Update results
+        for i, row in zip(valid, predictions):
+            for j, name in enumerate(self.model_names):
+                results[i].update({f'{self.prefix}_{name}': row[j]})
+
         # Aggregate
-        aggregated_predictions = self.agg(predictions, axis=0)
+        aggregated_predictions = self.agg(predictions, axis=1)
 
         # Update results
         for i, prob in zip(valid, aggregated_predictions):
