@@ -316,10 +316,11 @@ def getspconfig(options, key_i, tab):
         # If norm, optional specification of max/min
         st.markdown('**Parameters**')
         if smod_obj.__name__ == 'norm':
+            col1, col2 = st.columns(2)
             # Buttons
-            if st.button(label='Specify max/min') or ss.maxmin:
+            if col1.button(label='Specify max/min', key=f'{key_i}: maxmin') or ss.maxmin:
                 ss.maxmin = True
-            if st.button(label='Don\'t specify max/min') or not ss.maxmin:
+            if col2.button(label='Don\'t specify max/min', key=f'{key_i}: nomaxmin') or not ss.maxmin:
                 ss.maxmin = False
             # Grab parameters and plot
             if ss.maxmin:
