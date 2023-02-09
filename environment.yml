@@ -3,25 +3,23 @@ channels:
   - anaconda
   - conda-forge
   - openeye
+  - pytorch
+  - nvidia
 dependencies:
-  - python=3.10.8
-  - rdkit=2022.09.3
-  - ipython=8.9.0
-  - prolif=1.1.0
-  - openeye-toolkits=2022.2.1
+  - python>=3.8
+  - rdkit>=2019.03.2
+  - ipython
+  - prolif 
+  - openeye-toolkits
   - smina=2017.11.9
-  - openbabel=3.1.1
-  - dask=2023.1.1
-  - py-xgboost=1.5.0
-  - pytorch=1.13.1
+  - openbabel
+  - dask 
+  - py-xgboost
+  - streamlit>=1.11.0
+  - pytorch
   - pytorch-cuda=11.6
-  - pytorch-mutex=1.0
-  - torchaudio=0.13.1
-  - torchvision=0.14.1
-  - streamlit=1.17.0
   - pip
   - pip:
-    - zenodo-client==0.2.0
-    - levenshtein==0.20.9
-#    - streamlit-bokeh-events
+    - zenodo-client 
+    - levenshtein
     - streamlit-plotly-events
