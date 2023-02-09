@@ -18,11 +18,6 @@ if 'input_latest' not in SS.keys(): SS.input_latest = []
 if 'dock_path' not in SS.keys(): SS.dock_path = None
 if 'pymol' not in SS: SS.pymol = None
 
-# ----- Setup PyMol -----
-if SS.pymol is None:
-    if ('PYMOL_PATH' in os.environ):
-        SS.pymol = PyMol(pymol_path=os.environ['PYMOL_PATH'])
-
 # ----- Setup page -----
 st.set_page_config(
      page_title='Streamlit monitor',
@@ -77,6 +72,14 @@ def main():
         
         # Check any dock path
         SS.dock_path = any([utils.check_dock_paths(d) for d in SS.input_dirs])
+
+    # Setup PyMol
+    if (SS.pymol is None) and (SS.dock_path):
+        if ('PYMOL_PATH' in os.environ):
+            SS.pymol = PyMol(pymol_path=os.environ['PYMOL_PATH'])
+        else:
+            SS.pymol = False
+            print('Export PyMol to PYMOL_PATH to visualise molecules in PyMOl')
 
     st.sidebar.title('MolScore Monitor')
     if SS.main_df is not None:

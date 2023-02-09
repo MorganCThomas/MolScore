@@ -31,10 +31,10 @@ def load(input_dir: os.PathLike, latest_idx: int=0):
     df = pd.DataFrame()
     if os.path.exists(it_path):
         it_files = sorted(glob(os.path.join(it_path, '*.csv')))
-        if len(it_files) > latest_idx+1:
-            for f in it_files[latest_idx+1:]:
+        if len(it_files) > latest_idx:
+            for f in it_files[latest_idx:]:
                 df = pd.concat([df, pd.read_csv(f, index_col=0, dtype={'valid': object})], axis=0)
-            latest_idx = len(it_files)-1
+            latest_idx = len(it_files)
     elif scores_path:
         df = pd.read_csv(scores_path, index_col=0, dtype={'valid': object})
     else:
@@ -60,7 +60,7 @@ def update(SS):
             SS.input_latest[i] = new_idx
             # First update mol index
             df.reset_index(inplace=True)
-            df['idx'] = df['idx'] + len(SS.main_df.loc[SS.main_df.run == os.path.basename(curr_dir), :])
+            df.rename(columns={'index': 'idx'}, inplace=True) # Index should carry between iteration as index col is read in
             # Add to main_df
             SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
             # Sort

@@ -19,7 +19,7 @@ def scaffold_plot(main_df, SS, dock_path=None):
                 options=SS.input_dirs
                 )
         else:
-            input_dir = SS.input_dir[0]
+            input_dir = SS.input_dirs[0]
 
         memory_path = os.path.join(input_dir, 'scaffold_memory.csv')
         if not os.path.exists(memory_path):
