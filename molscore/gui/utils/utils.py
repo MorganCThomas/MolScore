@@ -143,7 +143,7 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
                     show_pymol = col.button(label='Send2PyMol', key=f'{legend}_pymol_button')
                     if show_pymol:
                         file_paths, names = find_sdfs([midx], main_df)
-                        send2pymol(name=names[0], path=file_paths[0], pymol=pymol)
+                        send2pymol(name=names[0], path=file_paths[0], pymol=pymol, col=col)
                 
         if dock_path is not None:
             if viewer is not None:
@@ -161,7 +161,7 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
 
 
 # ---- Exporting -----
-def send2pymol(name, path, pymol):
+def send2pymol(name, path, pymol, col=None):
     if path is None: 
         return
     # Load molecule
@@ -169,8 +169,7 @@ def send2pymol(name, path, pymol):
         with gzip.open(path) as f:
             mol = next(Chem.ForwardSDMolSupplier(f, removeHs=False))
     else:
-        with open(path) as rf:
-            mol = next(Chem.ForwardSDMolSupplier(rf, removeHs=False))
+        mol = next(Chem.ForwardSDMolSupplier(path, removeHs=False))
     # Save it to tempfile
     if mol:
         with NamedTemporaryFile(mode='w+t', suffix='.sdf') as tfile:
@@ -180,6 +179,10 @@ def send2pymol(name, path, pymol):
             writer.close()
             pymol(f'load {tfile.name}, {name}')
             sleep(0.1) # Give PyMol one hot 100th
+    else:
+        if col is not None:
+            col.write('Error parsing molecule')
+
 
 
 def _find_sdf(query_dir, step, batch_idx):
