@@ -140,9 +140,8 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
                         viewer.add_ligand(path=file_paths[0])
                 
                 if pymol is not None:
-                    show_pymol = col.button(label='Send2PyMol', key=f'{legend}_pymol_button')
-                    if show_pymol:
-                        file_paths, names = find_sdfs([midx], main_df)
+                    if col.button(label='Send2PyMol', key=f'{legend}_pymol_button'):
+                        file_paths, names = find_sdfs([midx], main_df))
                         send2pymol(name=names[0], path=file_paths[0], pymol=pymol, col=col)
                 
         if dock_path is not None:
@@ -190,6 +189,9 @@ def _find_sdf(query_dir, step, batch_idx):
          return
     # Search for an sdf file
     possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sdf*'))
+    # Try without variant
+    if len(possible_files) == 0:
+        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*.sdf*'))
     # Try another subdirectory
     if len(possible_files) == 0:
         possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*', '*.sdf*'))
