@@ -8,6 +8,8 @@ from tempfile import NamedTemporaryFile
 from typing import Union
 from itertools import cycle
 from glob import glob
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from molscore.scoring_functions.utils import get_mol
 
