@@ -181,7 +181,7 @@ def send2pymol(name, path, pymol, col=None):
             sleep(0.1) # Give PyMol one hot 100th
     else:
         if col is not None:
-            col.write('Error parsing molecule')
+            col.write('RDKit error parsing molecule')
 
 
 
@@ -201,7 +201,7 @@ def _find_sdf(query_dir, step, batch_idx):
         else:
             print(f'Ambiguous file {possible_files}')
             return possible_files[0]
-    if len(possible_files) > 0:
+    if len(possible_files) == 1:
         return possible_files[0]
 
 
