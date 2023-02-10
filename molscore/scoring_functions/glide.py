@@ -2,6 +2,7 @@
 import os
 import glob
 import gzip
+import atexit
 import logging
 from typing import Union
 from tempfile import TemporaryDirectory
@@ -66,6 +67,12 @@ class GlideDock:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
+
+        atexit.register(self._close_dask)
+
+    def _close_dask(self):
+        if self.client:
+            self.client.close()
 
     @staticmethod
     def modify_glide_in(glide_in: str, glide_property: str, glide_value: str):

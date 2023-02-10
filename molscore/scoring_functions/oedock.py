@@ -1,5 +1,6 @@
 import os
 import glob
+import atexit
 import logging
 from typing import Union
 from functools import partial
@@ -35,7 +36,7 @@ class OEDock:
         :param prefix: Prefix to identify scoring function instance (e.g., Risperidone)
         :param receptor: Path to receptor file (.oeb, .oez, .pdb, .mol2, .mmcif)
         :param ref_ligand: Path to reference ligand file used to determine binding site (.sdf, .mol2, .pdb)
-        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         :param omega_energy_window: Sets the maximum allowable energy difference between the lowest and the highest energy conformers, in units of kcal/mol
         :param omega_max_confs: Sets the maximum number of conformers to be kept
         :param omega_strict_stereo: Sets whether conformer generation should fail if stereo is not specified on the input molecules
@@ -97,6 +98,12 @@ class OEDock:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
+
+        atexit.register(self._close_dask)
+
+    def _close_dask(self):
+        if self.client:
+            self.client.close()
 
     def load_prepared_ligand(self) -> oechem.OEMol:
         """

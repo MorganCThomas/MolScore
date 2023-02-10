@@ -1,6 +1,7 @@
 import os
 import ast
 import glob
+import atexit
 import logging
 import pandas as pd
 from copy import deepcopy
@@ -166,6 +167,12 @@ class GOLDDock:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
+        
+        atexit.register(self._close_dask)
+    
+    def _close_dask(self):
+        if self.client:
+            self.client.close()
 
     @staticmethod
     def read_gold_config(gold_config):

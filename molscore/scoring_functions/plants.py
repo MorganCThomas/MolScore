@@ -1,4 +1,5 @@
 import os
+import atexit
 import glob
 import logging
 import pandas as pd
@@ -40,7 +41,7 @@ class PLANTSDock:
         :param ref_ligand: Reference ligand for identifying binding site (.sdf, .pdb, .mol2)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout before killing an individual docking simulation (seconds)
-        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         :param kwargs:
         """        
         # Convert necessary file formats
@@ -97,6 +98,12 @@ class PLANTSDock:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
+
+        atexit.register(self._close_dask)
+
+    def _close_dask(self):
+        if self.client:
+            self.client.close()
 
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .mol2"""

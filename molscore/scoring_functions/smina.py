@@ -7,6 +7,7 @@ As well as pyscreener,
 """
 
 import os
+import atexit
 import logging
 import glob
 from typing import Union
@@ -71,6 +72,12 @@ class SminaDock:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
+
+        atexit.register(self._close_dask)
+
+    def _close_dask(self):
+        if self.client:
+            self.client.close()
 
     def dock_ligands(self, ligand_paths):
         smina_commands = []
