@@ -113,7 +113,7 @@ class GOLDDock:
     }
 
     def __init__(
-        self, prefix: str, gold_template: os.PathLike = None, receptor: os.PathLike = None,  ref_ligand: os.PathLike = None,
+        self, prefix: str, gold_template: Union[None, os.PathLike] = None, receptor: os.PathLike = None,  ref_ligand: os.PathLike = None,
         cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL', **kwargs
         ):
         """
@@ -123,7 +123,7 @@ class GOLDDock:
         :param ref_ligand: Reference ligand for identifying binding site (.sdf, .pdb, .mol2)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout before killing an individual docking simulation (seconds)
-        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         :param kwargs:
         """
         assert (gold_template is not None) or ((receptor is not None) and (ref_ligand is not None)), "Must specify gold template config, or both receptor and ref_ligand" 
@@ -153,7 +153,7 @@ class GOLDDock:
         if self.client is None: self.cluster = None
 
         # Set GOLD params
-        if self.gold_template is not None:
+        if self.gold_template:
             self.params = self.read_gold_config(self.gold_template)
         else:
             self.params = self.default_config
