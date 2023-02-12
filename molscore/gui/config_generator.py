@@ -219,7 +219,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                     ptype_args = getattr(pinfo['type'], '__args__', None)
                     if ptype_args is not None:
                         pinfo['type'] = st.selectbox(label=f'{p}: input type', options=ptype_args,
-                                            index=0, key=f'{key_i}: {obj.__name__}_{p}')
+                                            index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
                     result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}',
                                                  default=pinfo['default'], label=label, options=pinfo['options'])
                     #if pinfo['type'] == int: result_dict[p] = int(result_dict[p])

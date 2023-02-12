@@ -141,7 +141,7 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
                 
                 if pymol is not None:
                     if col.button(label='Send2PyMol', key=f'{legend}_pymol_button'):
-                        file_paths, names = find_sdfs([midx], main_df))
+                        file_paths, names = find_sdfs([midx], main_df)
                         send2pymol(name=names[0], path=file_paths[0], pymol=pymol, col=col)
                 
         if dock_path is not None:
