@@ -46,21 +46,21 @@ class timedSubprocess(object):
     """
     Currently used
     """
-    def __init__(self, timeout, shell=False):
+    def __init__(self, timeout=None, shell=False, cwd=None):
         self.cmd = None
+        self.cwd = None
         self.timeout = timeout
-        assert isinstance(self.timeout, float)
         self.shell = shell
         self.process = None
 
-    def run(self, cmd):
+    def run(self, cmd, cwd=None):
         if not self.shell:
             self.cmd = cmd.split()
-            self.process = subprocess.Popen(self.cmd, preexec_fn=os.setsid,
+            self.process = subprocess.Popen(self.cmd, preexec_fn=os.setsid, cwd=cwd,
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         else:
             self.cmd = cmd
-            self.process = subprocess.Popen(self.cmd, shell=self.shell,
+            self.process = subprocess.Popen(self.cmd, shell=self.shell, cwd=cwd,
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
             out, err = self.process.communicate(timeout=self.timeout)
