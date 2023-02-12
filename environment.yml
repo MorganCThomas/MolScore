@@ -6,16 +6,14 @@ channels:
   - pytorch
   - nvidia
 dependencies:
-  - python>=3.8
+  - python>=3.8,<3.10
   - rdkit>=2019.03.2
   - ipython
   - prolif 
   - openeye-toolkits
   - smina=2017.11.9
   - openbabel
-  - dask 
-  - py-xgboost
-  - streamlit>=1.11.0
+  - dask
   - pytorch
   - pytorch-cuda=11.6
   - pip
@@ -23,3 +21,4 @@ dependencies:
     - zenodo-client 
     - levenshtein
     - streamlit-plotly-events
+    - streamlit>=1.11.0
