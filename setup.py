@@ -13,7 +13,7 @@ setup(
         'molscore': [
             'data/sample.smi',
             'data/models/RAScore/*/*.pkl',
-            'data/models/pidgin/*'],
+            'data/models/aizynth/*'],
         'moleval': [
             'test/data/sample.smi',
             'metrics/mcf.csv',
