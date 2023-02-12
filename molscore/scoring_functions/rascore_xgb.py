@@ -1,7 +1,10 @@
 """
 Adapted from https://github.com/reymond-group/RAscore published https://doi.org/10.1039/d0sc05401a
 """
+import os
+import tempfile
 import logging
+import pandas as pd
 import numpy as np
 import pickle as pkl
 from importlib import resources
@@ -10,6 +13,8 @@ from multiprocessing import Pool
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
+from molscore.scoring_functions.utils import get_mol, timedSubprocess
 
 logger = logging.getLogger('rascore_xgb')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -25,29 +30,38 @@ class RAScore_XGB:
     """
     return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str = 'RAScore', model: str = 'ChEMBL', n_jobs: int = 1, **kwargs):
+    def __init__(self, prefix: str = 'RAScore', model: str = 'ChEMBL', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance
         :param model: Either ChEMBL, GDB, GDBMedChem [ChEMBL, GDB, GDBMedChem]
-        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
         :param kwargs:
         """
         self.prefix = prefix
-        self.n_jobs = n_jobs
+        self.subprocess = timedSubprocess()
+        
+        # Check RAscore Environment
+        envs, _ = self.subprocess.run(cmd='conda info --envs')
+        envs = [line.split(" ")[0] for line in envs.decode().splitlines()[2:]]
+        assert "rascore-env" in envs, "rascore-env must be install as per instructions https://github.com/reymond-group/RAscore"
 
         if model == 'ChEMBL':
-            with resources.open_binary('molscore.data.models.RAScore.XGB_chembl_ecfp_counts', 'model.pkl') as f:
-                self.model = pkl.load(f)
+            #with resources.open_binary('molscore.data.models.RAScore.XGB_chembl_ecfp_counts', 'model.pkl') as f:
+            #    self.model = pkl.load(f)
+            with resources.path('molscore.data.models.RAScore.XGB_chembl_ecfp_counts', 'model.pkl') as p:
+                self.model_path = str(p)
         elif model == 'GDB':
-            with resources.open_binary('molscore.data.models.RAScore.XGB_gdbchembl_ecfp_counts', 'model.pkl') as f:
-                self.model = pkl.load(f)
+            #with resources.open_binary('molscore.data.models.RAScore.XGB_gdbchembl_ecfp_counts', 'model.pkl') as f:
+            #    self.model = pkl.load(f)
+            with resources.path('molscore.data.models.RAScore.XGB_gdbchembl_ecfp_counts', 'model.pkl') as p:
+                self.model_path = str(p)
         elif model == 'GDBMedChem':
-            with resources.open_binary('molscore.data.models.RAScore.XGB_gdbmedechem_ecfp_counts', 'model.pkl') as f:
-                self.model = pkl.load(f)
+            #with resources.open_binary('molscore.data.models.RAScore.XGB_gdbmedechem_ecfp_counts', 'model.pkl') as f:
+            #    self.model = pkl.load(f)
+            with resources.path('molscore.data.models.RAScore.XGB_gdbmedechem_ecfp_counts', 'model.pkl') as p:
+                self.model_path = str(p)      
         else:
             raise "Please select from ChEMBL, GDB or GDBMedChem"
-            #with open(os.path.abspath(model), 'rb') as f:
-            #    self.model = pkl.load(f)
+
 
     @staticmethod
     def calculate_fp(smiles):
@@ -58,6 +72,7 @@ class RAScore_XGB:
         :return: ECFP6 counted vector with features
         :rtype: np.array
         """
+        raise DeprecationWarning
         mol = Chem.MolFromSmiles(smiles)
         if mol:
             fp = AllChem.GetMorganFingerprint(mol, 3, useCounts=True, useFeatures=False)
@@ -79,6 +94,7 @@ class RAScore_XGB:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
+        raise DeprecationWarning
         results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
         valid = []
         fps = []
@@ -92,7 +108,7 @@ class RAScore_XGB:
 
         return results
 
-    def __call__(self, smiles: list, **kwargs):
+    def score(self, smiles: list, directory: str, **kwargs):
         """
         Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
         should return 0.0
@@ -101,5 +117,42 @@ class RAScore_XGB:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        logger.warning("__call__() will be deprecated in future versions, please use score() instead.")
-        return self.score(smiles=smiles)
+        directory = os.path.abspath(directory)
+        # Populate results with 0.0 placeholder
+        results = [{'smiles': smi} for smi in smiles]
+        for result in results:
+            result.update({f"{self.prefix}_{metric}": 0.0 for metric in self.return_metrics})
+        # Ensure they're valid otherwise AiZynthFinder will throw an error
+        valid = [i for i, smi in enumerate(smiles) if get_mol(smi)]
+        if len(valid) == 0:
+            return results
+        # Write smiles to a tempfile
+        smiles_file = tempfile.NamedTemporaryFile(mode='w+t', dir=directory, suffix='.smi')
+        smiles_file.write('SMILES\n')
+        for i in valid:
+            smiles_file.write(smiles[i]+'\n')
+        smiles_file.flush()
+        # Specify output file
+        output_file = os.path.join(directory, 'rascore_out.csv')
+        # Submit job to aizynthcli (specify filter policy if not None)
+        cmd = f"conda run -n rascore-env " \
+              f"RAscore -f {smiles_file.name} -o {output_file} -m {self.model_path}"
+        self.subprocess.run(cmd=cmd,cwd=directory)
+        # Read in ouput
+        output_data = pd.read_csv(output_file)
+        # Process output
+        for i, score in zip(valid, output_data.RAscore):
+            results[i].update({f"{self.prefix}_pred_proba": score})
+        return results
+
+
+    def __call__(self, smiles: list, directory, **kwargs):
+        """
+        Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
+        should return 0.0
+
+        :param smiles: List of SMILES strings
+        :param kwargs: Ignored
+        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        """
+        return self.score(smiles=smiles, directory=directory)

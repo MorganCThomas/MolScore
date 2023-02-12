@@ -52,7 +52,6 @@ class AiZynthFinder:
         :param exclude_target_from_stock: If the target is in stock it will be broken down if this property is True
         :param use_rdchiral: If true, will apply templates with RDChiral, otherwise RDKit will be used
         """
-        # TODO check AiZynth is actually available
         self.prefix = prefix.replace(" ", "_")
         self.config_file = tempfile.NamedTemporaryFile(mode='w+t', suffix='_config.yml')
         self.n_jobs = n_jobs

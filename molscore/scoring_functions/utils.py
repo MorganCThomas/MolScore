@@ -46,7 +46,7 @@ class timedSubprocess(object):
     """
     Currently used
     """
-    def __init__(self, timeout=None, shell=False, cwd=None):
+    def __init__(self, timeout=None, shell=False):
         self.cmd = None
         self.cwd = None
         self.timeout = timeout
