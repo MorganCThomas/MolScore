@@ -10,6 +10,8 @@ import rdkit
 from scipy.spatial.distance import cosine as cos_distance
 from scipy.stats import wasserstein_distance
 
+from molbloom import buy
+
 from moleval.utils import disable_rdkit_log, enable_rdkit_log
 from moleval.metrics.fcd_torch import FCD as FCDMetric
 from moleval.metrics.metrics_utils import mapper
@@ -195,6 +197,9 @@ class GetMetrics(object):
         # Calculate % pass filters
         if verbose: print("Calculating Filters")
         metrics['Filters'] = fraction_passes_filters(mols, self.pool)
+
+        # Calculate purchasability
+        metrics['Purchasable_ZINC20'] = np.mean(mapper(self.pool)(buy, gen))
 
         # ---- Extrinsic properties ---- 
 
