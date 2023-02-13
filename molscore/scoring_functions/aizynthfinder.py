@@ -6,6 +6,7 @@ import yaml
 import tempfile
 import logging
 import json
+import subprocess
 from typing import Union
 from importlib import resources
 
@@ -56,11 +57,15 @@ class AiZynthFinder:
         self.config_file = tempfile.NamedTemporaryFile(mode='w+t', suffix='_config.yml')
         self.n_jobs = n_jobs
         self.subprocess = timedSubprocess(timeout=None, shell=False)
+        self.env = 'aizynth-env'
 
-        # Check AiZynth Environment
-        envs, _ = self.subprocess.run(cmd='conda info --envs')
-        envs = [line.split(" ")[0] for line in envs.decode().splitlines()[2:]]
-        assert "aizynth-env" in envs, "aizynth-env must be install as per instructions https://github.com/MolecularAI/aizynthfinder"
+        # Check/create AiZynth Environment
+        if not self._check_env():
+            logger.warning(f"Failed to identify {self.env}, attempting to create it automatically (this may take several minutes)")
+            self._create_env()
+            logger.info(f"{self.env} successfully created")
+        else:
+            logger.info(f"Found existing {self.env}")
 
         # Load policy
         def try_resources(input):
@@ -122,6 +127,23 @@ class AiZynthFinder:
         logger.info(f"AiZynthFinder instantiated with the following configuration:\n{yaml.dump(self.config)}")
             
         
+    def _check_env(self):
+        cmd = "conda info --envs"
+        out = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
+        envs = [line.split(" ")[0] for line in out.stdout.decode().splitlines()[2:]]
+        return self.env in envs
+
+    
+    def _create_env(self):
+        cmd = f"conda create \"python>=3.8,<3.10\" -n {self.env} -y ; " \
+              f"conda run -n {self.env} pip install aizynthfinder"
+        try:
+            out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(out.stderr.decode())
+            logger.error(f"Failed to create {self.env} automatically please install as per instructions https://github.com/MolecularAI/aizynthfinder")
+            raise e
+
 
     def score(self, smiles, directory, **kwargs):
         """
@@ -147,7 +169,7 @@ class AiZynthFinder:
         # Specify output file
         output_file = os.path.join(directory, 'aizynth_out.json')
         # Submit job to aizynthcli (specify filter policy if not None)
-        cmd = f"conda run -n aizynth-env " \
+        cmd = f"conda run -n {self.env} " \
               f"aizynthcli --smiles {smiles_file.name} --config {self.config_file.name} --output {output_file} --nproc {int(self.n_jobs)}" # --filter my_policy
         if self.filter_policy:
             cmd += f" --filter my_policy"
@@ -162,11 +184,11 @@ class AiZynthFinder:
             results[i].update({f"{self.prefix}_{metric}": out[metric] for metric in ['precursors_in_stock', 'precursors_not_in_stock']})
         return results
 
-    def __call__(self, smiles, directory, file_names, **kwargs):
+    def __call__(self, smiles, directory, **kwargs):
         """
         Calculate AiZynthfinder for a list of smiles.
         :param smiles: List of SMILES strings.
         :param directory: Directory to save files and logs into
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        return self.score(smiles=smiles, directory=directory, file_names=file_names)
+        return self.score(smiles=smiles, directory=directory)

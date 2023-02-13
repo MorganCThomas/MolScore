@@ -4,6 +4,7 @@ Adapted from https://github.com/reymond-group/RAscore published https://doi.org/
 import os
 import tempfile
 import logging
+import subprocess
 import pandas as pd
 import numpy as np
 import pickle as pkl
@@ -30,37 +31,61 @@ class RAScore_XGB:
     """
     return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str = 'RAScore', model: str = 'ChEMBL', **kwargs):
+    def __init__(self, prefix: str = 'RAScore', model: str = 'ChEMBL', method: str = 'XGB', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance
         :param model: Either ChEMBL, GDB, GDBMedChem [ChEMBL, GDB, GDBMedChem]
+        :param method: Either XGB or DNN [XGB, DNN]
         :param kwargs:
         """
         self.prefix = prefix
         self.subprocess = timedSubprocess()
+        self.env = "rascore-env"
+        self.method = method
+        if self.method == 'XGB':
+            self.ext = 'pkl'
+            self.fp = 'ecfp'
+        else:
+            self.ext = 'h5'
+            self.fp = 'fcfp'
         
-        # Check RAscore Environment
-        envs, _ = self.subprocess.run(cmd='conda info --envs')
-        envs = [line.split(" ")[0] for line in envs.decode().splitlines()[2:]]
-        assert "rascore-env" in envs, "rascore-env must be install as per instructions https://github.com/reymond-group/RAscore"
+        # Check/create RAscore Environment
+        if not self._check_env():
+            logger.warning(f"Failed to identify {self.env}, attempting to create it automatically (this may take several minutes)")
+            self._create_env()
+            logger.info(f"{self.env} successfully created")
+        else:
+            logger.info(f"Found existing {self.env}")
 
         if model == 'ChEMBL':
-            #with resources.open_binary('molscore.data.models.RAScore.XGB_chembl_ecfp_counts', 'model.pkl') as f:
-            #    self.model = pkl.load(f)
-            with resources.path('molscore.data.models.RAScore.XGB_chembl_ecfp_counts', 'model.pkl') as p:
+            with resources.path(f'molscore.data.models.RAScore.{self.method}_chembl_{self.fp}_counts', f'model.{self.ext}') as p:
                 self.model_path = str(p)
         elif model == 'GDB':
-            #with resources.open_binary('molscore.data.models.RAScore.XGB_gdbchembl_ecfp_counts', 'model.pkl') as f:
-            #    self.model = pkl.load(f)
-            with resources.path('molscore.data.models.RAScore.XGB_gdbchembl_ecfp_counts', 'model.pkl') as p:
+            with resources.path(f'molscore.data.models.RAScore.{self.method}_gdbchembl_{self.fp}_counts', f'model.{self.ext}') as p:
                 self.model_path = str(p)
         elif model == 'GDBMedChem':
-            #with resources.open_binary('molscore.data.models.RAScore.XGB_gdbmedechem_ecfp_counts', 'model.pkl') as f:
-            #    self.model = pkl.load(f)
-            with resources.path('molscore.data.models.RAScore.XGB_gdbmedechem_ecfp_counts', 'model.pkl') as p:
+            with resources.path(f'molscore.data.models.RAScore.{self.method}_gdbmedechem_{self.fp}_counts', f'model.{self.ext}') as p:
                 self.model_path = str(p)      
         else:
             raise "Please select from ChEMBL, GDB or GDBMedChem"
+
+
+    def _check_env(self):
+        cmd = "conda info --envs"
+        out = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
+        envs = [line.split(" ")[0] for line in out.stdout.decode().splitlines()[2:]]
+        return self.env in envs
+
+    
+    def _create_env(self):
+        cmd = f"conda create -n {self.env} python=3.7 -y ; " \
+              f"conda install -n {self.env} -c rdkit rdkit -y ; " \
+              f"conda run -n {self.env} pip install git+https://github.com/reymond-group/RAscore.git@master"
+        try:
+            subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to create {self.env} automatically please install as per instructions https://github.com/reymond-group/RAscore")
+            raise e
 
 
     @staticmethod
@@ -85,7 +110,7 @@ class RAScore_XGB:
         else:
             return None
 
-    def score(self, smiles: list, **kwargs):
+    def _score_old(self, smiles: list, **kwargs):
         """
         Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
         should return 0.0
@@ -135,7 +160,7 @@ class RAScore_XGB:
         # Specify output file
         output_file = os.path.join(directory, 'rascore_out.csv')
         # Submit job to aizynthcli (specify filter policy if not None)
-        cmd = f"conda run -n rascore-env " \
+        cmd = f"conda run -n {self.env} " \
               f"RAscore -f {smiles_file.name} -o {output_file} -m {self.model_path}"
         self.subprocess.run(cmd=cmd,cwd=directory)
         # Read in ouput
