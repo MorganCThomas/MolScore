@@ -506,11 +506,11 @@ class MolScore:
             self.monitor_app = None
         return self
 
-    def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
-                 score_only: bool = False):
+    def score(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
+              score_only: bool = False):
         """
-        Calling MolScore will result in the primary function of scoring smiles and logging data in
-         an automated fashion.
+        Calling this method will result in the primary function of scoring smiles and logging data in
+         an automated fashion, and returning output values.
 
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
@@ -521,6 +521,24 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
         :return: Scores (either float list or np.array)
         """
+        return self(smiles=smiles, step=step, flt=flt, recalculate=recalculate, score_only=score_only)
+    
+    def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
+                 score_only: bool = False):
+        """
+        Calling MolScore will result in the primary function of scoring smiles and logging data in
+         an automated fashion, and returning output values.
+
+        :param smiles: A list of smiles for scoring.
+        :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
+        :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
+        :param recalculate: Whether to recalculate scores for duplicated values,
+         in case scoring function may be somewhat stochastic.
+          (default False i.e. use existing scores for duplicated molecules)
+        :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
+        :return: Scores (either float list or np.array)
+        """
+        logger.warning(f'This method will be removed in the future, please use .score() instead.')
         if score_only:
             batch_start = time.time()
             if step is not None:
