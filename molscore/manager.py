@@ -2,6 +2,7 @@ import os
 import signal
 import time
 import json
+import atexit
 import logging
 import numpy as np
 import subprocess
@@ -162,6 +163,9 @@ class MolScore:
                                                      scores=previous_scaffold_memory.loc[: ,
                                                             ~previous_scaffold_memory.columns.isin(['Cluster', 'Scaffold', 'SMILES'])].to_dict('records'))
 
+        # Registor write_scores and kill_monitor at close
+        atexit.register(self.write_scores)
+        atexit.register(self.kill_monitor)
         logger.info('MolScore initiated')
 
     def parse_smiles(self, smiles: list, step: int):
@@ -411,9 +415,7 @@ class MolScore:
 
     def write_scores(self):
         """
-        Function to write final dataframe to file.
-
-        :return:
+        Write final dataframe to file.
         """
         if len(self.logged_parameters) > 0:
             temp = self.main_df.copy()
@@ -484,7 +486,7 @@ class MolScore:
 
     def run_monitor(self):
         """
-        Run Dash Monitor.
+        Run streamlit monitor.
         """
         # Start dash_utils monitor (Killed in write scores method)
         cmd = ['streamlit', 'run', self.monitor_app_path, self.save_dir]
@@ -493,7 +495,7 @@ class MolScore:
 
     def kill_monitor(self):
         """
-        Kill dash_utils monitor
+        Kill streamlit monitor.
         """
         if self.monitor_app is None:
             logger.info('No monitor to kill')
@@ -501,6 +503,7 @@ class MolScore:
         else:
             os.killpg(os.getpgid(self.monitor_app.pid), signal.SIGTERM)
             _, _ = self.monitor_app.communicate()
+            self.monitor_app = None
         return self
 
     def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
