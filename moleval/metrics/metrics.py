@@ -15,6 +15,7 @@ from molbloom import buy
 from moleval.utils import disable_rdkit_log, enable_rdkit_log
 from moleval.metrics.fcd_torch import FCD as FCDMetric
 from moleval.metrics.metrics_utils import mapper
+from moleval.metrics.metrics_utils import SillyWalks
 from moleval.metrics.metrics_utils import SA, QED, NP, weight, logP
 from moleval.metrics.metrics_utils import compute_fragments, average_agg_tanimoto, \
     compute_scaffolds, fingerprints, numpy_fps_to_bitvectors, sphere_exclusion,\
@@ -124,14 +125,17 @@ class GetMetrics(object):
         if self.test is not None:
             print('Computing test pre-statistics')
             self.test_int = compute_intermediate_statistics(self.test, pool=self.pool, run_fcd=self.run_fcd, **self.kwargs)
+            self.test_sw = SillyWalks(reference_mols=self.test, n_jobs=self.n_jobs)
             if not self.ptest: self.ptest = self.test_int.get('FCD')
         if self.test_scaffolds is not None:
             print('Computing test scaffold pre-statistics')
             self.test_scaffolds_int = compute_intermediate_statistics(self.test_scaffolds, pool=self.pool, run_fcd=self.run_fcd, **self.kwargs)
+            self.test_scaffolds_sw = SillyWalks(reference_mols=self.test_scaffolds, n_jobs=self.n_jobs)
             if not self.ptest_scaffolds: self.ptest_scaffolds = self.test_scaffolds_int.get('FCD')
         if self.target is not None:
             print('Computing target pre-statistics')
             self.target_int = compute_intermediate_statistics(self.target, pool=self.pool, run_fcd=self.run_fcd, **self.kwargs)
+            self.target_sw = SillyWalks(reference_mols=self.target, n_jobs=self.n_jobs)
             if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
     def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, verbose=False):
@@ -185,7 +189,9 @@ class GetMetrics(object):
         if verbose: print("Calculating Diversity")
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
-        metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
+        if (se_k is not None) and (len(mols) < se_k):
+            print(f'WARNING: Less than {se_k} molecules so SEDiv is non-standard.')
+            metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
         if (se_k is not None) and (len(gen) >= se_k):
             metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
@@ -227,6 +233,7 @@ class GetMetrics(object):
             metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
+            metrics['Sillyness'] = self.test_sw.score_mols(mols)
             for name, func in [('logP', logP),
                                ('NP', NP),
                                ('SA', SA),
@@ -240,6 +247,7 @@ class GetMetrics(object):
             metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
             metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
             metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
+            metrics['Sillyness_testSF'] = self.test_scaffolds_sw.score_mols(mols)
 
         # Target metrics
         if self.target_int is not None:
@@ -252,6 +260,7 @@ class GetMetrics(object):
             metrics['SNN_target'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['SNN'])
             metrics['Frag_target'] = FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag'])
             metrics['Scaf_target'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf'])
+            metrics['Sillyness_target'] = self.target_sw.score_mols(mols)
             for name, func in [('logP', logP),
                                ('NP', NP),
                                ('SA', SA),

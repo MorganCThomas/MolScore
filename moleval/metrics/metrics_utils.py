@@ -1,4 +1,5 @@
 import os
+from typing import Union, Tuple
 from multiprocessing import Pool
 from collections import Counter, defaultdict
 from itertools import combinations
@@ -553,7 +554,12 @@ class SillyWalks:
                 count_dict[k] = v
         return count_dict
         
-    def score(self, mol):
+    def score(self, mol: Union[str, Chem.rdchem.Mol]) -> Tuple:
+        """
+        Return the ratio of outlier FP bits in a molecule
+        :param mol: SMILES or RDKit Mol
+        :return: (Ratio of outlier FP bits, identifies bits, molecule bit information) 
+        """
         mol = get_mol(mol)
         if mol is not None:
             bi = {}
@@ -562,3 +568,25 @@ class SillyWalks:
             silly_bits = [bit for bit in on_bits if self.count_dict[bit] == 0]
             score = len(silly_bits) / len(on_bits)
             return score, silly_bits, bi
+
+    @staticmethod
+    def _score(mol: Union[str, Chem.rdchem.Mol], count_dict) -> Tuple:
+        mol = get_mol(mol)
+        if mol is not None:
+            bi = {}
+            fp = AllChem.GetMorganFingerprint(mol, 2, bitInfo=bi)
+            on_bits = fp.GetNonzeroElements().keys()
+            silly_bits = [bit for bit in on_bits if count_dict[bit] == 0]
+            score = len(silly_bits) / len(on_bits)
+            return score, silly_bits, bi
+
+    def score_mols(self, mols: list) -> float:
+        """
+        Return the average ratio of outlier FP bits for a list of molecules
+        :param: List of SMILES or RDKit Mols
+        :return: Average ratio of outlier FP bits
+        """
+        mols = [m for m in mapper(self._n_jobs)(get_mol, mols) if m is not None]
+        scores = [s[0] for s in mapper(self._n_jobs)(partial(self._score, count_dict=self.count_dict), mols)]
+        return np.mean(scores)
+
