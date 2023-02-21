@@ -14,8 +14,10 @@ dependencies:
   - smina=2017.11.9
   - openbabel
   - dask
-  - pytorch
-  - pytorch-cuda=11.6
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - pytorch::pytorch-cuda=11.6  # Version may need to change depending on NVIDIA drivers
   - pip
   - pip:
     - zenodo-client 
