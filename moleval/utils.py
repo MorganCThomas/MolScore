@@ -7,6 +7,7 @@ import numpy as np
 from tqdm.auto import tqdm
 import gzip
 from Levenshtein import distance as levenshtein
+from torch import cuda
 
 from rdkit import Chem, SimDivFilters, DataStructs
 from rdkit.Chem import AllChem, rdMolDescriptors, rdmolops, Scaffolds
@@ -25,6 +26,10 @@ disable_rdkit_log()
 
 def enable_rdkit_log():
     rdBase.EnableLog('rdApp.*')
+
+
+def cuda_available():
+    return cuda.is_available()
 
 
 def mapper(function, input: list, n_jobs: int = 1, progress_bar: bool = True):

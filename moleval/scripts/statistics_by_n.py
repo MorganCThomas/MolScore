@@ -7,14 +7,15 @@ import pickle as pkl
 import numpy as np
 import math
 
-from moleval.metrics.metrics import GetMosesMetrics
+from moleval.metrics.metrics import GetMetrics
+from moleval import utils
 
-from rdkit import rdBase
-rdBase.DisableLog('rdApp.error')
+#from rdkit import rdBase
+#rdBase.DisableLog('rdApp.error')
 
 
 def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain, ptest, ptarget,
-                           n_jobs, n_col=None, n=None):
+                           n_jobs, n_col=None, n=None, device='cpu', run_fcd=False):
     """
     Function that iterates of molscore results and summarises per K molecules.
 
@@ -25,10 +26,10 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
     """
 
     n_metrics = []
-    get_moses = GetMosesMetrics(n_jobs=n_jobs, device='cuda:1', batch_size=512,
-                                pool=None, train=train, test=test,
-                                test_scaffolds=test_scaffolds, target=target,
-                                ptest=ptest, ptrain=ptrain, ptarget=ptarget)
+    get_metrics = GetMetrics(n_jobs=n_jobs, device=device, batch_size=512, run_fcd=run_fcd,
+                             pool=None, train=train, test=test,
+                             test_scaffolds=test_scaffolds, target=target,
+                             ptest=ptest, ptrain=ptrain, ptarget=ptarget)
 
     if (n_col is not None) and (n is None):
         for i in tqdm(results[n_col].unique()):
@@ -37,7 +38,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'step': i})
             # ------ Compute Moses metrics ------
-            moses_metrics = get_moses.calculate(smiles, se_k=None)
+            moses_metrics = get_metrics.calculate(smiles, se_k=None)
             sum_metrics.update(moses_metrics)
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
@@ -61,7 +62,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'n': i})
             # ------ Compute Moses metrics ------
-            moses_metrics = get_moses.calculate(smiles, se_k=None)
+            moses_metrics = get_metrics.calculate(smiles, se_k=None)
             sum_metrics.update(moses_metrics)
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
@@ -86,7 +87,7 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
             smiles = sum_df['smiles'].unique().tolist()
             sum_metrics.update({'step': i+n})
             # ------ Compute Moses metrics ------
-            moses_metrics = get_moses.calculate(smiles, se_k=None)
+            moses_metrics = get_metrics.calculate(smiles, se_k=None)
             sum_metrics.update(moses_metrics)
             # ------ Compute molscore metrics ------
             sum_metrics.update({'Validity': (sum_df['valid'] == 'true').mean()})
@@ -107,87 +108,82 @@ def calculate_n_statistics(results, train, test, test_scaffolds, target, ptrain,
 
 
 if __name__=='__main__':
-    parser = argparse.ArgumentParser(description='Summarise molscore results per K molecules for ease of analysis.')
-    parser.add_argument('-i', dest='input', help='Path to relevant scores.csv file.')
-    parser.add_argument('--train', help='Smiles used for training (.smi).')
-    parser.add_argument('--test', help='Smiles used for test (.smi).')
-    parser.add_argument('--test_scaff', help='Smiles used for test scaffold (.smi).')
-    parser.add_argument('--target', help='Smiles used for target (.smi)')
-    parser.add_argument('--o', dest='output', help='Output directory to save output to.')
-    parser.add_argument('--n_col', help='Split data by column definining step / iteration.', type=str)
-    parser.add_argument('--n', help='Split data into groups of specified size.', type=int)
-    parser.add_argument('--ptrain', help='FCD summary statistics for training data (.pkl).')
-    parser.add_argument('--ptest', help='FCD summary statistics for test data (.pkl).')
-    parser.add_argument('--ptarget', help='FCD summary statistics for target data - #5000 minimum ideally (.pkl).')
-    parser.add_argument('--n_jobs', help='Number of jobs for parallel processing where possible.', default=1,
-                        type=int)
+    parser = argparse.ArgumentParser(description=
+                                    """
+                                    Summarise molscore results per n molecules or n values by calculating the mean, median and std as well as calculating moleval metrics. 
+                                    For example, n=100 is every 100 molecules, n_col=step is every step, n=100 and n_col=step is every 100 steps.
+                                    Either n or n_col must be provided.
+                                    """
+                                    )
+    parser.add_argument('input', help='Path to relevant scores.csv file.')
+    parser.add_argument('--output_dir', dest='output', help='Output directory to save output to, default is parent directory of input.')
+    parser.add_argument('--n_col', help='Split data by column definining step / iteration.', type=str, default=None)
+    parser.add_argument('--n', help='Split data into groups of specified size.', type=int, default=None)
+    parser.add_argument('--n_jobs', help='Number of jobs for parallel processing where possible.', default=1, type=int)
+    parser.add_argument('--run_fcd', action='store_true', help='Run Frechet Chemnet Distance calculations (FCD)')
+    parser.add_argument('--cpu', action='store_true', help='Only use CPU during metric calculations')
+
+    ref_sets = parser.add_argument_group('Reference datasets', 'Reference datasets to compare to de novo molecules. If not provided, will compute intrinsic properties only.')
+    ref_sets.add_argument('--train', help='Smiles used for training (.smi).', default=None)
+    ref_sets.add_argument('--test', help='Smiles used for test (.smi).', default=None)
+    ref_sets.add_argument('--test_scaff', help='Smiles used for test scaffold (.smi).', default=None)
+    ref_sets.add_argument('--target', help='Smiles used for target (.smi)', default=None)
+    
+    fcd_stats = parser.add_argument_group('FCD statistics', 'Pre-prepared FCD statistics for reference datasets')
+    fcd_stats.add_argument('--ptrain', help='FCD summary statistics for training data (.pkl).', default=None)
+    fcd_stats.add_argument('--ptest', help='FCD summary statistics for test data (.pkl).', default=None)
+    fcd_stats.add_argument('--ptarget', help='FCD summary statistics for target data - #5000 minimum ideally (.pkl).', default=None)
+
     args = parser.parse_args()
 
-    # Load in files
-    if args.input:
-        results = pd.read_csv(args.input, index_col=0, dtype={'valid': object,
-                                                              'unique': object})
-
+    # ----- Prepare inputs -----
+    # Load in scores.csv
+    results = pd.read_csv(args.input, index_col=0, dtype={'valid': object, 'unique': object})
+    # Check n/n_col
+    assert (args.n is not None) or (args.n_col is not None), "Either \'n\' or \'n_col\' must be provided. Try \'--n 100\' maybe?"
+    # Load in reference datasets
     if args.train:
-        with open(args.train, 'rt') as f:
-            train = f.read().splitlines()
-    else:
-        train = None
-
+        args.train = utils.read_smiles(args.train)
     if args.test:
-        with open(args.test, 'rt') as f:
-            test = f.read().splitlines()
-    else:
-        test = None
-
+        args.test = utils.read_smiles(args.test)
     if args.test_scaff:
-        with open(args.test_scaff, 'rt') as f:
-            test_scaff = f.read().splitlines()
-    else:
-        test_scaff = None
-
+        args.test_scaff = utils.read_smiles(args.test_scaff)
     if args.target:
-        with open(args.target, 'rt') as f:
-            target = f.read().splitlines()
-    else:
-        target = None
-
+        args.target = utils.read_smiles(args.target)
+    # Load in pre-prepared FCD statistics
     if args.ptrain:
-        with open(args.ptrain, 'rb') as f:
-            ptrain = pkl.load(f)
-    else:
-        ptrain = None
-
+        args.ptrain = utils.read_pickle(args.ptrain)
     if args.ptest:
-        with open(args.ptest, 'rb') as f:
-            ptest = pkl.load(f)
-    else:
-        ptest = None
-
+        args.ptest = utils.read_pickle(args.ptest)
     if args.ptarget:
-        with open(args.ptarget, 'rb') as f:
-            ptarget = pkl.load(f)
+        args.ptarget = utils.read_pickle(args.ptarget)
+    # Set device
+    if utils.cuda_available() and not (args.cpu):
+        device = 'cuda:1'
     else:
-        ptarget = None
+        device = 'cpu'
 
-    # Print basic summary
+    # ----- Basic summary -----
     print('Processing {}'.format(args.input))
     print('Size: {}\nValid: {}%\nUnique: {}%'.format(len(results),
                                                      round((results['valid'] == 'true').mean() * 100, 2),
                                                      round((results['unique'] == 'true').mean() * 100, 2)))
 
-    # Calculate Statistics
+    # ----- Calculate Statistics -----
     n_results = calculate_n_statistics(results=results,
-                                       train=train, test=test, test_scaffolds=test_scaff, target=target,
-                                       ptrain=ptrain, ptest=ptest, ptarget=ptarget,
-                                       n_jobs=args.n_jobs,
-                                       n_col=args.n_col, n=args.n)
-
+                                       train=args.train, test=args.test, test_scaffolds=args.test_scaff, target=args.target,
+                                       ptrain=args.ptrain, ptest=args.ptest, ptarget=args.ptarget,
+                                       n_jobs=args.n_jobs, n_col=args.n_col, n=args.n, device=device, run_fcd=args.run_fcd)
+    
+    # ----- Save output -----
+    # Output file name
     in_name = os.path.basename(args.input).split(".")[0]
     out_name = f"{in_name}_summary"
-    # Check directory
-    if not os.path.exists(args.output):
-        os.makedirs(args.output)
+    # Output directory
+    if args.output:
+        os.makedirs(args.output, exist_ok=True)
+    else:
+        args.output = os.path.dirname(args.input)
     # If similar file, rename.
     if os.path.exists(os.path.join(args.output, f"{out_name}.csv")):
         print('Warning: Found pre-existing file that would be overwritten. Appending data and time.')
