@@ -20,7 +20,7 @@ dependencies:
   - pytorch::pytorch-cuda=11.6  # Version may need to change depending on NVIDIA drivers
   - pip
   - pip:
-    - zenodo-client 
+    - zenodo-client==0.2.0
     - levenshtein
     - streamlit-plotly-events
     - streamlit>=1.11.0
