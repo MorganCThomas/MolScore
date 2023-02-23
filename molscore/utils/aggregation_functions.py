@@ -9,16 +9,17 @@ from molscore.scoring_functions.utils import Fingerprints
 
 def single(x: np.ndarray, **kwargs):
     """
-    Dummy function for single property optimization
+    Dummy function that doesn't apply any transformation (for single property optimization that takes only one value).
     :param x: Vector of scores
-    :return: Aggregate score bound between [0, 1]
+    :return: x
     """
     return x
 
 
 def wsum(x: np.ndarray, w: np.ndarray, **kwargs):
     """
-    Weighted sum
+    Weighted sum, where $x_{i}$ is a molecules value for parameter $i$ with weight $w_{i}$ and $N$ is the total number of parameters.  
+    $${\sum_{i}^{N}x_{i}w_{i} \over \sum_{i}^{N}w_{i}}$$
     :param x: Vector of scores
     :param w: Vector of weights that should sum to 1
     :return: Aggregate score bound between [0, 1]
@@ -33,7 +34,8 @@ def wsum(x: np.ndarray, w: np.ndarray, **kwargs):
 
 def prod(x: np.ndarray, **kwargs):
     """
-    Product
+    Product, where $x_{i}$ is a molecules value for parameter $i$ and $N$ is the total number of parameters.  
+    $$\prod_{i}^{N}x_{i}$$
     :param x: Vector of score
     :return: Vector product
     """
@@ -43,7 +45,8 @@ def prod(x: np.ndarray, **kwargs):
 
 def wprod(x: np.ndarray, w: np.ndarray, **kwargs):
     """
-    Weighted product
+    Weighted product, where $x_{i}$ is a molecules value for parameter $i$ with weight $w_{i}$ and $N$ is the total number of parameters.  
+    $$[\prod_{i}^{N}x_{i}^{w_{i}}]^{1 \over \sum_{i}^{N}w_{i}}$$
     :param x: Vector of scores
     :param w: Vector of weights that should sum to 1
     :return: Aggregate score bound between [0, 1]
@@ -64,9 +67,11 @@ class DynamicSum:
     @classmethod
     def auto_wsum(cls, x: np.ndarray, X: np.ndarray, thresh: int = 0.5, **kwargs):
         """
-        Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9)
+        Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9).
+        Same as the weighted sum but weights are calculated based on the ratio of molecules within a batch above a set threshold (default threshold is 0.5). 
         :param x: Vector of scores
         :param X: Scores for all molecules within a batch
+        :param thresh: Threshold used to assign weight ratios, default = 0.5
         :return: Aggregate score bound between [0, 1]
         """
         # Update class to avoid computing weights every query x in the same batch
@@ -90,9 +95,11 @@ class DynamicProd:
     @classmethod
     def auto_wprod(cls, x: np.ndarray, X: np.ndarray, thresh: int = 0.5, **kwargs):
         """
-         Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9)
+        Dynamic weights based on intra-batch feature ratios from 'DrugEx v2' (10.1186/s13321-021-00561-9).
+        Same as the weighted product but weights are calculated based on the ratio of molecules within a batch above a set threshold (default threshold is 0.5). 
         :param x: Vector of scores
-        :param X: Scores for all molecules within a batch
+        :param X: Scores for all molecules within a batch (molecules, features)
+        :param thresh: Threshold used to assign weight ratios, default = 0.5
         :return: Aggregate score bound between [0, 1]
         """
         # Update class to avoid computing weights every query x in the same batch
@@ -109,7 +116,8 @@ class DynamicProd:
 
 def gmean(x: np.ndarray, **kwargs):
     """
-    Geometric mean
+    Geometric mean, where $x_{i}$ is a molecules value for parameter $i$ and $N$ is the total number of parameters.  
+    $$[\prod_{i}^{N}x_{i}]^{1 \over N}$$
     :param x: Vector of scores
     :return: Aggregate score bound between [0, 1]
     """
@@ -119,7 +127,8 @@ def gmean(x: np.ndarray, **kwargs):
 
 def amean(x: np.ndarray, **kwargs):
     """
-    Arithmetic mean
+    Arithmetic mean, where $x_{i}$ is a molecules value for parameter $i$ and $N$ is the total number of parameters.   
+    $$ {1 \over N} \sum_{i}^{N} x_{i} $$
     :param x: Vector of scores
     :return: Aggregate score bound between [0, 1]
     """
@@ -187,7 +196,9 @@ class ParetoFront:
     @classmethod
     def pareto_front(cls, x: np.ndarray, X: np.ndarray, batch_smiles: list, thresh: float = 0.5, **kwargs):
         """
-        Implementation of Pareto Front from 'DrugEx v2' (10.1186/s13321-021-00561-9)
+        Implementation of Pareto Front from 'DrugEx v2' (10.1186/s13321-021-00561-9).
+        Compute the intra-batch pareto front and score molecules based on their rank and desirability.
+        See the referred publication for more detail.
         :param x: Vector of scores
         :param X: Scores for all molecules within a batch
         :param thresh: Threshold to define desirable or undesirable molecules

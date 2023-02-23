@@ -251,10 +251,12 @@ def getsfconfig(key_i, tab):
     with tab:
         # Choose scoring functions
         sf_config['name'] = st.selectbox(
-            label='Type',
+            label='Type of scoring function',
             options=[s.__name__ for s in scoring_functions.all_scoring_functions if not (s.__name__ in ['TanimotoSimilarity', 'RDKitDescriptors'])], # Remove these as only present for backwards compatability
             index=0,
-            key=f'{key_i}: sf_name')
+            key=f'{key_i}: sf_name',
+            help='Select which type of scoring function to run from the dropdown list.'
+            )
         sf_config['run'] = True
         # Get (class/function) from name ...
         sf_obj = [s for s in scoring_functions.all_scoring_functions if s.__name__ == sf_config['name']][0]
@@ -289,21 +291,27 @@ def getspconfig(options, key_i, tab):
     sp_config = {}
     # Do it within a tab
     with tab:
-        sp_config['name'] = st.selectbox(label='Ouput name',
-                                        options=options,
-                                        index=0,
-                                        key=f'{key_i}: sp_name')
+        sp_config['name'] = st.selectbox(
+            label='Scoring parameter',
+            options=options,
+            index=0,
+            key=f'{key_i}: sp_name',
+            help='Select which scoring parameter to include in the final molecule score/reward from the dropdown list.'
+            )
         if sp_config['name'] is None:
             return
         with st.expander(label='Weight (only applicable if using wsum or wprod)'):
             sp_config['weight'] = st.number_input(
-                label='weight', value=1.0, key=f'{key_i}: sp_weight'
+                label='weight', value=1.0, key=f'{key_i}: sp_weight', help='These weights are normalized by the sum of all weights (i.e., any positive value can be used).'
                 )
         # Get (class/function) for transformation/modification from name and print doc ...
-        sp_config['modifier'] = st.selectbox(label='Modifier',
-                                            options=[m.__name__ for m in utils.all_score_modifiers],
-                                            index=0,
-                                            key=f'{key_i}: sp_modifier')
+        sp_config['modifier'] = st.selectbox(
+            label='Transformation function',
+            options=[m.__name__ for m in utils.all_score_modifiers],
+            index=0,
+            key=f'{key_i}: sp_modifier',
+            help='Select the transformation function used to transform the parameter value to between 0 and 1 from the dropdown list.'
+            )
         smod_obj = [m for m in utils.all_score_modifiers if m.__name__ == sp_config['modifier']][0]
         # Write doc for func
         smod_doc = inspect.getdoc(smod_obj).split(':')[0]
@@ -318,9 +326,9 @@ def getspconfig(options, key_i, tab):
         if smod_obj.__name__ == 'norm':
             col1, col2 = st.columns(2)
             # Buttons
-            if col1.button(label='Specify max/min', key=f'{key_i}: maxmin') or ss.maxmin:
+            if col1.button(label='Specify max/min', key=f'{key_i}: maxmin', help='Parameter value will be maxmin normalized between these values') or ss.maxmin:
                 ss.maxmin = True
-            if col2.button(label='Don\'t specify max/min', key=f'{key_i}: nomaxmin') or not ss.maxmin:
+            if col2.button(label='Don\'t specify max/min', key=f'{key_i}: nomaxmin', help='Pameter value will be dynamically maxmin normalized based on the maximum and minimum observed values so far (i.e., moving goal post).') or not ss.maxmin:
                 ss.maxmin = False
             # Grab parameters and plot
             if ss.maxmin:
@@ -335,7 +343,7 @@ def getspconfig(options, key_i, tab):
         col1, col2, col3 = st.columns([1, 1, 1])
         try:
             with col1:
-                st.write('Example')
+                st.write('Example value transformation shown here (if relevant):')
             with col2:
                 st.write(utils.transformation_functions.plot_mod(smod_obj, sp_config['parameters']))
         except:
@@ -349,21 +357,43 @@ def getspconfig(options, key_i, tab):
 
 # ----- Start App -----
 st.title('MolScore Configuration Writer')
+st.markdown(
+    """
+    This interface can be used to help write the configuration file describing how to score molecules required by MolScore.
+    Below each section, you can preview the resulting JSON for that section. Widgets and descriptions for functions and 
+    function parameters are automatically extracted from documentation and typing.
+    """
+    )
 config = dict()
 
 
 # ------ Basic information ------
 st.markdown('#') # Add spacing
 st.subheader('Run parameters')
-config['task'] = st.text_input(label='Task name (for file naming)', value='QED').strip().replace(' ', '_')
+config['task'] = st.text_input(
+    label='Task name (for file naming)',
+    value='QED',
+    help='This should succinctly and uniquely name your objective.'
+    ).strip().replace(' ', '_')
 
-config['output_dir'] = st.text_input(label='Output directory', value='./')
-absolute_output_path = st.checkbox(label='Absolute path')
+config['output_dir'] = st.text_input(
+    label='Output directory',
+    value='./',
+    help='Output directory to where MolScore will save another directory containing the run output that will be automatically named.'
+    )
+
+absolute_output_path = st.checkbox(
+    label='Absolute path',
+    help='Whether this is an absolute file path or not. If unchecked, this is assumed to be a relative path based depending on where you run generative model script.'
+    )
 if absolute_output_path:
     config['output_dir'] = os.path.abspath(config['output_dir'])
     st.write(f"Selected: {config['output_dir']}")
 
-config['load_from_previous'] = st.checkbox(label='Continue from previous directory')
+config['load_from_previous'] = st.checkbox(
+    label='Continue from previous directory',
+    help='Continue scoring from a previous run and automatically run from the more recent step, generative model iterations may need to be modified.'
+    )
 if config['load_from_previous']:
     col1, col2 = st.columns([1, 9])
     with col2:
@@ -376,18 +406,115 @@ if config['load_from_previous']:
         st.write(f"Selected: {config['previous_dir']}")
 
 # ------ Logging ------
-config['logging'] = st.checkbox(label='Verbose logging')
+config['logging'] = st.checkbox(
+    label='Verbose logging',
+    help='Set logging level to info and additionally channel logging to the terminal.'
+    )
 
 # ------ App monitor ------
-config['monitor_app'] = st.checkbox(label='Run live monitor app')
+config['monitor_app'] = st.checkbox(
+    label='Run live monitor app',
+    help='Automatically run the monitor gui as a subprocess after the first iteration is scored. This can also be run manually at any time.'
+    )
+
+# ----- Scoring functions ------
+st.markdown('#') # Add spacing
+st.subheader('Scoring functions')
+st.markdown(
+    """
+    Select and run one/multiple scoring functions found in the `all_scoring_functions` list specified in molscore/scoring_functions/\_\_init\_\_.py.
+    Multiple scoring functions can be run without using all of them for scoring molecules (e.g., it may be useful to always run MolecularDescriptors).
+    """
+    )
+# Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
+col1, col2 = st.columns(2)
+with col1:
+    if st.button(label='Add scoring function', help='Increases the number of scoring functions run, will add a new tab below.'):
+        ss.n_sf += 1
+with col2:
+    if st.button(label='Delete scoring function', help='Decreases the number of scoring functions run, will remove the most recent tab below.'):
+        ss.n_sf -= 1
+sf_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sf)])
+# Get user input parameters
+config['scoring_functions'] = [getsfconfig(i, tab=t) for i, t in zip(range(ss.n_sf), sf_tabs)]
+
+
+# ----- Scoring transformations -----
+st.markdown('#') # Add spacing
+st.subheader('Score transformation')
+st.markdown(
+    """
+    Determine which returned metrics/parameters should be included in the molecules final score, and how to transform each value to between 0 and 1.
+    Available return metrics/parameters shown are determined by the combination of scoring function `prefix` specified for each scoring function (see above) 
+    and `return_metrics` attribute
+    of scoring functions.
+    """
+)
+config['scoring'] = {}
+
+# Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
+col1, col2 = st.columns(2)
+with col1:
+    if st.button(label='Add scoring parameter', help='Increase the number of scoring parameters, will add a new tab below.'):
+        ss.n_sp += 1
+with col2:
+    if st.button(label='Delete scoring parameter', help='Decrease the number of scoring parameters, will remove the most recent tab below.'):
+        ss.n_sp -= 1
+sp_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sp)])
+
+# Get user input parameters if scoring functions have been defined
+if len(config['scoring_functions']) > 0:
+    smetric_options = []
+    for sf in config['scoring_functions']:
+        sf_name = sf['name']
+        sf_prefix = sf['parameters']['prefix']
+        sf_obj = [sf for sf in scoring_functions.all_scoring_functions if sf.__name__ == sf_name][0]
+        try:
+            sf_metrics = sf_obj.return_metrics
+            _ = [smetric_options.append(f"{sf_prefix.strip().replace(' ', '_')}_{m}")
+                 for m in sf_metrics]
+        except AttributeError:
+            st.write(f'WARNING: No return metrics found for {sf_name}')
+            continue
+    # Get parameter inputs
+    config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
+
+# ----- Score aggregation -----
+st.markdown('#') # Add spacing
+st.subheader('Score aggregation')
+st.markdown(
+    """
+    Specify how to aggregate multiple score parameters into a single numerical value between 0 and 1. If only using a single scoring parameter use `single`.
+    For any more than one scoring parameter, select any other aggregation function.
+    """
+    )
+
+config['scoring']['method'] = st.radio(
+    label='Aggregation function',
+    options=[m.__name__ for m in utils.all_score_methods],
+    index=0,
+    key='Scoring method')
+
+# Get (class/function) from name and print doc ...
+sm_obj = [s for s in utils.all_score_methods if s.__name__ == config['scoring']['method']][0]
+sm_doc = inspect.getdoc(sm_obj)
+st.markdown('**Description**')
+if sm_doc is not None:
+    st.markdown(sm_doc.split(':')[0])
+else:
+    st.markdown('No documentation')
+
 
 # ----- Diversity filters -----
 st.markdown('#') # Add spacing
 st.subheader('Diversity filter')
 config['diversity_filter'] = {}
-config['diversity_filter']['run'] = st.checkbox(label='Run diversity filter')
+config['diversity_filter']['run'] = st.checkbox(
+    label='Run diversity filter',
+    help='Apply a diversity filter penalizing non-diverse molecules. Click to expand further options.'
+    )
 if config['diversity_filter']['run']:
-    config['diversity_filter']['name'] = st.radio(label='Type of filter',
+    config['diversity_filter']['name'] = st.radio(label='Type of diversity filter',
                                                   options=['Unique', 'Occurrence'] +
                                                           [s.__name__ for s in scaffold_memory.all_scaffold_filters],
                                                   index=0)
@@ -420,71 +547,6 @@ if config['diversity_filter']['run']:
     with st.expander(label='Check parsing'):
         st.write(config['diversity_filter'])
 
-# ----- Scoring functions ------
-st.markdown('#') # Add spacing
-st.subheader('Scoring functions')
-# Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
-col1, col2 = st.columns(2)
-with col1:
-    if st.button(label='Add scoring function'):
-        ss.n_sf += 1
-with col2:
-    if st.button(label='Delete scoring function'):
-        ss.n_sf -= 1
-sf_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sf)])
-# Get user input parameters
-config['scoring_functions'] = [getsfconfig(i, tab=t) for i, t in zip(range(ss.n_sf), sf_tabs)]
-
-
-# ----- Scoring transformations -----
-st.markdown('#') # Add spacing
-st.subheader('Score transformation')
-config['scoring'] = {}
-
-# Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
-col1, col2 = st.columns(2)
-with col1:
-    if st.button(label='Add scoring parameter'):
-        ss.n_sp += 1
-with col2:
-    if st.button(label='Delete scoring parameter'):
-        ss.n_sp -= 1
-sp_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sp)])
-# Get user input parameters if scoring functions have been defined
-if len(config['scoring_functions']) > 0:
-    smetric_options = []
-    for sf in config['scoring_functions']:
-        sf_name = sf['name']
-        sf_prefix = sf['parameters']['prefix']
-        sf_obj = [sf for sf in scoring_functions.all_scoring_functions if sf.__name__ == sf_name][0]
-        try:
-            sf_metrics = sf_obj.return_metrics
-            _ = [smetric_options.append(f"{sf_prefix.strip().replace(' ', '_')}_{m}")
-                 for m in sf_metrics]
-        except AttributeError:
-            st.write(f'WARNING: No return metrics found for {sf_name}')
-            continue
-    # Get parameter inputs
-    config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
-
-# ----- Score aggregation -----
-st.markdown('#') # Add spacing
-st.subheader('Score aggregation')
-config['scoring']['method'] = st.radio(
-    label='Method',
-    options=[m.__name__ for m in utils.all_score_methods],
-    index=0,
-    key='Scoring method')
-
-# Get (class/function) from name and print doc ...
-sm_obj = [s for s in utils.all_score_methods if s.__name__ == config['scoring']['method']][0]
-sm_doc = inspect.getdoc(sm_obj)
-st.markdown('**Description**')
-if sm_doc is not None:
-    st.write(sm_doc.split(':')[0])
-else:
-    st.write('No documentation')
-
 
 # ----- Output -----
 st.markdown('#') # Add spacing
@@ -509,8 +571,10 @@ with col2:
 # ----- Navigation Sidebar -----
 st.sidebar.header('Navigate')
 st.sidebar.markdown("[Run parameters](#run-parameters)")
-st.sidebar.markdown("[Diversity filter](#diversity-filter)")
 st.sidebar.markdown("[Scoring functions](#scoring-functions)")
 st.sidebar.markdown("[Score transformation](#score-transformation)")
 st.sidebar.markdown("[Score aggregation](#score-aggregation)")
-st.sidebar.markdown("[Output](#output-json)")
+st.sidebar.markdown("[Diversity filter](#diversity-filter)")
+st.sidebar.markdown("[Save](#output-json)")
+if st.sidebar.button('Exit', key='sidebar_exit'):
+    os._exit(0)
