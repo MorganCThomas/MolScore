@@ -65,7 +65,7 @@ def mpo_plot(main_df, SS, dock_path=None):
     # ----- MPO @ step ----- 
     st.subheader('Per step MPO')
     st.text('Select multiple paramerers to co-plot (only showing valid, unique molecules)')
-    x_variables = st.multiselect('x-axis', main_df.columns.tolist())
+    x_variables = st.multiselect('x-axis', [c for c in main_df.columns.tolist() if c not in SS.exclude_params])
     step_idx = st.slider('Step', min_value=int(main_df.step.min()), max_value=int(main_df.step.max()),
                             value=int(main_df.step.max()))
     tdf = main_df.loc[(main_df.valid == 'true') & (main_df.unique == True), :].copy()

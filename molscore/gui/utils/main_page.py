@@ -9,7 +9,7 @@ def single_plot(main_df, SS, dock_path=None):
     # ----- Show central plot -----
     col1, col2, col3 = st.columns(3)
     x_axis = col1.selectbox('Plot x-axis', ['step', 'index'], index=0)
-    y_axis = col2.selectbox('Plot y-axis', main_df.columns.tolist(), index=7)
+    y_axis = col2.selectbox('Plot y-axis', [c for c in main_df.columns.tolist() if c not in SS.exclude_params], index=7)
     valid_only = col3.checkbox(label='Valid only')
     unique_only = col3.checkbox(label='Unique only')
 

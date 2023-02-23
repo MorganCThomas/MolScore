@@ -17,6 +17,7 @@ if 'input_dirs' not in SS.keys(): SS.input_dirs = []
 if 'input_latest' not in SS.keys(): SS.input_latest = []
 if 'dock_path' not in SS.keys(): SS.dock_path = None
 if 'pymol' not in SS: SS.pymol = None
+if 'exclude_params' not in SS: SS.exclude_params = ['run', 'dock_path']
 
 # ----- Setup page -----
 st.set_page_config(
@@ -118,7 +119,7 @@ def main():
 
         # ----- Multi-plot -----
         if nav == 'Multi-plot':
-            multi_plot(main_df=SS.main_df)        
+            multi_plot(main_df=SS.main_df, SS=SS)        
 
         # ----- MPO Graph -----
         if nav == 'MPO':
