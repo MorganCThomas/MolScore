@@ -542,7 +542,7 @@ class MolScore:
         :return: Scores (either float list or np.array)
         """
         if not self.call2score_warning:
-            logger.warning(f'This method will be removed in the future, please use .score() instead.')
+            logger.warning(f'Calling MolScore directly will be removed in the future, please use .score() instead.')
             self.call2score_warning = True
         if score_only:
             batch_start = time.time()
