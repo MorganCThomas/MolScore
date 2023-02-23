@@ -44,7 +44,7 @@ class OEDock:
         :param dock_search_resolution: Rotational/translational RMSD step sizes used during search and optimization [High, Standard, Low]
         :param dock_num_poses: Number of poses for docking to return
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param timeout: Timeout (seconds) before killing an individual docking simulation (only if using Dask for parallelisation)
         """
         self.prefix = prefix.replace(" ", "_")
         self.timeout = timeout

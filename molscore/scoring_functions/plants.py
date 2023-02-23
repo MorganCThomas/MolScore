@@ -40,7 +40,7 @@ class PLANTSDock:
         :param receptor: Protein receptor (.pdb, .mol2)
         :param ref_ligand: Reference ligand for identifying binding site (.sdf, .pdb, .mol2)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout before killing an individual docking simulation (seconds)
+        :param timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         :param kwargs:
         """        

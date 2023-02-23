@@ -154,7 +154,7 @@ class GlideDockFromROCS(GlideDock, ROCS):
         :param glide_template: Path to a template docking file (.in)
         :param ref_file: Path to reference file to overlay query to (.pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask
-        :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param timeout: Timeout (seconds) before killing an individual docking simulation (only if using Dask for parallelisation)
         :param ligand_preparation: Whether to use 'ligprep' with limited default functionality, or 'epik' to protonate
         only the most probable state
         :param kwargs:

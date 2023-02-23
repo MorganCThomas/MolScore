@@ -20,7 +20,7 @@ logger.addHandler(ch)
 
 
 class Align3D:
-    """Align molecules in 3D using open-source 3D align via RDKit"""
+    """Align molecules in 3D using open-source 3D align via RDKit, atleast one reference molecule must be specified."""
     return_metrics = ['O3A_score', 'shape_sim', 'pharm_sim', 'shape_score']
 
     def __init__(

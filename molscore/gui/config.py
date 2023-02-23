@@ -116,7 +116,7 @@ def type2widget(ptype, label, key, default=None, options=None):
                 session_key = f'{key}_input_path'
                 ss[session_key] = 'configs'
             ss[session_key] = st_file_selector(label=label, path=ss[session_key],
-                                                  st_placeholder=st.empty(), key=key)
+                                                st_placeholder=st.empty(), key=key)
             st.write(f"Selected: {ss[session_key]}")
             widget = ss[session_key]
     return widget
@@ -152,6 +152,7 @@ def parseobject(obj, exceptions=[]):
             'name': p,
             'type': sig[p].annotation if sig[p].annotation != inspect._empty else None,
             'default': sig[p].default if sig[p].default != inspect._empty else None,
+            'optional': True if (sig[p].default is None) and (sig[p].default != inspect._empty) else False,
             'description': None,
             'options': None
             }
@@ -195,47 +196,52 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
     for p, pinfo in params.items():
         label = f"{p}: {pinfo['description']}"
 
-        # No default
-        if pinfo['default'] is None:
-            # If no type either, print warning and use text input
-            if pinfo['type'] is None:
-                st.write(f'WARNING: {p} is has no default or type annotation, using text_input')
-                result_dict[p] = st.text_input(label=label, key=f'{key_i}: {obj.__name__}_{p}')
-        
-            else:
-                # Check to see if ptype is union i.e., multiple types possible
-                ptype_args = getattr(pinfo['type'], '__args__', None)
-                if ptype_args is not None:
-                    pinfo['type'] = st.selectbox(label=f'{p}: input type', options=ptype_args,
-                                                 index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
-                result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}', label=label, options=pinfo['options'])
-                if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
+        # Check to see if it's optional
+        if pinfo['optional']:
+            add_optional = st.checkbox(label=f'Specificy {p} [optional]', value=False, key=f'{key_i}: {obj.__name__}_{p}_optional')
 
-        else:
-            # Use type annotation if present
-            if pinfo['type'] is not None:
-                with st.expander(f"{p}={pinfo['default']}"):
+        if not pinfo['optional'] or add_optional:
+            # No default
+            if pinfo['default'] is None:
+                # If no type either, print warning and use text input
+                if pinfo['type'] is None:
+                    st.write(f'WARNING: {p} is has no default or type annotation, using text_input')
+                    result_dict[p] = st.text_input(label=label, key=f'{key_i}: {obj.__name__}_{p}')
+            
+                else:
                     # Check to see if ptype is union i.e., multiple types possible
                     ptype_args = getattr(pinfo['type'], '__args__', None)
                     if ptype_args is not None:
                         pinfo['type'] = st.selectbox(label=f'{p}: input type', options=ptype_args,
-                                            index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
-                    result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}',
-                                                 default=pinfo['default'], label=label, options=pinfo['options'])
-                    #if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
+                                                    index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
+                    result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}', label=label, options=pinfo['options'])
+                    if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
 
-            # Otherwise use type of default
             else:
-                with st.expander(f"{p}={pinfo['default']}"):
-                    result_dict[p] = type2widget(type(pinfo['default']), key=f'{key_i}: {obj.__name__}_{p}', 
-                                                 default=pinfo['default'], label=label, options=pinfo['options'])
+                # Use type annotation if present
+                if pinfo['type'] is not None:
+                    with st.expander(f"{p}={pinfo['default']}"):
+                        # Check to see if ptype is union i.e., multiple types possible
+                        ptype_args = getattr(pinfo['type'], '__args__', None)
+                        if ptype_args is not None:
+                            pinfo['type'] = st.selectbox(label=f'{p}: input type', options=ptype_args,
+                                                index=0, key=f'{key_i}: {obj.__name__}_{p}_type')
+                        result_dict[p] = type2widget(pinfo['type'], key=f'{key_i}: {obj.__name__}_{p}',
+                                                    default=pinfo['default'], label=label, options=pinfo['options'])
+                        #if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
 
-        # If list convert correctly
-        if pinfo['type'] == list:
-            result_dict[p] = result_dict[p].replace(',', '').replace('\n', ' ').split(' ')
-            # Check if empty and handle properly
-            if result_dict[p] == [''] or result_dict[p] == ['[]'] or result_dict[p] == ['', '']:
-                result_dict[p] = []
+                # Otherwise use type of default
+                else:
+                    with st.expander(f"{p}={pinfo['default']}"):
+                        result_dict[p] = type2widget(type(pinfo['default']), key=f'{key_i}: {obj.__name__}_{p}', 
+                                                    default=pinfo['default'], label=label, options=pinfo['options'])
+
+            # If list convert correctly
+            if pinfo['type'] == list:
+                result_dict[p] = result_dict[p].replace(',', '').replace('\n', ' ').split(' ')
+                # Check if empty and handle properly
+                if result_dict[p] == [''] or result_dict[p] == ['[]'] or result_dict[p] == ['', '']:
+                    result_dict[p] = []
 
     return result_dict
 

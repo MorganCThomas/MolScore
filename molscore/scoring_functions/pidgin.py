@@ -20,7 +20,7 @@ logger.addHandler(ch)
 
 class PIDGIN():
     """
-    Download and run PIDGIN classification models (~11GB) via Zenodo to return the positive predictions
+    Download and run PIDGIN classification models (~11GB) via Zenodo to return the positive predictions, atleast one uniprot must be specified.
     """
     return_metrics = ['pred_proba']
 

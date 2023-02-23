@@ -32,6 +32,7 @@ class MolecularSimilarity:
         :param fp: Type of fingerprint used to featurize the molecule [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, AP, hashAP, hashTT, RDK5, RDK6, RDK7, PHCO]
         :param bits: Length of fingerprints (if relevant)
         :param similarity_measure: Type of similarity Measure [AllBit, Asymmetric, BraunBlanquet, Cosine, McConnaughey, Dice, Kulczynski, Russel, OnBit, RogotGoldberg, Sokal, Tanimoto]
+        :param thresh: If provided check if similarity is above threshold, binarising the similarity coefficients
         :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour) [mean, max]
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
         :param kwargs:
