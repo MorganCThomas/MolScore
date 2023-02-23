@@ -417,17 +417,18 @@ class MolScore:
         """
         Write final dataframe to file.
         """
-        if len(self.logged_parameters) > 0:
-            temp = self.main_df.copy()
-            for p, v in self.logged_parameters.items():
-                try:
-                    temp[p] = v
-                except ValueError:
-                    # temp[p] = [v]*len(temp)
-                    pass
-            temp.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
-        else:
-            self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
+        if self.main_df is not None:
+            if len(self.logged_parameters) > 0:
+                temp = self.main_df.copy()
+                for p, v in self.logged_parameters.items():
+                    try:
+                        temp[p] = v
+                    except ValueError:
+                        # temp[p] = [v]*len(temp)
+                        pass
+                temp.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
+            else:
+                self.main_df.to_csv(os.path.join(self.save_dir, 'scores.csv'))  # save main csv
 
         if (self.diversity_filter is not None) and (isinstance(self.diversity_filter, scaffold_memory.ScaffoldMemory)):
             self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
@@ -497,14 +498,15 @@ class MolScore:
         """
         Kill streamlit monitor.
         """
-        if self.monitor_app is None:
+        if (self.monitor_app is None) or (not self.monitor_app):
             logger.info('No monitor to kill')
-            return self
         else:
-            os.killpg(os.getpgid(self.monitor_app.pid), signal.SIGTERM)
-            _, _ = self.monitor_app.communicate()
+            try:
+                os.killpg(os.getpgid(self.monitor_app.pid), signal.SIGTERM)
+                _, _ = self.monitor_app.communicate()
+            except AttributeError as e:
+                logger.error(f'Monitor may not have opened/closed properly: {e}')
             self.monitor_app = None
-        return self
 
     def score(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
               score_only: bool = False):
