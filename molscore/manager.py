@@ -45,6 +45,7 @@ class MolScore:
         self.main_df = None
         self.monitor_app = None
         self.diversity_filter = None
+        self.call2score_warning = False
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
 
         # Setup save directory
@@ -540,7 +541,9 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
         :return: Scores (either float list or np.array)
         """
-        logger.warning(f'This method will be removed in the future, please use .score() instead.')
+        if not self.call2score_warning:
+            logger.warning(f'This method will be removed in the future, please use .score() instead.')
+            self.call2score_warning = True
         if score_only:
             batch_start = time.time()
             if step is not None:
