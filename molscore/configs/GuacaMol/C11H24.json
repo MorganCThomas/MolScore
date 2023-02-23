@@ -1,1 +1,31 @@
-{"task": "C11H24", "output_dir": "./", "load_from_previous": false, "logging": false, "monitor_app": false, "diversity_filter": {"run": false}, "scoring_functions": [{"name": "Isomer", "run": true, "parameters": {"prefix": "C11H24", "molecular_formula": "C11H24"}}], "scoring": {"method": "single", "metrics": [{"name": "C11H24_isomer_score", "weight": 1.0, "modifier": "raw", "parameters": {}}]}}
+{
+  "task": "C11H24",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": false
+  },
+  "scoring_functions": [
+    {
+      "name": "Isomer",
+      "run": true,
+      "parameters": {
+        "prefix": "C11H24",
+        "molecular_formula": "C11H24"
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "C11H24_isomer_score",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}
