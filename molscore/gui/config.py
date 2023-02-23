@@ -428,8 +428,9 @@ st.markdown('#') # Add spacing
 st.subheader('Scoring functions')
 st.markdown(
     """
-    Select and run one/multiple scoring functions found in the `all_scoring_functions` list specified in molscore/scoring_functions/\_\_init\_\_.py.
-    Multiple scoring functions can be run without using all of them for scoring molecules (e.g., it may be useful to always run MolecularDescriptors).
+    Select and run one or more scoring functions found in the `all_scoring_functions` list specified in `molscore/scoring_functions/__init__.py`.
+    Multiple scoring functions can be run without using all of them for scoring molecules 
+    (e.g., it may be useful to always run MolecularDescriptors to record property changes).
     """
     )
 # Buttons to add and delete scoring function (i.e. append no. of scoring functions to Session State)
