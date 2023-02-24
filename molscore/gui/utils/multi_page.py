@@ -14,9 +14,9 @@ def multi_plot(main_df, SS):
 
     tdf = main_df
     if valid_only:
-        tdf = main_df.loc[main_df.valid == 'true', :]
+        tdf = tdf.loc[tdf.valid == 'true', :]
     if unique_only:
-        tdf = main_df.loc[main_df.unique == True, :]
+        tdf = tdf.loc[tdf.unique == True, :]
 
     for y, col in zip(y_variables, cycle(st.columns(3))):
         sub_fig = utils.plotly_plot(y, tdf, size=(250, 200))
