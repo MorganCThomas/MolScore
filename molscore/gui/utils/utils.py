@@ -112,7 +112,7 @@ def mol2png(mol):
     return d2d.GetDrawingText()
 
 
-def display_selected_data(main_df, key, y: Union[str, list, None]=None, selection=None, dock_path=None, viewer=None, pymol=None):
+def display_selected_data(main_df, key, y: Union[str, list, None]=None, selection=None, dock_path=False, viewer=None, pymol=None):
     if isinstance(y, str): y = [y]
     if selection is None:
         return
@@ -131,7 +131,7 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
         for smi, midx, legend, col in zip(smis, match_idx, legends, cycle(st.columns(5))):
             col.image(mol2png(smi))
             col.text(legend)
-            if dock_path is not None:
+            if dock_path:
                 if viewer is not None:
                     show_3D = col.button(label='Show3D', key=f'{legend}_3D_button')
                     if show_3D:
@@ -144,7 +144,7 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
                         file_paths, names = find_sdfs([midx], main_df)
                         send2pymol(name=names[0], path=file_paths[0], pymol=pymol, col=col)
                 
-        if dock_path is not None:
+        if dock_path:
             if viewer is not None:
                 if st.button(f'ShowAll3D', key=f'All3D_{key}'):
                     paths, names = find_sdfs(match_idx, main_df)

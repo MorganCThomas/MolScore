@@ -36,14 +36,14 @@ def single_plot(main_df, SS, dock_path=None):
         )
     
     # ----- Add option to save sdf -----
-    if (dock_path is not None) and (selection is not None):
+    if dock_path and (selection is not None):
         with st.expander(label='Export selected molecules'):
             # User input
             out_file = st.text_input(label='File name')
             out_file = os.path.abspath(f'{out_file}.sdf')
             st.write(out_file)
             if st.button(label='Save', key='save_all_selected'):
-                file_paths, mol_names = utils.find_sdfs(selection, main_df, dock_path)
+                file_paths, mol_names = utils.find_sdfs(selection, main_df)
                 utils.save_sdf(
                     mol_paths=file_paths,
                     mol_names=mol_names,

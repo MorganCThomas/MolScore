@@ -59,7 +59,7 @@ def calculate_aggregate(df, x_variables, x_orders, x_weights, agg_method):
     return top_df.fillna(1e6).apply(lambda x: agg_method(x, w=x_weights), axis=1, raw=True).tolist()
 
 
-def mpo_plot(main_df, SS, dock_path=None):
+def mpo_plot(main_df, SS, dock_path=False):
     """ Show parallel plots of Top-K molecules"""
 
     # ----- MPO @ step ----- 
@@ -127,7 +127,7 @@ def mpo_plot(main_df, SS, dock_path=None):
                 st.write('Saved!')
 
         # ----- Add option to save sdf -----
-        if dock_path is not None:
+        if dock_path:
             with st.expander(label='Export top-K molecules'):
                 # User input
                 out_file = st.text_input(label='File name', key='topk_sdf_output')
