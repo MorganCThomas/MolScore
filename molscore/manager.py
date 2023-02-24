@@ -332,6 +332,7 @@ class MolScore:
 
         mpo_columns = {"names": [], "weights": []}
         # Iterate through specified metrics and apply modifier
+        transformed_columns = []
         for metric in self.configs['scoring']['metrics']:
             mod_name = f"{metric['modifier']}_{metric['name']}"
             mpo_columns["names"].append(mod_name)
@@ -351,13 +352,16 @@ class MolScore:
                 raise AssertionError
 
 
-            df[mod_name] = df.loc[:, metric['name']].apply(
+            transformed_columns.append(
+                df.loc[:, metric['name']].apply(
                 lambda x: modifier(x, **metric['parameters'])
-            )
+                ).rename(mod_name)
+                )
+        df = pd.concat([df] + transformed_columns, axis=1)
 
         # Double check we have no NaN or 0 values (necessary for geometric mean) for mpo columns
-        df.loc[:, mpo_columns['names']] = df.loc[:, mpo_columns['names']].fillna(1e-6)
-        df.loc[:, mpo_columns['names']] = df.loc[:, mpo_columns['names']].apply(
+        df.loc[:, mpo_columns['names']].fillna(1e-6, inplace=True)
+        df[mpo_columns['names']] = df[mpo_columns['names']].apply(
             lambda x: [1e-6 if y < 1e-6 else y for y in x]
         )
 
