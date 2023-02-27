@@ -525,7 +525,7 @@ class MolScore:
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
-        :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
+        :param score_only: Whether to log molecule data or simply score and return
         :return: Scores (either float list or np.array)
         """
         if score_only:
@@ -668,7 +668,7 @@ class MolScore:
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
-        :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
+        :param score_only: Whether to log molecule data or simply score and return
         :return: Scores (either float list or np.array)
         """
         if self.call2score_warning:
