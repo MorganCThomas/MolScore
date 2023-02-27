@@ -45,7 +45,7 @@ class MolScore:
         self.main_df = None
         self.monitor_app = None
         self.diversity_filter = None
-        self.call2score_warning = False
+        self.call2score_warning = True
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
 
         # Setup save directory
@@ -671,8 +671,8 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return (this ignores any diversity filter)
         :return: Scores (either float list or np.array)
         """
-        if not self.call2score_warning:
+        if self.call2score_warning:
             logger.warning(f'Calling MolScore directly will be removed in the future, please use .score() instead.')
-            self.call2score_warning = True
+            self.call2score_warning = False
         return self.score(smiles=smiles, step=step, flt=flt, recalculate=recalculate, score_only=score_only)
         
