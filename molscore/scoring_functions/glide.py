@@ -137,7 +137,7 @@ class GlideDock:
         else:
             results = [p(command) for command in glide_commands]
         logger.debug('Glide finished')
-        _ = [logger.warning(err.decode()) for out, err in results if err != ''.encode()]
+        _ = [logger.debug(err.decode()) for out, err in results if err != ''.encode()]
         return self
 
     def get_docking_scores(self, smiles: list, return_best_variant: bool = False):
