@@ -196,7 +196,7 @@ class GetMetrics(object):
             metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
-        metrics['Scaff uniqueness'] = len(scaff_gen)/len(gen)
+        metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
         # Calculate number of FG and RS relative to sample size
         metrics['FG'] = len(list(fgs.keys()))/len(gen)
         metrics['RS'] = len(list(rss.keys()))/len(gen)
