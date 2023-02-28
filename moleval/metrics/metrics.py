@@ -190,7 +190,7 @@ class GetMetrics(object):
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
         if (se_k is not None) and (len(mols) < se_k):
-            print(f'WARNING: Less than {se_k} molecules so SEDiv is non-standard.')
+            warnings.warn(f'Less than {se_k} molecules so SEDiv is non-standard.')
             metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
         if (se_k is not None) and (len(gen) >= se_k):
             metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
