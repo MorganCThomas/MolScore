@@ -233,7 +233,7 @@ class GetMetrics(object):
             metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
-            metrics['Sillyness'] = self.test_sw.score_mols(mols)
+            metrics['OutlierBits'] = self.test_sw.score_mols(mols)
             for name, func in [('logP', logP),
                                ('NP', NP),
                                ('SA', SA),
@@ -247,7 +247,7 @@ class GetMetrics(object):
             metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
             metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
             metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
-            metrics['Sillyness_testSF'] = self.test_scaffolds_sw.score_mols(mols)
+            metrics['OutlierBits_testSF'] = self.test_scaffolds_sw.score_mols(mols)
 
         # Target metrics
         if self.target_int is not None:
@@ -260,12 +260,12 @@ class GetMetrics(object):
             metrics['SNN_target'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['SNN'])
             metrics['Frag_target'] = FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag'])
             metrics['Scaf_target'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf'])
-            metrics['Sillyness_target'] = self.target_sw.score_mols(mols)
+            metrics['OutlierBits_target'] = self.target_sw.score_mols(mols)
             for name, func in [('logP', logP),
                                ('NP', NP),
                                ('SA', SA),
                                ('QED', QED),
-                               ('weight', weight)]:
+                               ('Weight', weight)]:
                 metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
 
         return metrics
