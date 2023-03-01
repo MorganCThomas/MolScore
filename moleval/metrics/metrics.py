@@ -233,7 +233,7 @@ class GetMetrics(object):
             metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
-            metrics['OutlierBits'] = self.test_sw.score_mols(mols)
+            metrics['OutlierBits_test'] = self.test_sw.score_mols(mols)
             for name, func in [('logP', logP),
                                ('NP', NP),
                                ('SA', SA),
