@@ -89,7 +89,7 @@ class ROCS:
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...] (, list best conformers)
         """
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
-        self.directory = os.path.join(os.path.abspath(directory), 'ROCS', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_ROCS', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
         self.file_names = file_names
@@ -179,7 +179,7 @@ class GlideDockFromROCS(GlideDock, ROCS):
 
         # Assign some attributes
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
-        self.directory = os.path.join(os.path.abspath(directory), 'GlideDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_GlideDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
         self.file_names = file_names

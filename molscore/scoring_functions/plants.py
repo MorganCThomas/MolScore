@@ -279,7 +279,7 @@ class PLANTSDock:
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'PLANTSDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_PLANTSDock', step)
         os.makedirs(self.directory, exist_ok=True)
         self.file_names = file_names
         self.docking_results = []  # make sure no carry over

@@ -66,8 +66,11 @@ def mpo_plot(main_df, SS, dock_path=False):
     st.subheader('Per step MPO')
     st.text('Select multiple paramerers to co-plot (only showing valid, unique molecules)')
     x_variables = st.multiselect('x-axis', [c for c in main_df.columns.tolist() if c not in SS.exclude_params])
-    step_idx = st.slider('Step', min_value=int(main_df.step.min()), max_value=int(main_df.step.max()),
-                            value=int(main_df.step.max()))
+    if len(main_df.step.unique()) == 1:
+        step_idx = 1
+    else:
+        step_idx = st.slider('Step', min_value=int(main_df.step.min()), max_value=int(main_df.step.max()),
+                                value=int(main_df.step.max()))
     tdf = main_df.loc[(main_df.valid == 'true') & (main_df.unique == True), :].copy()
     
     # Plot graph
@@ -114,8 +117,14 @@ def mpo_plot(main_df, SS, dock_path=False):
         selection = list(topk_df.index)
 
         # Plot mols
-        utils.display_selected_data(main_df, key='TopKMPO', dock_path=dock_path,
-                                    selection=selection, pymol=SS.pymol)
+        utils.display_selected_data(
+            y=x_variables,
+            main_df=main_df,
+            key='TopKMPO',
+            dock_path=dock_path,
+            selection=selection,
+            pymol=SS.pymol
+            )
 
         # ----- Export data -----
         with st.expander('Export top-K data'):

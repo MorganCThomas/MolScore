@@ -71,10 +71,12 @@ def update(SS):
 
 def check_dock_paths(input_path):
     subdirectories = [x for x in os.walk(os.path.abspath(input_path))][0][1]
+    dock_paths = []
     for subd in subdirectories:
         if re.search("Dock|ROCS|Align3D", subd):
-            st.write()
-            return os.path.join(input_path, subd)
+            dock_paths.append(os.path.join(input_path, subd))
+    if dock_paths:
+        return dock_paths
 
 
 # ----- Plotting molecules -----
@@ -117,7 +119,7 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
     if selection is None:
         return
     else:
-        match_idx = selection
+        match_idx = list(set(selection))
         if len(match_idx) > 100:
             st.write("Warning: Limiting display to first 100")
             match_idx = match_idx[:100]
@@ -133,16 +135,18 @@ def display_selected_data(main_df, key, y: Union[str, list, None]=None, selectio
             col.text(legend)
             if dock_path:
                 if viewer is not None:
-                    show_3D = col.button(label='Show3D', key=f'{legend}_3D_button')
+                    show_3D = col.button(label='Show3D', key=f'{key} {legend} 3D_button')
                     if show_3D:
                         # Grab best variants
                         file_paths, _ = find_sdfs([midx], main_df)
-                        viewer.add_ligand(path=file_paths[0])
+                        for p in file_paths:
+                            viewer.add_ligand(path=p)
                 
                 if pymol is not None:
-                    if col.button(label='Send2PyMol', key=f'{legend}_pymol_button'):
+                    if col.button(label='Send2PyMol', key=f'{key} {legend} pymol_button'):
                         file_paths, names = find_sdfs([midx], main_df)
-                        send2pymol(name=names[0], path=file_paths[0], pymol=pymol, col=col)
+                        for (p, n) in zip(file_paths, names):
+                            send2pymol(name=n, path=p, pymol=pymol)
                 
         if dock_path:
             if viewer is not None:
@@ -217,15 +221,18 @@ def find_sdfs(match_idxs, main_df):
     # Find first (potentially non-matching idx of first recorded unique smiles)
     first_idxs = []
     for run, smi in sel_smiles:
-        first_idx = main_df.loc[(main_df.run == run) & (main_df['smiles'] == smi), ['run', 'step', 'batch_idx', 'dock_path']].drop_duplicates().to_records(index=False)
+        first_idx = main_df.loc[(main_df.run == run) & (main_df['smiles'] == smi), ['run', 'step', 'batch_idx', 'dock_path']].drop_duplicates(subset=['run', 'step', 'batch_idx']).to_records(index=False)
         first_idxs.append(first_idx[0])
 
     # Get file paths
     file_paths = []
-    for _, s, bi, dp in first_idxs:
-        file_paths.append(_find_sdf(query_dir=dp, step=s, batch_idx=bi))
-
-    return file_paths, [f'Mol: {s}_{b}' for _, _, s, b in idx_names]
+    names = []
+    for (_, s, bi, dps), (_, _, og_s, og_b) in zip(first_idxs, idx_names):
+        for dp in dps:
+            file_paths.append(_find_sdf(query_dir=dp, step=s, batch_idx=bi))
+            dock_path_prefix = os.path.basename(dp).split("_")[0]
+            names.append(f'Mol: {og_s}_{og_b} - {dock_path_prefix}')
+    return file_paths, names
 
 
 def save_sdf(mol_paths, mol_names, out_file):

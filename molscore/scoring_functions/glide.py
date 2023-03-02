@@ -285,7 +285,7 @@ class GlideDock:
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'GlideDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_GlideDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
         self.file_names = file_names

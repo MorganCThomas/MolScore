@@ -286,7 +286,7 @@ class Align3D:
         """
         # Create directory
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
-        directory = os.path.join(os.path.abspath(directory), 'Align3D', step)
+        directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_Align3D', step)
         os.makedirs(directory, exist_ok=True)
         # Prepare function for parallelization
         pfunc = partial(

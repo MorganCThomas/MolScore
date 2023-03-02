@@ -331,7 +331,7 @@ class OEDock:
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'OEDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_OEDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
         self.file_names = file_names
