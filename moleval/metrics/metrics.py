@@ -238,7 +238,7 @@ class GetMetrics(object):
                                ('NP', NP),
                                ('SA', SA),
                                ('QED', QED),
-                               ('weight', weight)]:
+                               ('Weight', weight)]:
                 metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
 
         # Test scaff metrics
@@ -273,10 +273,10 @@ class GetMetrics(object):
     def property_distributions(self, gen):
         metrics = {}
         if self.test_int is not None:
-            for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
+            for name in ['logP', 'NP', 'SA', 'QED', 'Weight']:
                 metrics[f'{name}_test'] = self.test_int[name]['values']
         if self.target_int is not None:
-            for name in ['logP', 'NP', 'SA', 'QED', 'weight']:
+            for name in ['logP', 'NP', 'SA', 'QED', 'Weight']:
                 metrics[f'{name}_test'] = self.target_int[name]['values']
 
         gen = remove_invalid(gen, canonize=True, n_jobs=self.n_jobs)
@@ -286,7 +286,7 @@ class GetMetrics(object):
                            ('NP', NP),
                            ('SA', SA),
                            ('QED', QED),
-                           ('weight', weight)]:
+                           ('Weight', weight)]:
 
             metrics[name] = WassersteinMetric(func, **self.kwargs).precalc(mols)['values']
         return metrics
@@ -329,7 +329,7 @@ def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
                        ('NP', NP),
                        ('SA', SA),
                        ('QED', QED),
-                       ('weight', weight)]:
+                       ('Weight', weight)]:
         statistics[name] = WassersteinMetric(func, **kwargs).precalc(mols)
     if close_pool:
         pool.terminate()
