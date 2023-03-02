@@ -215,8 +215,7 @@ class MolScore:
         self.batch_df['unique'] = unique
 
         # Count previous occurrences
-        occurrences = [self.batch_df.smiles[:i][self.batch_df.smiles == self.batch_df.smiles[i]].count() for i in
-                       self.batch_df.index]
+        occurrences = [self.batch_df.smiles.iloc[:i][self.batch_df.smiles.iloc[:i] == self.batch_df.smiles.iloc[i]].count() for i in range(len(self.batch_df))]
         self.batch_df['occurrences'] = occurrences
 
         number_invalid = len(self.batch_df.loc[self.batch_df.valid == 'false', :])
@@ -233,11 +232,11 @@ class MolScore:
 
         # Update unique and occurrence columns
         if len(self.exists_df) > 1:
-            for smi in self.batch_df.smiles:
-                if self.exists_df[self.exists_df.smiles == smi].any()[0]:
+            for smi in self.batch_df.smiles.unique():
+                tdf = self.exists_df[self.exists_df.smiles == smi]
+                if len(tdf) > 0:
                     self.batch_df.loc[self.batch_df.smiles == smi, 'unique'] = 'false'
-                    self.batch_df.loc[self.batch_df.smiles == smi, 'occurrences'] += self.exists_df.smiles[
-                        self.exists_df.smiles == smi].count()
+                    self.batch_df.loc[self.batch_df.smiles == smi, 'occurrences'] += len(tdf)
         return self
 
     def run_scoring_functions(self, smiles: list, file_names: list):
