@@ -18,8 +18,8 @@ def single(x: np.ndarray, **kwargs):
 
 def wsum(x: np.ndarray, w: np.ndarray, **kwargs):
     """
-    Weighted sum, where $x_{i}$ is a molecules value for parameter $i$ with weight $w_{i}$ and $N$ is the total number of parameters.  
-    $${\sum_{i}^{N}x_{i}w_{i} \over \sum_{i}^{N}w_{i}}$$
+    Weighted sum, where $x_{i}$ is a molecules value for parameter $i$ with weight $w_{i}$ and $n$ is the total number of parameters.  
+    $${\sum_{i}^{n}x_{i}w_{i} \over \sum_{i}^{n}w_{i}}$$
     :param x: Vector of scores
     :param w: Vector of weights that should sum to 1
     :return: Aggregate score bound between [0, 1]
@@ -34,8 +34,8 @@ def wsum(x: np.ndarray, w: np.ndarray, **kwargs):
 
 def prod(x: np.ndarray, **kwargs):
     """
-    Product, where $x_{i}$ is a molecules value for parameter $i$ and $N$ is the total number of parameters.  
-    $$\prod_{i}^{N}x_{i}$$
+    Product, where $x_{i}$ is a molecules value for parameter $i$ and $n$ is the total number of parameters.  
+    $$\prod_{i}^{n}x_{i}$$
     :param x: Vector of score
     :return: Vector product
     """
@@ -45,8 +45,8 @@ def prod(x: np.ndarray, **kwargs):
 
 def wprod(x: np.ndarray, w: np.ndarray, **kwargs):
     """
-    Weighted product, where $x_{i}$ is a molecules value for parameter $i$ with weight $w_{i}$ and $N$ is the total number of parameters.  
-    $$[\prod_{i}^{N}x_{i}^{w_{i}}]^{1 \over \sum_{i}^{N}w_{i}}$$
+    Weighted product, where $x_{i}$ is a molecules value for parameter $i$ with weight $w_{i}$ and $n$ is the total number of parameters.  
+    $$[\prod_{i}^{n}x_{i}^{w_{i}}]^{1 \over \sum_{i}^{n}w_{i}}$$
     :param x: Vector of scores
     :param w: Vector of weights that should sum to 1
     :return: Aggregate score bound between [0, 1]
@@ -116,8 +116,8 @@ class DynamicProd:
 
 def gmean(x: np.ndarray, **kwargs):
     """
-    Geometric mean, where $x_{i}$ is a molecules value for parameter $i$ and $N$ is the total number of parameters.  
-    $$[\prod_{i}^{N}x_{i}]^{1 \over N}$$
+    Geometric mean, where $x_{i}$ is a molecules value for parameter $i$ and $n$ is the total number of parameters.  
+    $$[\prod_{i}^{n}x_{i}]^{1 \over n}$$
     :param x: Vector of scores
     :return: Aggregate score bound between [0, 1]
     """
@@ -127,8 +127,8 @@ def gmean(x: np.ndarray, **kwargs):
 
 def amean(x: np.ndarray, **kwargs):
     """
-    Arithmetic mean, where $x_{i}$ is a molecules value for parameter $i$ and $N$ is the total number of parameters.   
-    $$ {1 \over N} \sum_{i}^{N} x_{i} $$
+    Arithmetic mean, where $x_{i}$ is a molecules value for parameter $i$ and $n$ is the total number of parameters.   
+    $$ {1 \over n} \sum_{i}^{n} x_{i} $$
     :param x: Vector of scores
     :return: Aggregate score bound between [0, 1]
     """
