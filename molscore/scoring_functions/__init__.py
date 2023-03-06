@@ -11,7 +11,7 @@ from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDe
 from molscore.scoring_functions.isomer import Isomer
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
 from molscore.scoring_functions.substructure_match import SubstructureMatch
-from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLearnModel
+from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLearnModel, SKLearnClassifier, SKLearnRegressor
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.scoring_functions.aizynthfinder import AiZynthFinder
 

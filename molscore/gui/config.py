@@ -258,7 +258,7 @@ def getsfconfig(key_i, tab):
         # Choose scoring functions
         sf_config['name'] = st.selectbox(
             label='Type of scoring function',
-            options=[s.__name__ for s in scoring_functions.all_scoring_functions if not (s.__name__ in ['TanimotoSimilarity', 'RDKitDescriptors'])], # Remove these as only present for backwards compatability
+            options=[s.__name__ for s in scoring_functions.all_scoring_functions if not (s.__name__ in ['TanimotoSimilarity', 'RDKitDescriptors', 'SKLearnModel'])], # Remove these as only present for backwards compatability
             index=0,
             key=f'{key_i}: sf_name',
             help='Select which type of scoring function to run from the dropdown list.'
