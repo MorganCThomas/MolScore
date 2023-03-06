@@ -42,7 +42,6 @@ class Align3D:
         self.prefix = prefix.strip().replace(" ", "_")
         self.ref_smiles = ref_smiles if ref_smiles is not None else []
         self.ref_sdf = ref_sdf
-        self.align_method = 'shapeit'
         self.max_confs = max_confs
         assert similarity_method in ['Tanimoto', 'Tversky']
         self.similarity_method = similarity_method
@@ -131,7 +130,7 @@ class Align3D:
         assert len(self.ref_mols) > 0, "Zero reference molecules due to processing errors"
 
     def optimize_starting_conf(self, mols):
-        """Take first valid molecule and select conformation with best average alignmen to other mols."""
+        """Take first valid molecule and select conformation with best average alignment to other mols."""
         # Optimize starting conformation
         for i, mol in enumerate(mols):
             if mol:

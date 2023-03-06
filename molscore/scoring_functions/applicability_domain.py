@@ -62,7 +62,7 @@ class ApplicabilityDomain:
             pfunc = partial(self.compute_features, fp=self.fp, qed=self.qed, physchem=self.physchem)
             self.ref_features = np.asarray([f for f in pool.imap(pfunc, mols)])
 
-        # Compount bounds
+        # Compound bounds
         self.ref_max = np.max(self.ref_features, axis=0)
         self.ref_min = np.min(self.ref_features, axis=0)
 
@@ -83,8 +83,7 @@ class ApplicabilityDomain:
             Crippen.MolMR,
             Descriptors.MolWt,
             CalcFractionCSP3,
-            Descriptors.HeavyAtomCount,
-            # TODO find chiral centres
+            Descriptors.HeavyAtomCount
         ]
         physchem_features = [d(mol) for d in descriptors]
         # Add BM/HA ratio custom features

@@ -9,14 +9,15 @@ from rdkit import Chem
 from rdkit.Avalon import pyAvalonTools
 from rdkit import rdBase
 import joblib
+import pickle as pkl
 
 from molscore.scoring_functions.utils import Fingerprints
 rdBase.DisableLog('rdApp.error')
 
 
-class SKLearnModel:
+class SKLearnClassifier:
     """
-    Score structures by loading a pre-trained sklearn model and return the predicted values
+    Score structures by loading a pre-trained sklearn classifier (using joblib) and return the predicted values
     """
     return_metrics = ['pred_proba']
 
@@ -38,41 +39,13 @@ class SKLearnModel:
         self.n_jobs = n_jobs
 
         # Load in model and assign to attribute
-        self.model = joblib.load(model_path)
-
-    @staticmethod
-    def calculate_fp(smi: str, fp: str, nBits=1024):
-        """Calculates fp based on fp and smiles"""        
-        mol = Chem.MolFromSmiles(smi)
-        if mol:
-            #Circular fingerprints
-            if fp == "ECFP4":
-                fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nBits) # ECFP4
-            elif fp == "ECFP6":
-                fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits) # ECFP6
-
-            # Structural fingerprints:
-            elif fp == "Avalon":
-                fp = pyAvalonTools.GetAvalonFP(mol, nBits=nBits) # Avalon
-            elif fp == "MACCSkeys":
-                fp = rdkit.Chem.rdMolDescriptors.GetMACCSKeysFingerprint(mol) #MACCS Keys
-            
-            # Path-based fingerprints
-            elif fp == "hashAP":
-                fp = rdkit.Chem.rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
-            elif fp == "hashTT":
-                fp = rdkit.Chem.rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits=nBits)
-            elif fp == "RDK5":
-                fp = rdkit.Chem.rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
-            elif fp == "RDK6":
-                fp = rdkit.Chem.rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
-            elif fp == "RDK7":
-                fp = rdkit.Chem.rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
-        
-            return np.asarray(fp).reshape(1, -1)
-
+        if model_path.endswith('.joblib'):
+            self.model = joblib.load(model_path)
+        elif model_path.endswith('.pkl') or model_path.endswith('.pickle'):
+            with open(model_path, 'rb') as f:
+                self.model = pkl.load(f)
         else:
-            return None
+            raise TypeError(f"Unrecognized file extension: {os.rsplit('.', 1)[-1]}")
 
     def __call__(self, smiles: list, **kwargs):
         """
@@ -88,7 +61,6 @@ class SKLearnModel:
         valid = []
         fps = []
         with Pool(self.n_jobs) as pool:
-            #pcalulate_fp = partial(self.calculate_fp, fp=self.fp, nBits=self.nBits)
             pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
             [(valid.append(i), fps.append(fp.reshape(1, -1)))
              for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
@@ -101,6 +73,55 @@ class SKLearnModel:
 
         return results
 
+
+class SKLearnRegressor(SKLearnClassifier):
+    """
+    Score structures by loading a pre-trained sklearn regressor (using joblib) and return the predicted values
+    """
+    return_metrics = ['predict']
+
+    def __init__(self, prefix: str, model_path: os.PathLike,
+                 fp: str, nBits: int = 1024, n_jobs: int = 1, **kwargs):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param model_path: Path to pre-trained model (saved using joblib)
+        :param fp: What type of fingerprint to use [ECFP4, ECFP4c, FCFP4, FCFP4c, ECFP6, ECFP6c, FCFP6, FCFP6c, Avalon, MACCSkeys, hashAP, hashTT, RDK5, RDK6, RDK7]
+        :param nBits: Length of fingerprint
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
+        :param kwargs:
+        """
+        super().__init__(prefix=prefix, model_path=model_path, fp=fp, nBits=nBits, n_jobs=n_jobs)
+
+    def __call__(self, smiles: list, **kwargs):
+        """
+        Calculate scores for an sklearn model given a list of SMILES, if a smiles is abberant or invalid,
+         should return 0.0 for all metrics for that smiles
+
+        :param smiles: List of SMILES strings
+        :param kwargs: Ignored
+        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        """
+
+        results = [{'smiles': smi, f'{self.prefix}_predict': 0.0} for smi in smiles]
+        valid = []
+        fps = []
+        with Pool(self.n_jobs) as pool:
+            pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
+            [(valid.append(i), fps.append(fp.reshape(1, -1)))
+             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
+             if fp is not None]
+
+        if len(valid) != 0 :
+            preds = self.model.predict(np.asarray(fps).reshape(len(fps), -1))
+            for i, pred in zip(valid, preds):
+                results[i].update({f'{self.prefix}_predict': pred})
+
+        return results
+
+
+# Backwards compatability
+SKLearnModel = SKLearnClassifier
+    
 
 class EnsembleSKLearnModel(SKLearnModel):
     """
@@ -136,7 +157,6 @@ class EnsembleSKLearnModel(SKLearnModel):
         predictions = []
         averages = []
         with Pool(self.n_jobs) as pool:
-            #pcalulate_fp = partial(self.calculate_fp, fp=self.fp, nBits=self.nBits)
             pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
             [(valid.append(i), fps.append(fp))
              for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
