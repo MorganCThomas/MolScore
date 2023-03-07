@@ -162,9 +162,9 @@ class PIDGIN():
         
         # Predict
         for clf in self.models:
-            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]  # (smiles, bits)
+            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]  # Input (smiles, bits)
             predictions.append(prediction)
-        predictions = np.asarray(predictions).reshape(len(fps), -1)  # (smiles, models)
+        predictions = np.asarray(predictions).transpose()  # Reshape to (smiles, models)
 
         # Binarise
         if self.binarise:

@@ -17,7 +17,7 @@ rdBase.DisableLog('rdApp.error')
 
 class SKLearnClassifier:
     """
-    Score structures by loading a pre-trained sklearn classifier (using joblib) and return the predicted values
+    Score structures by loading a pre-trained sklearn classifier and return the predicted values
     """
     return_metrics = ['pred_proba']
 
@@ -76,7 +76,7 @@ class SKLearnClassifier:
 
 class SKLearnRegressor(SKLearnClassifier):
     """
-    Score structures by loading a pre-trained sklearn regressor (using joblib) and return the predicted values
+    Score structures by loading a pre-trained sklearn regressor and return the predicted values
     """
     return_metrics = ['predict']
 
