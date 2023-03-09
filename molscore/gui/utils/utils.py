@@ -239,20 +239,23 @@ def save_sdf(mol_paths, mol_names, out_file):
     # Setup writer
     writer = AllChem.SDWriter(out_file)
     for path, name in zip(mol_paths, mol_names):
-        if path.endswith('gz'):
-            with gzip.open(path) as rf:
-                suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
-                mol = suppl.__next__()
-                if mol:
-                    mol.SetProp('_Name', name)
-                    writer.write(mol)
-        elif '.sdf' in path:
-            with open(path) as rf:
-                suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
-                mol = suppl.__next__()
-                if mol:
-                    mol.SetProp('_Name', name)
-                    writer.write(mol)
+        if path:
+            if path.endswith('gz'):
+                with gzip.open(path) as rf:
+                    suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
+                    mol = suppl.__next__()
+                    if mol:
+                        mol.SetProp('_Name', name)
+                        writer.write(mol)
+            elif '.sdf' in path:
+                with open(path) as rf:
+                    suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
+                    mol = suppl.__next__()
+                    if mol:
+                        mol.SetProp('_Name', name)
+                        writer.write(mol)
+        else:
+            st.write(f'No path found for {name}')
     writer.flush()
     writer.close()
 
