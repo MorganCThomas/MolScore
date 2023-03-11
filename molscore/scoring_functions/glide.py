@@ -32,7 +32,7 @@ class GlideDock:
                       'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     def __init__(self, prefix: str, glide_template: os.PathLike, cluster: Union[str, int] = None,
-                 timeout: float = 120.0, ligand_preparation: str = 'epik', **kwargs):
+                 timeout: float = 120.0, ligand_preparation: str = 'LigPrep', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
