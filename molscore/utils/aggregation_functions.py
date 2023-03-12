@@ -24,9 +24,8 @@ def wsum(x: np.ndarray, w: np.ndarray, **kwargs):
     :param w: Vector of weights that should sum to 1
     :return: Aggregate score bound between [0, 1]
     """
-    assert w.sum() > 0, "Weights must be provided"
     # Normalize weights
-    w = w / w.sum()
+    w = w / np.sum(w)
     # Score
     y = x.dot(w)
     return y
@@ -54,7 +53,7 @@ def wprod(x: np.ndarray, w: np.ndarray, **kwargs):
     # Compute weighted product
     y = np.prod(np.power(x, w))
     # Normalize
-    y = np.power(y, 1/w.sum())
+    y = np.power(y, 1/np.sum(w))
     return y
 
 
