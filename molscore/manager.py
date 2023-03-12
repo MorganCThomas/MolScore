@@ -368,9 +368,10 @@ class MolScore:
         df[self.configs['scoring']['method']] = df.loc[:, mpo_columns['names']].apply(
             lambda x: self.mpo_method(
                 x=x,
-                w=mpo_columns['weights'],
+                w=np.asarray(mpo_columns['weights']),
                 X=df.loc[:, mpo_columns['names']].to_numpy()),
-            axis=1
+            axis=1,
+            raw=True
         )
 
         return df
