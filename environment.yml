@@ -1,4 +1,4 @@
-name: molscore_minimal
+name: molscore
 channels:
   - anaconda
   - conda-forge
