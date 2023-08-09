@@ -94,7 +94,7 @@ class DaskUtils:
                 print(f"Dask worker dashboard: {client.dashboard_link}")
         # Or is unrecognized
         else:
-            if logger is not None:
+            if (logger is not None) and (cluster_address_or_n_workers is not None):
                 logger.warning(f"Unrecognized dask input {cluster_address_or_n_workers}")
 
         return client
