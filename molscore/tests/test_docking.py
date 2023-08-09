@@ -87,8 +87,8 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -144,8 +144,8 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -209,8 +209,8 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -274,8 +274,8 @@ class TestGOLDDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -308,8 +308,8 @@ class TestChemPLPGOLDDock(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -342,8 +342,8 @@ class TestASPGOLDDock(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -376,8 +376,8 @@ class TestChemScoreGOLDDock(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -410,8 +410,8 @@ class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
@@ -475,8 +475,8 @@ class TestOEDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
-        cls.inst.client.cluster.close()
         cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
