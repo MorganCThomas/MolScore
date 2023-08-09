@@ -173,7 +173,7 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
-        print(f"\nPLANTSDock Output:\n{json.dump(cls.output, indent=2)}\n")
+        print(f"\nPLANTSDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
