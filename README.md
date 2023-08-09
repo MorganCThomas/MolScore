@@ -9,18 +9,34 @@ Custom scoring functions can be implemented following the guidelines [here](http
 
 Contributions and/or ideas for added functionality are welcomed!
 
+A description of this software:
+
+**Thomas, M., O'Boyle, N.M., Bender, A., de Graaf, C. MolScore: A scoring and evaluation framework for de novo drug design. chemRxiv (2023). https://doi.org/10.26434/chemrxiv-2023-c4867**
+
 This code here was used in the following publications:
 1. **Thomas, M., Smith, R.T., O’Boyle, N.M. et al. Comparison of structure- and ligand-based scoring functions for deep generative models: a GPCR case study. J Cheminform 13, 39 (2021). https://doi.org/10.1186/s13321-021-00516-0**
 2. **Thomas M, O'Boyle NM, Bender A, de Graaf C. Augmented Hill-Climb increases reinforcement learning efficiency for language-based de novo molecule generation. J Cheminform 14, 68 (2022).  https://doi.org/10.1186/s13321-022-00646-z**
 
 ## Installation
-Conda can be used to install the molscore environment, mamba is considerably faster though.
+Conda can be used to install the molscore environment but mamba is HIGHLY recommended as it is considerably faster.
 ```
 git clone https://github.com/MorganCThomas/MolScore.git
 cd MolScore
 conda env create -f environment.yml
 conda activate molscore
 python setup.py develop
+```
+
+## Tests
+Unittests are currently available for some functionality, but not all.
+```
+cd molscore/tests
+python -m unittest
+```
+
+Or any individual test, for example
+```
+python test_docking.py
 ```
 ## Implementation into a generative model
 
@@ -64,7 +80,7 @@ Scoring functionality present in **molscore**, some scoring functions require ex
 |Synthesizability|[RAscore](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc05401a), [AiZynthFinder](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00472-1), SAscore|
 |Descriptors|RDKit, Maximum consecutive rotatable bonds, Penalized LogP etc.|
 |Transformation methods|Linear, linear threshold, step threshold, Gaussian|
-|Aggregation methods|Arithemtic mean, geometric mean, weighted sum, product, weighted product, [auto-weighted sum/product, pareto front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)|
+|Aggregation methods|Arithmetic mean, geometric mean, weighted sum, product, weighted product, [auto-weighted sum/product, pareto front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)|
 |Diversity filters|Unique, Occurence, [memory assisted](https://github.com/tblaschke/reinvent-memory) + ScaffoldSimilarityECFP|
 <sup>a</sup> PIDGINv5 is a suite of pre-trained RF classifiers on ~2,300 ChEMBL31 targets
   
