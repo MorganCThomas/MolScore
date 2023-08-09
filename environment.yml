@@ -5,6 +5,7 @@ channels:
   - openeye
   - pytorch
   - nvidia
+  - bioconda
 dependencies:
   - python>=3.8,<3.10
   - rdkit>=2019.03.2
