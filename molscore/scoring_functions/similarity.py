@@ -23,7 +23,7 @@ class MolecularSimilarity:
     """
     return_metrics = ['Sim']
 
-    def __init__(self, prefix: str, ref_smiles: Union[list, os.PathLike],
+    def __init__(self, prefix: str, ref_smiles: Union[list, str, os.PathLike],
                  fp: str = 'ECFP4', bits: int = 1024, similarity_measure: str = 'Tanimoto',  thresh: float = None, method: str = 'mean',
                  n_jobs: int = 1, **kwargs):
         """

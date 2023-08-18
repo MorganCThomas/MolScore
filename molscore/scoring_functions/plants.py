@@ -32,7 +32,7 @@ class PLANTSDock:
         'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant'
         ]
 
-    def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cluster: Union[str, int] = None,
+    def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike], cluster: Union[str, int] = None,
                  timeout: float = 120.0, ligand_preparation: str = 'GypsumDL',
                  **kwargs):
         """

@@ -6,6 +6,7 @@ import inspect
 import streamlit as st
 
 from molscore import utils
+#from molscore.gui.utils.file_picker import st_file_selector
 import molscore.scaffold_memory as scaffold_memory
 import molscore.scoring_functions as scoring_functions
 
@@ -14,11 +15,9 @@ ss = st.session_state
 if 'configs' not in ss:
     ss.input_path = 'configs'
 if 'n_sf' not in ss:
-    ss.n_sf=1
+    ss.n_sf=0
 if 'n_sp' not in ss:
-    ss.n_sp=1
-if 'maxmin' not in ss:
-    ss.maxmin=False
+    ss.n_sp=0
 if 'pidgin_docstring' not in ss:
     ss.pidgin_docstring=False
 
@@ -332,12 +331,14 @@ def getspconfig(options, key_i, tab):
         if smod_obj.__name__ == 'norm':
             col1, col2 = st.columns(2)
             # Buttons
-            if col1.button(label='Specify max/min', key=f'{key_i}: maxmin', help='Parameter value will be maxmin normalized between these values') or ss.maxmin:
-                ss.maxmin = True
-            if col2.button(label='Don\'t specify max/min', key=f'{key_i}: nomaxmin', help='Pameter value will be dynamically maxmin normalized based on the maximum and minimum observed values so far (i.e., moving goal post).') or not ss.maxmin:
-                ss.maxmin = False
+            if f'maxmin{key_i}' not in ss:
+                ss[f'maxmin{key_i}'] = False
+            if col1.button(label='Specify max/min', key=f'{key_i}: maxmin', help='Parameter value will be maxmin normalized between these values'):
+                ss[f'maxmin{key_i}'] = True
+            if col2.button(label='Don\'t specify max/min', key=f'{key_i}: nomaxmin', help='Pameter value will be dynamically maxmin normalized based on the maximum and minimum observed values so far (i.e., moving goal post).'):
+                ss[f'maxmin{key_i}'] = False
             # Grab parameters and plot
-            if ss.maxmin:
+            if ss[f'maxmin{key_i}']:
                 sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x'])
             else:
                 sp_config['parameters'] = object2dictionary(smod_obj, key_i=key_i, exceptions=['x', 'max', 'min'])
@@ -379,13 +380,15 @@ st.subheader('Run parameters')
 config['task'] = st.text_input(
     label='Task name (for file naming)',
     value='QED',
-    help='This should succinctly and uniquely name your objective.'
+    help='This should succinctly and uniquely name your objective.',
+    key='task'
     ).strip().replace(' ', '_')
 
 config['output_dir'] = st.text_input(
     label='Output directory',
     value='./',
-    help='Output directory to where MolScore will save another directory containing the run output that will be automatically named.'
+    help='Output directory to where MolScore will save another directory containing the run output that will be automatically named.',
+    key='output_dir'
     )
 
 absolute_output_path = st.checkbox(
@@ -414,13 +417,15 @@ if config['load_from_previous']:
 # ------ Logging ------
 config['logging'] = st.checkbox(
     label='Verbose logging',
-    help='Set logging level to info and additionally channel logging to the terminal.'
+    help='Set logging level to info and additionally channel logging to the terminal.',
+    key='logging'
     )
 
 # ------ App monitor ------
 config['monitor_app'] = st.checkbox(
     label='Run live monitor app',
-    help='Automatically run the monitor gui as a subprocess after the first iteration is scored. This can also be run manually at any time.'
+    help='Automatically run the monitor gui as a subprocess after the first iteration is scored. This can also be run manually at any time.',
+    key='monitor_app'
     )
 
 # ----- Scoring functions ------
@@ -441,9 +446,12 @@ with col1:
 with col2:
     if st.button(label='Delete scoring function', help='Decreases the number of scoring functions run, will remove the most recent tab below.'):
         ss.n_sf -= 1
-sf_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sf)])
-# Get user input parameters
-config['scoring_functions'] = [getsfconfig(i, tab=t) for i, t in zip(range(ss.n_sf), sf_tabs)]
+if ss.n_sf > 0:
+    # Get user input parameters
+    sf_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sf)])
+    config['scoring_functions'] = [getsfconfig(i, tab=t) for i, t in zip(range(ss.n_sf), sf_tabs)]
+else:
+    config['scoring_functions'] = []
 
 
 # ----- Scoring transformations -----
@@ -467,24 +475,26 @@ with col1:
 with col2:
     if st.button(label='Delete scoring parameter', help='Decrease the number of scoring parameters, will remove the most recent tab below.'):
         ss.n_sp -= 1
-sp_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sp)])
-
-# Get user input parameters if scoring functions have been defined
-if len(config['scoring_functions']) > 0:
-    smetric_options = []
-    for sf in config['scoring_functions']:
-        sf_name = sf['name']
-        sf_prefix = sf['parameters']['prefix']
-        sf_obj = [sf for sf in scoring_functions.all_scoring_functions if sf.__name__ == sf_name][0]
-        try:
-            sf_metrics = sf_obj.return_metrics
-            _ = [smetric_options.append(f"{sf_prefix.strip().replace(' ', '_')}_{m}")
-                 for m in sf_metrics]
-        except AttributeError:
-            st.write(f'WARNING: No return metrics found for {sf_name}')
-            continue
-    # Get parameter inputs
-    config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
+if ss.n_sp > 0:
+    sp_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sp)])
+    # Get user input parameters if scoring functions have been defined
+    if len(config['scoring_functions']) > 0:
+        smetric_options = []
+        for sf in config['scoring_functions']:
+            sf_name = sf['name']
+            sf_prefix = sf['parameters']['prefix']
+            sf_obj = [sf for sf in scoring_functions.all_scoring_functions if sf.__name__ == sf_name][0]
+            try:
+                sf_metrics = sf_obj.return_metrics
+                _ = [smetric_options.append(f"{sf_prefix.strip().replace(' ', '_')}_{m}")
+                    for m in sf_metrics]
+            except AttributeError:
+                st.write(f'WARNING: No return metrics found for {sf_name}')
+                continue
+        # Get parameter inputs
+        config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
+else:
+    config['scoring']['metrics'] = []
 
 # ----- Score aggregation -----
 st.markdown('#') # Add spacing
@@ -518,12 +528,14 @@ st.subheader('Diversity filter')
 config['diversity_filter'] = {}
 config['diversity_filter']['run'] = st.checkbox(
     label='Run diversity filter',
-    help='Apply a diversity filter penalizing non-diverse molecules. Click to expand further options.'
+    help='Apply a diversity filter penalizing non-diverse molecules. Click to expand further options.',
+    key='run_DF'
     )
 if config['diversity_filter']['run']:
     config['diversity_filter']['name'] = st.radio(label='Type of diversity filter',
                                                   options=['Unique', 'Occurrence'] +
                                                           [s.__name__ for s in scaffold_memory.all_scaffold_filters],
+                                                  key='DF_name',
                                                   index=0)
     if config['diversity_filter']['name'] == 'Unique':
         st.markdown('**Description**')
@@ -576,6 +588,108 @@ with col2:
         os._exit(0)
 
 # ----- Navigation Sidebar -----
+st.sidebar.header('Load from previous')
+ss.input_config = st_file_selector(
+    st_placeholder=st.sidebar.empty(),
+    path='./',
+    label='Please select a config file',
+    key='init_input'                
+    )
+
+def load_previous_meta():
+    """
+    Set widget values from previous config
+    """
+    with open(ss.input_config, 'rt') as f:
+        pconfig = json.load(f)
+        # Update meta
+        ss.task = pconfig['task']
+        ss.output_dir = pconfig['output_dir']
+        if 'previous_dir' in pconfig:
+            ss.previous_dir_selector = pconfig['previous_dir']
+        ss.logging = pconfig['logging']
+        ss.monitor_app = pconfig['monitor_app']
+        # Update SFs
+        ss.n_sf = len(pconfig['scoring_functions'])
+        # Update SPs
+        ss.n_sp = len(pconfig['scoring']['metrics'])
+        # Update method
+        ss['Scoring method'] = pconfig['scoring']['method']
+        # Update DF
+        if pconfig.get('diversity_filter'):
+            if pconfig['diversity_filter'].get('run'):
+                ss['run_DF'] = pconfig['diversity_filter']['run']
+            else:
+                ss['run_DF'] = False        
+
+def load_previous_widgets():
+    with open(ss.input_config, 'rt') as f:
+        pconfig = json.load(f)
+        # Update SFs
+        for i, sf in enumerate(pconfig['scoring_functions']):
+            ss[f'{i}: sf_name'] = sf['name']
+            for pk, pv in sf['parameters'].items():
+                # Add optional widgets
+                if f'{i}: {sf["name"]}_{pk}' not in ss:
+                    ss[f'{i}: {sf["name"]}_{pk}_optional'] = True
+                    continue
+                # Update parameter type
+                ptype = type(pv)
+                try: 
+                    ss[f'{i}: {sf["name"]}_{pk}_type'] = ptype
+                    continue
+                except KeyError:
+                    pass
+            # Always update prefix (too avoid bug if not in optional selections for scoring parameter)
+            ss[f'{i}: {sf["name"]}_prefix'] = sf['parameters']['prefix']
+                
+        # Update SPs
+        for i, sp in enumerate(pconfig['scoring']['metrics']):
+            ss[f'{i}: sp_name'] = sp['name']
+            ss[f'{i}: sp_weight'] = sp['weight']
+            ss[f'{i}: sp_modifier'] = sp['modifier']
+            if (sp['modifier'] == 'norm') and any([k in sp['parameters'] for k in ['max', 'min']]):
+                ss[f'maxmin{i}'] = True
+        # Update DFs
+        try:
+            ss['DF_name'] = pconfig['diversity_filter']['name']
+        except KeyError:
+            pass
+
+def load_previous_params():
+    with open(ss.input_config, 'rt') as f:
+        pconfig = json.load(f)
+        # Update SFs
+        for i, sf in enumerate(pconfig['scoring_functions']):
+            for pk, pv in sf['parameters'].items():
+                try:
+                    if isinstance(pv, list):
+                        ss[f'{i}: {sf["name"]}_{pk}'] = str(pv).strip('[]').replace('\'', '')
+                    else:
+                        ss[f'{i}: {sf["name"]}_{pk}'] = pv
+                except:
+                    continue
+        # Update SPs
+        for i, sp in enumerate(pconfig['scoring']['metrics']):
+            for pk, pv in sp['parameters'].items():
+                try:
+                    ss[f'{i}: {sp["modifier"]}_{pk}'] = pv
+                except:
+                    continue
+        # Update DFs
+        try:
+            for pk, pv in pconfig['diversity_filter']['parameters'].items():
+                ss[f'{i}: {pconfig["diversity_filter"]["name"]}_{pk}'] = pv
+        except KeyError:
+            pass
+                
+
+st.sidebar.markdown("Attempt to be load in three consecutive stages due to interactive nature of widgets and callbacks (second button may be needed twice)")
+col1, col2, col3 = st.sidebar.columns(3)
+col1.button('Load meta', on_click=load_previous_meta, help='Must load me first')
+col2.button('Load widgets', on_click=load_previous_widgets, help='Must load me second')
+col3.button('Load params', on_click=load_previous_params, help='Must load me third')
+    
 st.sidebar.header('Navigate')
 st.sidebar.markdown("[Run parameters](#run-parameters)")
 st.sidebar.markdown("[Scoring functions](#scoring-functions)")

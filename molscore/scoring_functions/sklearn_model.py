@@ -10,6 +10,7 @@ from rdkit.Avalon import pyAvalonTools
 from rdkit import rdBase
 import joblib
 import pickle as pkl
+from typing import Union
 
 from molscore.scoring_functions.utils import Fingerprints
 rdBase.DisableLog('rdApp.error')
@@ -21,7 +22,7 @@ class SKLearnClassifier:
     """
     return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str, model_path: os.PathLike,
+    def __init__(self, prefix: str, model_path: Union[str, os.PathLike],
                  fp: str, nBits: int = 1024, n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)

@@ -34,7 +34,7 @@ class SminaDock:
     """
     return_metrics = ['docking_score', 'best_variant']
 
-    def __init__(self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike, cpus: int = 1,
+    def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike], cpus: int = 1,
                  cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)

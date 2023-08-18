@@ -31,7 +31,7 @@ class GlideDock:
                       'r_i_glide_ecoul', 'r_i_glide_erotb', 'r_i_glide_esite', 'r_i_glide_emodel',
                       'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
-    def __init__(self, prefix: str, glide_template: os.PathLike, cluster: Union[str, int] = None,
+    def __init__(self, prefix: str, glide_template: Union[os.PathLike, str], cluster: Union[str, int] = None,
                  timeout: float = 120.0, ligand_preparation: str = 'LigPrep', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)

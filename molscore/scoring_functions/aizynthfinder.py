@@ -30,7 +30,7 @@ class AiZynthFinder:
     return_metrics = ['is_solved', 'top_score', 'number_of_steps', 'number_of_precursors']
 
     def __init__(self, 
-        prefix: str='AiZynth', config_file: os.PathLike=None, policy: str='full_uspto_rollout_policy', templates: str='full_uspto_unique_templates',
+        prefix: str='AiZynth', config_file: Union[str, os.PathLike]=None, policy: str='full_uspto_rollout_policy', templates: str='full_uspto_unique_templates',
         filter_policy: str='filter_policy_all', stock: Union[str, os.PathLike]='zinc_stock', n_jobs: int=1,
         iteration_limit: int = 100, return_first: bool=False, time_limit: int=120, C: float=1.4,
         cutoff_cumulative: float=0.995, cutoff_number: int=50, max_transforms: int=6,

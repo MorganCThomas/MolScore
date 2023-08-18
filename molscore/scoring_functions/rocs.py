@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import Union
 
 from rdkit.Chem import AllChem as Chem
 
@@ -27,7 +28,7 @@ class ROCS:
                       'GetRefSelfOverlap', 'GetRefTversky', 'GetRefTverskyCombo', 'GetShapeTanimoto',
                       'GetTanimoto', 'GetTanimotoCombo', 'GetTversky', 'GetTverskyCombo']
 
-    def __init__(self, prefix: str, ref_file: os.PathLike, **kwargs):
+    def __init__(self, prefix: str, ref_file: Union[str, os.PathLike], **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., Risperidone)
         :param ref_file: Path to reference file to overlay query to (.pdb)

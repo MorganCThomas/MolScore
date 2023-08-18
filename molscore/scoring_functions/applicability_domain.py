@@ -33,7 +33,7 @@ class ApplicabilityDomain:
 
     return_metrics = ['in_AD']
 
-    def __init__(self, prefix, ref_smiles: Union[os.PathLike, list], fp: str = None, qed: bool = False, physchem: bool = True, n_jobs: int = 1, **kwargs):
+    def __init__(self, prefix, ref_smiles: Union[os.PathLike, str, list], fp: str = None, qed: bool = False, physchem: bool = True, n_jobs: int = 1, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param ref_smiles: A file_path to or list of reference smiles used to define the applicability domain.

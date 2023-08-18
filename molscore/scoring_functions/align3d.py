@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from multiprocessing import Pool
 from functools import partial
-from typing import Tuple
+from typing import Tuple, Union
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.Pharm2D import Gobbi_Pharm2D, Generate
@@ -24,7 +24,7 @@ class Align3D:
     return_metrics = ['O3A_score', 'shape_sim', 'pharm_sim', 'shape_score']
 
     def __init__(
-        self, prefix: str, ref_smiles: list = None, ref_sdf: os.PathLike = None,
+        self, prefix: str, ref_smiles: list = None, ref_sdf: Union[str, os.PathLike] = None,
         similarity_method: str = 'Tanimoto', agg_method: str = 'mean',
         max_confs: int = 100, pharmacophore_similarity: bool = True, 
         n_jobs: int = 1, **kwargs,

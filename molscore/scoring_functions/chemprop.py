@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from typing import Union
 
 import chemprop as cp
 
@@ -10,7 +11,7 @@ class ChemPropModel:
     """
     return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str, model_path: os.PathLike, no_cuda: bool = False, device: int = 0, **kwargs):
+    def __init__(self, prefix: str, model_path: Union[str, os.PathLike], no_cuda: bool = False, device: int = 0, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model directory

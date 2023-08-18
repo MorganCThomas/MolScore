@@ -114,7 +114,7 @@ class GOLDDock:
     }
 
     def __init__(
-        self, prefix: str, gold_template: Union[None, os.PathLike] = None, receptor: os.PathLike = None,  ref_ligand: os.PathLike = None,
+        self, prefix: str, gold_template: Union[None, str, os.PathLike] = None, receptor: Union[str, os.PathLike] = None,  ref_ligand: Union[str, os.PathLike] = None,
         cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL', **kwargs
         ):
         """

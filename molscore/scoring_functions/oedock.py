@@ -27,7 +27,7 @@ class OEDock:
     return_metrics = ['docking_score', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     def __init__(
-        self, prefix: str, receptor: os.PathLike, ref_ligand: os.PathLike,
+        self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
         ligand_preparation: str,
         omega_energy_window: int = 10, omega_max_confs: int = 200, omega_strict_stereo: bool = False,
         dock_scoring_function: str = 'Chemgauss4', dock_search_resolution: str = 'Standard', dock_num_poses: int = 1,
