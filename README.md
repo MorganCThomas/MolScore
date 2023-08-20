@@ -85,6 +85,7 @@ Scoring functionality present in **molscore**, some scoring functions require ex
 |Transformation methods|Linear, linear threshold, step threshold, Gaussian|
 |Aggregation methods|Arithmetic mean, geometric mean, weighted sum, product, weighted product, [auto-weighted sum/product, pareto front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)|
 |Diversity filters|Unique, Occurence, [memory assisted](https://github.com/tblaschke/reinvent-memory) + ScaffoldSimilarityECFP|
+
 <sup>a</sup> PIDGINv5 is a suite of pre-trained RF classifiers on ~2,300 ChEMBL31 targets
   
 Performance metrics present in **moleval**, many of which are from [GuacaMol](https://pubs.acs.org/doi/10.1021/acs.jcim.8b00839) or [MOSES](https://www.frontiersin.org/articles/10.3389/fphar.2020.565644/full). 
