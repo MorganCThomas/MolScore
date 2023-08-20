@@ -18,14 +18,15 @@ This code here was used in the following publications:
 2. **Thomas M, O'Boyle NM, Bender A, de Graaf C. Augmented Hill-Climb increases reinforcement learning efficiency for language-based de novo molecule generation. J Cheminform 14, 68 (2022).  https://doi.org/10.1186/s13321-022-00646-z**
 
 ## Installation
-Conda can be used to install the molscore environment but mamba is HIGHLY recommended as it is considerably faster.
+Mamba should be used to install the molscore environment as it is considerably better than conda. If you do not have mamba first install this package manager following the instructions [here](https://github.com/conda-forge/miniforge#mambaforge).
 ```
 git clone https://github.com/MorganCThomas/MolScore.git
 cd MolScore
-conda env create -f environment.yml
-conda activate molscore
+mamba env create -f environment.yml
+mamba activate molscore
 python setup.py develop
 ```
+**Note:** Depending if you have conda already installed, you may have to use `conda activate` instead and point to the env path directly for example, `conda activate ~/mambaforge/envs/molscore`
 
 ## Tests
 Unittests are currently available for some functionality, but not all.
@@ -53,6 +54,8 @@ scores = ms.score(SMILES)
     
 # When the program exits, all recorded smiles will be saved and the monitor app (if selected) will be closed
 ```
+
+**Note: A generative language model with MolScore already implemented can be found [here](https://github.com/MorganCThomas/SMILES-RNN).**
 
 ## Usage
 Once `molscore` has been implemented into a generative model, the objective needs to be defined! Writing a JSON file is a pain though so instead a streamlit app is provided do help.
