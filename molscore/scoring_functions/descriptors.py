@@ -1,10 +1,9 @@
 from typing import Union
-from multiprocessing import Pool
 from functools import partial
 from rdkit.Chem import Descriptors, QED, Crippen, GraphDescriptors
 from rdkit.Chem import AllChem as Chem
 from molscore.scoring_functions.SA_Score import sascorer
-from molscore.scoring_functions.utils import get_mol
+from molscore.scoring_functions.utils import get_mol, Pool
 
 
 class MolecularDescriptors:

@@ -1,4 +1,3 @@
-from multiprocessing import Pool
 from functools import partial
 import glob
 import os
@@ -12,7 +11,7 @@ import joblib
 import pickle as pkl
 from typing import Union
 
-from molscore.scoring_functions.utils import Fingerprints
+from molscore.scoring_functions.utils import Fingerprints, Pool
 rdBase.DisableLog('rdApp.error')
 
 

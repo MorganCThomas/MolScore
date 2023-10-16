@@ -6,7 +6,8 @@ https://github.com/MolecularAI/Reinvent
 import numpy as np
 from rdkit import Chem
 from functools import partial
-from multiprocessing import Pool
+
+from molscore.scoring_functions.utils import Pool
 
 
 class SubstructureFilters:

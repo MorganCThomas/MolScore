@@ -6,8 +6,9 @@ https://github.com/MolecularAI/Reinvent
 import os
 from rdkit import Chem
 from functools import partial
-from multiprocessing import Pool
 from typing import Union
+
+from molscore.scoring_functions.utils import Pool
 
 
 class SubstructureMatch:

@@ -8,11 +8,10 @@ from functools import partial
 from tempfile import NamedTemporaryFile
 
 from molscore.scoring_functions.utils import get_mol, Fingerprints, SimilarityMeasures
-from multiprocessing import Pool
 from rdkit.Chem import AllChem as Chem
 from typing import Union
 
-from molscore.scoring_functions.utils import get_mol
+from molscore.scoring_functions.utils import get_mol, Pool
 
 logger = logging.getLogger('external_server')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

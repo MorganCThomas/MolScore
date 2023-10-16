@@ -6,10 +6,9 @@ import logging
 import pickle as pkl
 import numpy as np
 from functools import partial
-from multiprocessing import Pool
 from zenodo_client import Zenodo
 
-from molscore.scoring_functions.utils import Fingerprints
+from molscore.scoring_functions.utils import Fingerprints, Pool
 
 logger = logging.getLogger('pidgin')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

@@ -1,5 +1,6 @@
 from typing import Union
 import subprocess
+import multiprocessing
 import threading
 import os
 import signal
@@ -12,6 +13,10 @@ from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Avalon import pyAvalonTools
 from dask.distributed import Client, LocalCluster
 
+
+def Pool(*args):
+    context = multiprocessing.get_context("fork")
+    return context.Pool(*args)
 
 class timedThread(object):
     """

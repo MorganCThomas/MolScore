@@ -3,10 +3,9 @@ import logging
 import numpy as np
 from typing import Union
 from functools import partial
-from multiprocessing import Pool
 
 from molscore.scoring_functions.descriptors import Descriptors as molscore_descriptors
-from molscore.scoring_functions.utils import get_mol, Fingerprints, SimilarityMeasures
+from molscore.scoring_functions.utils import get_mol, Fingerprints, SimilarityMeasures, Pool
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import QED, Descriptors, Crippen,FindMolChiralCenters

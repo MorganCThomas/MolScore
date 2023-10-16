@@ -1,14 +1,13 @@
 import os
 import logging
 import numpy as np
-from multiprocessing import Pool
 from functools import partial
 from typing import Tuple, Union
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.Pharm2D import Gobbi_Pharm2D, Generate
 
-from molscore.scoring_functions.utils import SimilarityMeasures
+from molscore.scoring_functions.utils import SimilarityMeasures, Pool
 
 
 logger = logging.getLogger('align3d')
