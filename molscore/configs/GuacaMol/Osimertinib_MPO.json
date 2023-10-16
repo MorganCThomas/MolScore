@@ -53,7 +53,7 @@
     "method": "gmean",
     "metrics": [
       {
-        "name": "Osimertinib_FCFC4_Tc",
+        "name": "Osimertinib_FCFC4_Sim",
         "weight": 1.0,
         "modifier": "lin_thresh",
         "parameters": {
@@ -64,7 +64,7 @@
         }
       },
       {
-        "name": "Osimertinib_ECFC6_Tc",
+        "name": "Osimertinib_ECFC6_Sim",
         "weight": 1.0,
         "modifier": "gauss",
         "parameters": {

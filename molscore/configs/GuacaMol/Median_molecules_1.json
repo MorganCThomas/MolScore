@@ -45,13 +45,13 @@
     "method": "gmean",
     "metrics": [
       {
-        "name": "camphor_Tc",
+        "name": "camphor_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}
       },
       {
-        "name": "menthol_Tc",
+        "name": "menthol_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}

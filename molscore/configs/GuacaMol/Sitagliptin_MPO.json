@@ -45,7 +45,7 @@
     "method": "gmean",
     "metrics": [
       {
-        "name": "Sitagliptin_Tc",
+        "name": "Sitagliptin_Sim",
         "weight": 1.0,
         "modifier": "gauss",
         "parameters": {

@@ -37,7 +37,7 @@
     "method": "gmean",
     "metrics": [
       {
-        "name": "Perindopril_Tc",
+        "name": "Perindopril_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}

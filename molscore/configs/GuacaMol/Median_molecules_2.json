@@ -45,13 +45,13 @@
     "method": "gmean",
     "metrics": [
       {
-        "name": "tadalafil_Tc",
+        "name": "tadalafil_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}
       },
       {
-        "name": "sildenafil_Tc",
+        "name": "sildenafil_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}

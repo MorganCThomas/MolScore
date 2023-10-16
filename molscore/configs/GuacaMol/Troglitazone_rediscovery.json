@@ -29,7 +29,7 @@
     "method": "single",
     "metrics": [
       {
-        "name": "Troglitazone_Tc",
+        "name": "Troglitazone_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}

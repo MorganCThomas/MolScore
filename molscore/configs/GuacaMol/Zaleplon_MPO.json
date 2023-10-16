@@ -37,7 +37,7 @@
     "method": "gmean",
     "metrics": [
       {
-        "name": "Zaleplon_Tc",
+        "name": "Zaleplon_Sim",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}
