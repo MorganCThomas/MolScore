@@ -5,7 +5,7 @@ import numpy as np
 from functools import partial
 
 from molscore.scoring_functions.utils import get_mol, Fingerprints, SimilarityMeasures
-from multiprocessing import Pool
+from multiprocessing import Pool, get_context
 from rdkit.Chem import AllChem as Chem
 from typing import Union
 
@@ -44,6 +44,7 @@ class MolecularSimilarity:
         self.thresh = thresh
         self.method = method
         self.nBits = bits
+        self.mp_context = get_context("fork")
         self.n_jobs = n_jobs
 
         # If file path provided, load smiles.
@@ -104,7 +105,7 @@ class MolecularSimilarity:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        with Pool(self.n_jobs) as pool:
+        with self.mp_context.Pool(self.n_jobs) as pool:
             calculate_sim_p = partial(self.calculate_sim, ref_fps=self.ref_fps, fp=self.fp, nBits=self.nBits, thresh=self.thresh, similarity_measure=self.similarity_measure, method=self.method)
             results = [{'smiles': smi, f'{self.prefix}_Sim': sim} for smi, sim in pool.imap(calculate_sim_p, smiles)]
         return results
