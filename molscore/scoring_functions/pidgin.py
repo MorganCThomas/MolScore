@@ -6,9 +6,8 @@ import logging
 import pickle as pkl
 import numpy as np
 from functools import partial
-from zenodo_client import Zenodo
 
-from molscore.scoring_functions.utils import Fingerprints, Pool
+from molscore.scoring_functions.utils import Fingerprints, Pool, Zenodo
 
 logger = logging.getLogger('pidgin')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -23,17 +22,17 @@ class PIDGIN():
     """
     return_metrics = ['pred_proba']
 
-    zenodo = Zenodo()
-    #metadata = PIDGINMetadata(zenodo_client=zenodo)
+    zenodo = Zenodo(access_token='0') # Set access token to zero as it's required zenodo-client API but not Zenodo for downloading public data
     
     @classmethod
     def get_pidgin_record_id(cls):
-        return cls.zenodo.get_latest_record('7504135')
+        # This feature is broken in zenodo-client currently (17/10/23, v0.3.2): returns 'latest' and not actual record id
+        return '7547691'
 
     # Download list of uniprots
     @classmethod
     def get_uniprot_list(cls):
-        uniprots_path = cls.zenodo.download_latest(record_id=cls.get_pidgin_record_id(), path='uniprots.json')
+        uniprots_path = cls.zenodo.download(record_id=cls.get_pidgin_record_id(), name='uniprots.json')
         with open(uniprots_path, 'rt') as f:
             uniprots = json.load(f)
         uniprots = ['None'] + uniprots
@@ -43,7 +42,7 @@ class PIDGIN():
     @classmethod
     def get_uniprot_groups(cls):
         groups = {'None': None}
-        groups_path = cls.zenodo.download_latest(record_id=cls.get_pidgin_record_id(), path='uniprots_groups.json')
+        groups_path = cls.zenodo.download(record_id=cls.get_pidgin_record_id(), name='uniprots_groups.json')
         with open(groups_path, 'rt') as f:
             groups.update(json.load(f))
         return groups
@@ -105,7 +104,7 @@ class PIDGIN():
 
         # Download PIDGIN
         logger.warning('If not downloaded, PIDGIN will be downloaded which is a large file ~ 11GB and may take some several minutes')
-        pidgin_path = self.zenodo.download_latest(record_id=self.pidgin_record_id, path='trained_models.zip')
+        pidgin_path = self.zenodo.download(record_id=self.pidgin_record_id, name='trained_models.zip')
         with zipfile.ZipFile(pidgin_path, 'r') as zip_file:
             for uni in self.uniprots:
                 try:
@@ -168,19 +167,19 @@ class PIDGIN():
         # Binarise
         if self.binarise:
             thresh = np.asarray(self.ghost_thresholds)
-            predictions = (predictions >= thresh)
+            predictions = (predictions >= thresh).astype(int)
 
         # Update results
         for i, row in zip(valid, predictions):
             for j, name in enumerate(self.model_names):
-                results[i].update({f'{self.prefix}_{name}': row[j]})
+                results[i].update({f'{self.prefix}_{name}': float(row[j])}) # JSON doesn't like numpy types
 
         # Aggregate
         aggregated_predictions = self.agg(predictions, axis=1)
 
         # Update results
         for i, prob in zip(valid, aggregated_predictions):
-            results[i].update({f'{self.prefix}_pred_proba': prob})
+            results[i].update({f'{self.prefix}_pred_proba': float(prob)}) # JSON doesn't like numpy types
 
         return results
 

@@ -19,7 +19,7 @@ class TestPIDGIN(BaseTests.TestScoringFunction):
         cls.obj = PIDGIN
         PIDGIN.set_docstring()
         uniprots = sample(PIDGIN.get_uniprot_list(), 10)
-        groups = sample(PIDGIN.get_uniprot_groups().keys(), 1)
+        groups = sample(list(PIDGIN.get_uniprot_groups().keys()), 1)
         cls.inst = PIDGIN(
             prefix='test', 
             uniprot=uniprots[0],
@@ -49,7 +49,7 @@ class TestPIDGINParallel(BaseTests.TestScoringFunction):
         cls.obj = PIDGIN
         PIDGIN.set_docstring()
         uniprots = sample(PIDGIN.get_uniprot_list(), 10)
-        groups = sample(PIDGIN.get_uniprot_groups().keys(), 1)
+        groups = sample(list(PIDGIN.get_uniprot_groups().keys()), 1)
         cls.inst = PIDGIN(
             prefix='test', 
             uniprot=uniprots[0],
