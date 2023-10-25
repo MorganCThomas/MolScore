@@ -44,7 +44,7 @@ class SminaDock:
         :param cpus: Number of Smina CPUs to use per simulation
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param timeout: Timeout (seconds) before killing an individual docking simulation
-        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
+        :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         """
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):
