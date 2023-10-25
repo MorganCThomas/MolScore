@@ -49,7 +49,7 @@ class SminaDock:
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):
             pdbqt_receptor = receptor.replace('.pdb', '.pdbqt')
-            subprocess.run(cmd=f"obabel {receptor} -O {pdbqt_receptor}")
+            subprocess.run(["obabel", receptor, "-O", pdbqt_receptor])
             receptor = pdbqt_receptor
         
         # Specify class attributes
