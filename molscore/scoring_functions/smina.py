@@ -10,6 +10,7 @@ import os
 import atexit
 import logging
 import glob
+import subprocess
 from typing import Union
 from itertools import takewhile
 from tempfile import TemporaryDirectory
@@ -48,7 +49,7 @@ class SminaDock:
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):
             pdbqt_receptor = receptor.replace('.pdb', '.pdbqt')
-            self.subprocess.run(cmd=f"obabel {receptor} -O {pdbqt_receptor}")
+            subprocess.run(cmd=f"obabel {receptor} -O {pdbqt_receptor}")
             receptor = pdbqt_receptor
         
         # Specify class attributes
