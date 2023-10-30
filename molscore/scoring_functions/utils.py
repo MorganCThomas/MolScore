@@ -156,13 +156,21 @@ class Zenodo(ZenodoBase):
         concept_record_id = res_json["conceptrecid"]
         # FIXME send error report to zenodo about this - shouldn't version be required?
         version = res_json["metadata"].get("version", "v1")
-
-        for file in res_json["files"]:
-            if file["filename"] == name:  ##### Change in Zenodo API, "filename" not "key"
-                url = os.path.join(file["links"]["self"].rsplit("/", 1)[0], name, "content") ##### file["links"]["self"] no longer works instead try e.g., https://zenodo.org/records/7547691/files/trained_models.zip/content
+        
+        try:
+            for file in res_json["files"]:
+                if file["filename"] == name:  ##### Change in Zenodo API, "filename" not "key"
+                    url = os.path.join(file["links"]["self"].rsplit("/", 1)[0], name, "content") ##### file["links"]["self"] no longer works instead try e.g., https://zenodo.org/records/7547691/files/trained_models.zip/content
+                    break
+            else:
+                raise FileNotFoundError(f"zenodo.record:{record_id} does not have a file with key {name}")
+        except:
+            for file in res_json["files"]:
+            if file["key"] == name:
+                url = file["links"]["self"]
                 break
-        else:
-            raise FileNotFoundError(f"zenodo.record:{record_id} does not have a file with key {name}")
+            else:
+                raise FileNotFoundError(f"zenodo.record:{record_id} does not have a file with key {name}")
 
         if parts is None:
             parts = [self.module.replace(":", "-"), concept_record_id, version]
