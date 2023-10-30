@@ -1,6 +1,6 @@
 import os
 from typing import Union, Tuple
-from multiprocessing import Pool
+import multiprocessing
 from collections import Counter, defaultdict
 from itertools import combinations
 from functools import partial
@@ -42,7 +42,8 @@ def mapper(n_jobs):
 
         return _mapper
     if isinstance(n_jobs, int):
-        pool = Pool(n_jobs)
+        context = multiprocessing.get_context("fork")
+        pool = context.Pool(n_jobs)
 
         def _mapper(*args, **kwargs):
             try:
