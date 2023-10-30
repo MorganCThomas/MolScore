@@ -166,9 +166,9 @@ class Zenodo(ZenodoBase):
                 raise FileNotFoundError(f"zenodo.record:{record_id} does not have a file with key {name}")
         except:
             for file in res_json["files"]:
-            if file["key"] == name:
-                url = file["links"]["self"]
-                break
+                if file["key"] == name:
+                    url = file["links"]["self"]
+                    break
             else:
                 raise FileNotFoundError(f"zenodo.record:{record_id} does not have a file with key {name}")
 
