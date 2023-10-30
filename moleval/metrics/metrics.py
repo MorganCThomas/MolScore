@@ -198,8 +198,8 @@ class GetMetrics(object):
                                                  fp_type='morgan')
         metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
         # Calculate number of FG and RS relative to sample size
-        metrics['FG'] = len(list(fgs.keys()))/len(gen)
-        metrics['RS'] = len(list(rss.keys()))/len(gen)
+        metrics['FG'] = len(list(fgs.keys()))/fgs.total()
+        metrics['RS'] = len(list(rss.keys()))/rss.total()
         # Calculate % pass filters
         if verbose: print("Calculating Filters")
         metrics['Filters'] = fraction_passes_filters(mols, self.pool)
