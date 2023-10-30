@@ -1,0 +1,76 @@
+{
+  "task": "5HT2A_SerotoninSelective",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "PIDGIN",
+      "run": true,
+      "parameters": {
+        "prefix": "5HT2A",
+        "uniprot": "P28223",
+        "thresh": "1 uM",
+        "n_jobs": 1,
+        "method": "mean",
+        "binarise": false
+      }
+    },
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "PIDGIN",
+      "run": true,
+      "parameters": {
+        "prefix": "SerotoninReceptor",
+        "uniprot_set": "5 - Serotonin receptor (12)",
+        "thresh": "10 uM",
+        "exclude_uniprot": "P28223",
+        "n_jobs": 1,
+        "method": "mean",
+        "binarise": false
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "5HT2A_pred_proba",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "SerotoninReceptor_pred_proba",
+        "weight": 1.0,
+        "modifier": "norm",
+        "parameters": {
+          "objective": "minimize",
+          "max": 1.0,
+          "min": 0.0
+        }
+      }
+    ],
+    "method": "amean"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.25,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  }
+}

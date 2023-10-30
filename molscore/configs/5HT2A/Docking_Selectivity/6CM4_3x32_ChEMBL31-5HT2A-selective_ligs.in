@@ -1,0 +1,20 @@
+GLIDE_CONS_FINALONLY   True
+GRIDFILE   ./6CM4_D3x32_grid.zip
+LIGANDFILE   6CM4_3x32_ChEMBL31-5HT2A-selective_ligs.maegz
+PRECISION   SP
+
+[CONSTRAINT_GROUP:1]
+    USE_CONS   NOE1:1, A:ASP:114:OD2(hbond):2
+    NREQUIRED_CONS   1
+
+[FEATURE:1]
+    PATTERN1   "[#1][#7] 1 include"
+    PATTERN2   "[#1][S;X2] 1 include"
+    PATTERN3   "[#1][O-] 1 include"
+    PATTERN4   "[#1][O;X2] 1 include"
+
+[FEATURE:2]
+    PATTERN1   "[#1][#7] 1 include"
+    PATTERN2   "[#1][S;X2] 1 include"
+    PATTERN3   "[#1][O-] 1 include"
+    PATTERN4   "[#1][O;X2] 1 include"

@@ -1,0 +1,94 @@
+{
+  "task": "5HT2A_DRD2Selective_3x32Docking_PosCharge_CRot",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": true,
+  "scoring_functions": [
+    {
+      "name": "GlideDock",
+      "run": true,
+      "parameters": {
+        "prefix": "5HT2A",
+        "glide_template": "./6A93_3x32_ChEMBL31-5HT2A-selective_ligs.in",
+        "cluster": 10,
+        "timeout": 120.0,
+        "ligand_preparation": "LigPrep"
+      }
+    },
+    {
+      "name": "GlideDock",
+      "run": true,
+      "parameters": {
+        "prefix": "DRD2",
+        "glide_template": "./6CM4_3x32_ChEMBL31-5HT2A-selective_ligs.in",
+        "cluster": 10,
+        "timeout": 120.0,
+        "ligand_preparation": "LigPrep"
+      }
+    },
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "5HT2A_r_i_docking_score",
+        "weight": 1.0,
+        "modifier": "norm",
+        "parameters": {
+          "objective": "minimize"
+        }
+      },
+      {
+        "name": "DRD2_r_i_docking_score",
+        "weight": 0.5,
+        "modifier": "norm",
+        "parameters": {
+          "objective": "maximize"
+        }
+      },
+      {
+        "name": "5HT2A_PositiveCharge",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 1.0,
+          "lower": 0.0
+        }
+      },
+      {
+        "name": "desc_MaxConsecutiveRotatableBonds",
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "minimize",
+          "upper": 0.0,
+          "lower": 3.0,
+          "buffer": 2.0
+        }
+      }
+    ],
+    "method": "wsum"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  }
+}
