@@ -1,5 +1,6 @@
 import os
 import subprocess
+from multiprocessing import cpu_count
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
@@ -348,6 +349,8 @@ class GypsumDL(LigandPreparation):
         # Note here we use GypsumDL' in-built parallelizer
         if dask_client is not None:
             n_jobs = len(dask_client.ncores())
+            if n_jobs > cpu_count(): # As gypsum is limited to single node
+                n_jobs = -1
         else:
             n_jobs = -1
         super().__init__(logger=logger)
