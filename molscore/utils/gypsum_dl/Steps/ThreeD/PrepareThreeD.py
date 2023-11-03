@@ -77,3 +77,5 @@ def prepare_3d(contnrs, params):
                 job_manager,
                 parallelizer_obj,
             )
+            
+    return contnrs

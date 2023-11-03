@@ -158,6 +158,8 @@ def prepare_smiles(contnrs, params):
     if debug:
         Utils.print_current_smiles(contnrs)
 
+    return contnrs
+
 
 def wrap_molecules(contnrs):
     """Each molecule container holds only one SMILES string
