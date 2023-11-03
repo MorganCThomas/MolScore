@@ -30,8 +30,8 @@ class LigandPreparation:
         # This should be overwritten by specific classes
         raise NotImplementedError
 
-    def __call__(self, smiles: list, file_names: list, directory: os.PathLike):
-        return self.prepare(smiles=smiles, directory=directory, file_names=file_names)
+    def __call__(self, smiles: list, file_names: list, directory: os.PathLike, logger=None):
+        return self.prepare(smiles=smiles, directory=directory, file_names=file_names, logger=logger)
 
 
 class LigPrep(LigandPreparation):
@@ -57,7 +57,7 @@ class LigPrep(LigandPreparation):
         except KeyError:
             raise KeyError("Please ensure you have a Schrodinger installation and license")
 
-    def prepare(self, smiles: list, directory: str, file_names: list):
+    def prepare(self, smiles: list, directory: str, file_names: list, **kwargs):
         """
         Call ligprep to prepare molecules.
         :param smiles: List of SMILES strings
@@ -197,7 +197,7 @@ class Epik(LigandPreparation):
         else:
             return name, [], [], []
 
-    def prepare(self, smiles: list, directory: os.PathLike, file_names: list):
+    def prepare(self, smiles: list, directory: os.PathLike, file_names: list, **kwargs):
         """
         Use RDKit and Epik to prepare molecules.
         :param smiles: List of SMILES strings
@@ -267,7 +267,7 @@ class Moka(LigandPreparation):
                                             stdout=subprocess.PIPE).stdout.decode().strip('\n')
         assert self.corina_env != '', "Please ensure you have a Corina installation and license"
 
-    def prepare(self, smiles, directory, file_names):
+    def prepare(self, smiles, directory, file_names, **kwargs):
         """
         Call Moka and Corina to prepare molecules.
         :param smiles: List of SMILES strings
@@ -388,7 +388,7 @@ class GypsumDL(LigandPreparation):
         )
 
     
-    def prepare(self, smiles: list, directory: os.PathLike, file_names: list):
+    def prepare(self, smiles: list, directory: os.PathLike, file_names: list, logger=None, **kwargs):
         """
         Prepare smiles using GypsumDL's open-source ligand preparation protocol.
         :param smiles: List of SMILES strings
@@ -410,15 +410,18 @@ class GypsumDL(LigandPreparation):
         contnrs = [x for x in contnrs if x.orig_smi_canonical != None]
 
         # Prepare including protonation, tautomers and stereoenumeration
+        if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL')
         prepare_smiles(contnrs, self.gypsum_params)
 
         # Convert the processed SMILES strings to 3D.
+        if logger: logger.debug('Preparing 3D embedding with Gypsum-DL')
         prepare_3d(contnrs, self.gypsum_params)
 
         # Add in name and unique id to each molecule.
         add_mol_id_props(contnrs)
 
         # Save the output.
+        if logger: logger.debug('Writing prepared molecules with Gypsum-DL')
         variants = {name: [] for name in file_names}
         variant_files = []
         for i, contnr in enumerate(contnrs):

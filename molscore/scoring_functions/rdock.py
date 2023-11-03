@@ -320,7 +320,7 @@ END_SECTION
         logger.addHandler(fh)
 
         # Prepare ligands
-        self.variants, variant_paths = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=self.file_names)
+        self.variants, variant_paths = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=self.file_names, logger=logger)
         self.variants, variant_paths = self.reformat_ligands(self.variants, variant_paths)
 
         # Dock ligands
