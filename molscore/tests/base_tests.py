@@ -62,6 +62,7 @@ class BaseTests:
             out1, out2 = self.output
             self.assertIsInstance(out1, dict)
             self.assertIsInstance(out2, list)
+            self.assertGreater(len(out2), 0, "No file paths returned, suspicious")
             for i in out1:
                 for v in out1[i]:
                     self.assertGreater(len(glob(os.path.join(self.output_directory, f"{i}-{v}_prepared.*"))), 0)

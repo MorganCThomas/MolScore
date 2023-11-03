@@ -1,10 +1,12 @@
 import unittest
 import logging
 import os
+import time
 import subprocess
 
 from molscore.tests.base_tests import BaseTests
 from molscore.tests.mock_generator import MockGenerator
+from molscore.scoring_functions.utils import DaskUtils
 from molscore.scoring_functions._ligand_preparation import LigPrep, Epik, Moka, GypsumDL
 
 
@@ -99,6 +101,28 @@ class TestGypsumDL(BaseTests.TestLigandPreparation):
             self.output = self.inst(smiles=self.input, directory=self.output_directory, file_names=file_names)
 
     def tearDown(self):
+        os.system(f"rm -r {os.path.join(self.output_directory, '*')}")
+
+class TestGypsumDLParallel(BaseTests.TestLigandPreparation):
+    def setUp(self):
+            mg = MockGenerator(seed_no=123)
+            self.obj = GypsumDL
+            logger = logging.getLogger('test')
+            logger.setLevel(logging.DEBUG)
+            self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=4, local_directory=self.output_directory, logger=logger)
+            self.inst = GypsumDL(
+                dask_client=self.client,
+                logger=logger
+            )
+            # Clean the output directory
+            os.makedirs(self.output_directory, exist_ok=True)
+            self.input = mg.sample(5)
+            file_names = [str(i) for i in range(len(self.input))]
+            self.output = self.inst(smiles=self.input, directory=self.output_directory, file_names=file_names, logger=logger)
+    
+    def tearDown(self):
+        self.client.close()
+        self.client.cluster.close()
         os.system(f"rm -r {os.path.join(self.output_directory, '*')}")
 
 if __name__ == '__main__':
