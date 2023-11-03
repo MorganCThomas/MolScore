@@ -1,5 +1,6 @@
 import os
 import subprocess
+from dask.distributed import TimeoutError
 from multiprocessing import cpu_count
 
 from rdkit.Chem import AllChem as Chem
@@ -337,22 +338,21 @@ class GypsumDL(LigandPreparation):
         https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3
         https://durrantlab.pitt.edu/gypsum-dl/
     """
-    def __init__(self, dask_client=None, logger=None, pH: float = 7.0, pHt: float = 1.0, **kwargs):
+    def __init__(self, dask_client=None, timeout=30.0, logger=None, pH: float = 7.0, pHt: float = 1.0, **kwargs):
         """
         Initialize LigPrep ligand preparation
         :param dask_client: Scheduler address for dask parallelization or number of workers
-        :param timeout: Timeout for subprocess before killing
+        :param timeout: Timeout for subprocess before killing, only relevant if using dask (currently ignored)
         :param logger: Currently used logger if present
         :param pH: pH at which to protonate molecules at
         :param pHt: pH Tolerance
         """
-        # Note here we use GypsumDL' in-built parallelizer
-        if dask_client is not None:
-            n_jobs = len(dask_client.ncores())
-            if n_jobs > cpu_count(): # As gypsum is limited to single node
-                n_jobs = -1
-        else:
-            n_jobs = -1
+        self.dask_client = dask_client
+        self.timeout = timeout
+
+        n_jobs = 1
+        job_manager="serial"
+        
         super().__init__(logger=logger)
         self.gypsum_params = {
             "source": "",
@@ -379,13 +379,14 @@ class GypsumDL(LigandPreparation):
             "skip_enumerate_double_bonds": False,
             "let_tautomers_change_chirality": False,
             "use_durrant_lab_filters": True,
-            "job_manager": "multiprocessing",
+            "job_manager": job_manager,
             "cache_prerun": False,
             "test": False,
         }
         self.gypsum_params["Parallelizer"] = Parallelizer(
-            self.gypsum_params["job_manager"], self.gypsum_params["num_processors"], True
-        )
+                self.gypsum_params["job_manager"], self.gypsum_params["num_processors"], True
+            )
+        # Can use GypsumDLDaskParallelizer(client=self.dask_client) wrapper (see below)
 
     
     def prepare(self, smiles: list, directory: os.PathLike, file_names: list, logger=None, **kwargs):
@@ -409,13 +410,39 @@ class GypsumDL(LigandPreparation):
         # Remove None types from failed conversion
         contnrs = [x for x in contnrs if x.orig_smi_canonical != None]
 
-        # Prepare including protonation, tautomers and stereoenumeration
-        if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL')
-        prepare_smiles(contnrs, self.gypsum_params)
-
-        # Convert the processed SMILES strings to 3D.
-        if logger: logger.debug('Preparing 3D embedding with Gypsum-DL')
-        prepare_3d(contnrs, self.gypsum_params)
+        # Prepare including protonation, tautomers and stereoenumeration then embed in 3D
+        if self.dask_client:
+            # Using Dask
+            if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL and Dask')
+            # Send out preparation jobs
+            smiles_futures = []
+            embed_futures = []
+            for c in contnrs:
+                smiles_futures.append(self.dask_client.submit(prepare_smiles, [c], self.gypsum_params))
+            # Gather prep futures with a timeout (timeout doesn't kill C++ subjobs like RDKit ...)
+            # See here for potential timeout https://stackoverflow.com/questions/51547126/timeout-a-c-function-from-python
+            new_contnrs = []
+            for oc, f in zip(contnrs, smiles_futures):
+                nc = f.result()[0]
+                new_contnrs.append(nc)
+                #Send out for embedding here to compute something whilst waiting for slow C++ processes
+                embed_futures.append(self.dask_client.submit(prepare_3d, [nc], self.gypsum_params))
+            # Gather embed futures with a timeout
+            contnrs = []
+            for oc, f in zip(new_contnrs, embed_futures):
+                # If failed prepare and future is None
+                if not f:
+                    contnrs.append(oc)
+                    continue
+                nc = f.result(self.timeout)[0]
+                contnrs.append(nc)
+                    
+        else:
+            # Normal prepare and embed
+            if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL')
+            prepare_smiles(contnrs, self.gypsum_params)
+            if logger: logger.debug('Preparing 3D embedding with Gypsum-DL')
+            prepare_3d(contnrs, self.gypsum_params)
 
         # Add in name and unique id to each molecule.
         add_mol_id_props(contnrs)
@@ -439,5 +466,22 @@ class GypsumDL(LigandPreparation):
                     w.close()
                     if self.logger: self.logger.debug(f'Written {contnr.name}-{v}')
         return variants, variant_files
+    
+class GypsumDLDaskParallelizer:
+    def __init__(self, client):
+        """Wrapper to modify dask to apply to Gypsum-DL"""
+        self.client = client
+
+    def run(self, args, func, num_procs=None, mode=None):
+        """
+        :param args: List of lists or list of tuples to be supplied to func
+        :param func: Function to ro run args too
+        :return: List of results
+        """
+        futures = []
+        for inputs in args:
+            futures.append(self.client.submit(func, *inputs))
+        results = self.client.gather(futures)
+        return results
 
 ligand_preparation_protocols = [LigPrep, Epik, Moka, GypsumDL]
