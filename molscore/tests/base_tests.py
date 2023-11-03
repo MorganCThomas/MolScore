@@ -42,13 +42,13 @@ class BaseTests:
                 # Check all return metrics are in dict
                 for rm in self.obj.return_metrics:
                     self.assertIn(f'{self.inst.prefix}_{rm}', o1.keys(), f"{rm} not in output")
-                # Check all dict keys are in return metrics UPDATE not strictly necessary
-                #for k in o1.keys():
-                #    if k == 'smiles': continue
-                #    self.assertIn(k.replace(f'{self.inst.prefix}_', ''), self.obj.return_metrics, f"{k} not in return metrics")
-            # Check the rest are consistent UPDATE not strictly necessary
-            #for o in self.output:
-            #    self.assertEqual(o1.keys(), o.keys())
+            with self.subTest('Checking return values'):
+                # Check they are not all 0, this is suspicious
+                o_values = 0
+                for o in self.output:
+                    o.pop('smiles')
+                    o_values += sum([v for v in o.values() if isinstance(v, (int, float))])
+                self.assertNotEqual(o_values, 0, "All output values are 0, this is suspicious behaviour and an error is likely occurring")
 
     class TestLigandPreparation(unittest.TestCase):
         """
