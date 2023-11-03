@@ -6,7 +6,7 @@ import subprocess
 from molscore.tests import test_files
 from molscore.tests.base_tests import BaseTests
 from molscore.tests.mock_generator import MockGenerator
-from molscore.scoring_functions import GlideDock, SminaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock, OEDock
+from molscore.scoring_functions import GlideDock, SminaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock, OEDock, rDock
 
 
 class TestGlideDockSerial(BaseTests.TestScoringFunction):
@@ -472,6 +472,68 @@ class TestOEDockParallel(BaseTests.TestScoringFunction):
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.close()
+        cls.inst.client.cluster.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestrDockSerial(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+        # Check installation
+        if rDock.check_installation() is None:
+            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
+        # Clean output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = rDock
+        cls.inst = rDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            ligand_preparation='GypsumDL',
+            cluster=1
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+    
+
+class TestrDockParallel(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+        # Check installation
+        if rDock.check_installation() is None:
+            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
+        # Clean output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = rDock
+        cls.inst = rDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            ligand_preparation='GypsumDL',
+            cluster=4
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
