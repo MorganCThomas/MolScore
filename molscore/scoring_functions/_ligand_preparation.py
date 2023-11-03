@@ -423,10 +423,19 @@ class GypsumDL(LigandPreparation):
             # See here for potential timeout https://stackoverflow.com/questions/51547126/timeout-a-c-function-from-python
             new_contnrs = []
             for oc, f in zip(contnrs, smiles_futures):
-                nc = f.result()[0]
-                new_contnrs.append(nc)
-                #Send out for embedding here to compute something whilst waiting for slow C++ processes
-                embed_futures.append(self.dask_client.submit(prepare_3d, [nc], self.gypsum_params))
+                nc = f.result()
+                if nc:
+                    nc = nc[0]
+                    new_contnrs.append(nc)
+                    #Send out for embedding here to compute something whilst waiting for slow C++ processes
+                    embed_futures.append(self.dask_client.submit(prepare_3d, [nc], self.gypsum_params))
+                else:
+                    new_contnrs.append(oc)
+                    embed_futures.append(None)
+                    # Log error
+                    if logger: 
+                        logger.debug(f"Error preparing: {oc.orig_smi}")
+                        logger.debug(f"Dask future error:\n{f.traceback()}\n")
             # Gather embed futures with a timeout
             contnrs = []
             for oc, f in zip(new_contnrs, embed_futures):
@@ -434,8 +443,16 @@ class GypsumDL(LigandPreparation):
                 if not f:
                     contnrs.append(oc)
                     continue
-                nc = f.result(self.timeout)[0]
-                contnrs.append(nc)
+                nc = f.result()
+                if nc:
+                    nc = nc[0]
+                    contnrs.append(nc)
+                else:
+                    contnrs.append(oc)
+                    # Log error
+                    if logger: 
+                        logger.debug(f"Error embedding {oc.orig_smi}")
+                        logger.debug(f"Dask future error:\n{f.traceback()}\n")
                     
         else:
             # Normal prepare and embed
