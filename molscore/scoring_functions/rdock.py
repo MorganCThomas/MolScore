@@ -175,7 +175,6 @@ END_SECTION
         if self.cluster is not None:
             futures = self.client.map(p, rdock_commands)
             results = self.client.gather(futures)
-            logger.debug(results)
         else:
             results = [p(command) for command in rdock_commands]
         logger.debug('rDock finished')
