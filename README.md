@@ -75,7 +75,7 @@ Scoring functionality present in **molscore**, some scoring functions require ex
 
 |Type|Method|
 |---|---|
-|Docking|Glide, Smina, OpenEye, GOLD, PLANTS|
+|Docking|Glide, Smina, OpenEye, GOLD, PLANTS, rDock|
 |Ligand preparation|RDKit->Epik, Moka->Corina, Ligprep, [Gypsum-DL](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3)|
 |3D Similarity|ROCS, Open3DAlign|
 |2D Similarity|Fingerprint similarity (any RDKit fingerprint and similarity measure), substructure match/filter, [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)|
