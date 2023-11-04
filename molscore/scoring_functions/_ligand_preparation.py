@@ -10,7 +10,7 @@ from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
 from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
 from molscore.utils.gypsum_dl.MolContainer import MolContainer
 
-from molscore.scoring_functions.utils import timedSubprocess, get_mol
+from molscore.scoring_functions.utils import timedFunc, timedSubprocess, get_mol
 
 # Protonation states: LigPrep / Epik / Moka / GypsumDL (Substruct Dist) / OBabel? / OpenEye?
 # Tautomers: LigPrep / Epik / Moka / GypsumDL (MolVS)
@@ -347,13 +347,12 @@ class GypsumDL(LigandPreparation):
         :param pH: pH at which to protonate molecules at
         :param pHt: pH Tolerance
         """
+        super().__init__(timeout=timeout, logger=logger)
         self.dask_client = dask_client
         self.timeout = timeout
 
         n_jobs = 1
         job_manager="serial"
-        
-        super().__init__(logger=logger)
         self.gypsum_params = {
             "source": "",
             "output_folder": "./",
@@ -418,7 +417,8 @@ class GypsumDL(LigandPreparation):
             smiles_futures = []
             embed_futures = []
             for c in contnrs:
-                smiles_futures.append(self.dask_client.submit(prepare_smiles, [c], self.gypsum_params))
+                tprepare_smiles = timedFunc(prepare_smiles, self.timeout)
+                smiles_futures.append(self.dask_client.submit(tprepare_smiles, [c], self.gypsum_params))
             # Gather prep futures with a timeout (timeout doesn't kill C++ subjobs like RDKit ...)
             # See here for potential timeout https://stackoverflow.com/questions/51547126/timeout-a-c-function-from-python
             new_contnrs = []
@@ -428,7 +428,8 @@ class GypsumDL(LigandPreparation):
                     nc = nc[0]
                     new_contnrs.append(nc)
                     #Send out for embedding here to compute something whilst waiting for slow C++ processes
-                    embed_futures.append(self.dask_client.submit(prepare_3d, [nc], self.gypsum_params))
+                    tprepare_3d = timedFunc(prepare_3d, self.timeout)
+                    embed_futures.append(self.dask_client.submit(tprepare_3d, [nc], self.gypsum_params))
                 else:
                     new_contnrs.append(oc)
                     embed_futures.append(None)

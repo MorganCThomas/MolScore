@@ -1,4 +1,5 @@
 from typing import Union, Sequence, Callable
+from functools import partial
 import subprocess
 import multiprocessing
 import threading
@@ -22,6 +23,59 @@ from zenodo_client import Zenodo as ZenodoBase
 def Pool(*args):
     context = multiprocessing.get_context("fork")
     return context.Pool(*args)
+
+
+def test_func():
+    mol = Chem.MolFromSmiles('CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CC[C@@H](O)C[C@@H](O)CC(=O)O')
+    Chem.AddHs(mol)
+    Chem.EmbedMultipleConfs(mol, numConfs=100)
+    Chem.MMFFOptimizeMoleculeConfs(mol)
+    return True
+
+
+class timedFunc:
+    @staticmethod
+    def _func_wrapper(func, child_conn):
+        try:
+            result = func()
+            child_conn.send(result)
+        except Exception as e:
+            child_conn.send(e)
+        child_conn.close()
+    
+    def __init__(self, func, timeout: Union[int, float]):
+        """
+        Wrap a function by a timeout clause to also ideally work with C++ bindings i.e, RDKit
+        Based on: https://stackoverflow.com/questions/51547126/timeout-a-c-function-from-python
+        :param func: A function to be run with timeout
+        :param timeout: Timeout
+        """
+        self.func = func
+        self.timeout = timeout
+
+    def __call__(self, *args, **kwargs):
+        """
+        Run the timeout wrapped function with input args and kwargs
+        :param args: Function args
+        :param kwargs: Function kwargs
+        :return: Function result or None if timedout
+        """
+        pfunc = partial(self.func, *args, **kwargs)
+        parent_conn, child_conn = multiprocessing.Pipe()
+        process = multiprocessing.Process(target=self._func_wrapper, args=(pfunc, child_conn))
+        process.start()
+        process.join(self.timeout)
+
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            return None  # Return None if the timeout was reached
+
+        result = parent_conn.recv()
+        parent_conn.close()
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 class timedThread(object):
@@ -90,7 +144,8 @@ class DaskUtils:
     # TODO add dask-jobqueue templates https://jobqueue.dask.org/en/latest/
 
     @classmethod
-    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, logger=None):
+    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, processes=True, logger=None):
+        """Processes=False must be used if launching child subprocesses"""
         client = None
 
         # Check if it's a string
@@ -100,7 +155,7 @@ class DaskUtils:
         # Or a number
         elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
             if int(cluster_address_or_n_workers) > 1:
-                cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), threads_per_worker=1, local_directory=local_directory)
+                cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), processes=processes, threads_per_worker=1, local_directory=local_directory)
                 client = Client(cluster)
                 print(f"Dask worker dashboard: {client.dashboard_link}")
         # Or is unrecognized

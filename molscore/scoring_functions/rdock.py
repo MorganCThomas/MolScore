@@ -110,14 +110,19 @@ END_SECTION
 
         # Setup dask
         self.cluster = cluster
-        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        self.client = DaskUtils.setup_dask(
+            cluster_address_or_n_workers=self.cluster,
+            local_directory=self.temp_dir.name, 
+            processes=False, # Needed to run nested subprocess as in GypsumDL, only if local, otherwise --no-nanny via CLI
+            logger=logger
+            )
         if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=30.0, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
 
