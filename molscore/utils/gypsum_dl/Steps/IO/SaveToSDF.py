@@ -19,7 +19,7 @@ Saves output files to SDF.
 import __future__
 import os
 
-import gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.Utils as Utils
 
 try:
     from rdkit import Chem

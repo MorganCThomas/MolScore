@@ -19,8 +19,8 @@ debugging.
 
 # import webbrowser
 import os
-import gypsum_dl.Utils as Utils
-import gypsum_dl.ChemUtils as ChemUtils
+import molscore.utils.gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
 
 try:
     from rdkit.Chem import rdDepictor

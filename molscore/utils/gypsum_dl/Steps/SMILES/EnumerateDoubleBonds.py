@@ -22,10 +22,10 @@ import itertools
 import copy
 import random
 
-import gypsum_dl.Parallelizer as Parallelizer
-import gypsum_dl.Utils as Utils
-import gypsum_dl.ChemUtils as ChemUtils
-import gypsum_dl.MyMol as MyMol
+import molscore.utils.gypsum_dl.Parallelizer as Parallelizer
+import molscore.utils.gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
+import molscore.utils.gypsum_dl.MyMol as MyMol
 import math
 
 try:

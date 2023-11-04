@@ -19,16 +19,16 @@ tautomeric, chiral forms, etc.
 
 import __future__
 
-from gypsum_dl import Utils
-from gypsum_dl.Steps.SMILES.DeSaltOrigSmiles import desalt_orig_smi
-from gypsum_dl.Steps.SMILES.AddHydrogens import add_hydrogens
-from gypsum_dl.Steps.SMILES.MakeTautomers import make_tauts
-from gypsum_dl.Steps.SMILES.DurrantLabFilter import (
+from molscore.utils.gypsum_dl import Utils
+from molscore.utils.gypsum_dl.Steps.SMILES.DeSaltOrigSmiles import desalt_orig_smi
+from molscore.utils.gypsum_dl.Steps.SMILES.AddHydrogens import add_hydrogens
+from molscore.utils.gypsum_dl.Steps.SMILES.MakeTautomers import make_tauts
+from molscore.utils.gypsum_dl.Steps.SMILES.DurrantLabFilter import (
     durrant_lab_filters,
     durrant_lab_contains_bad_substr,
 )
-from gypsum_dl.Steps.SMILES.EnumerateChiralMols import enumerate_chiral_molecules
-from gypsum_dl.Steps.SMILES.EnumerateDoubleBonds import enumerate_double_bonds
+from molscore.utils.gypsum_dl.Steps.SMILES.EnumerateChiralMols import enumerate_chiral_molecules
+from molscore.utils.gypsum_dl.Steps.SMILES.EnumerateDoubleBonds import enumerate_double_bonds
 
 
 def prepare_smiles(contnrs, params):

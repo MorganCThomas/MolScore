@@ -21,9 +21,9 @@ import __future__
 
 import copy
 
-import gypsum_dl.Utils as Utils
-import gypsum_dl.ChemUtils as ChemUtils
-from gypsum_dl.MyMol import MyConformer
+import molscore.utils.gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
+from molscore.utils.gypsum_dl.MyMol import MyConformer
 
 
 def minimize_3d(

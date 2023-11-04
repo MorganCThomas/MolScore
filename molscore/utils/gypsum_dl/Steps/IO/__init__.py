@@ -26,6 +26,6 @@ gypsum_top_dir = os.path.dirname(gypsum_gypsum_dir)
 sys.path.extend([current_dir, Steps, gypsum_gypsum_dir, gypsum_top_dir])
 
 
-from gypsum_dl.Steps.IO.ProcessOutput import proccess_output
-from gypsum_dl.Steps.IO.LoadFiles import load_smiles_file
-from gypsum_dl.Steps.IO.LoadFiles import load_sdf_file
+from molscore.utils.gypsum_dl.Steps.IO.ProcessOutput import proccess_output
+from molscore.utils.gypsum_dl.Steps.IO.LoadFiles import load_smiles_file
+from molscore.utils.gypsum_dl.Steps.IO.LoadFiles import load_sdf_file

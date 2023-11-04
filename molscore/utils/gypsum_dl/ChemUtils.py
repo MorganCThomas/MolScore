@@ -18,7 +18,7 @@ The module includes definitions to manipulate the molecules.
 
 import __future__
 
-import gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.Utils as Utils
 
 try:
     from rdkit import Chem

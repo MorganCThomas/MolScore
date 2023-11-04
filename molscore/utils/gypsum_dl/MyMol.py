@@ -28,8 +28,8 @@ import sys
 import copy
 import operator
 
-import gypsum_dl.Utils as Utils
-import gypsum_dl.MolObjectHandling as MOH
+import molscore.utils.gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.MolObjectHandling as MOH
 
 # Disable the unnecessary RDKit warnings
 from rdkit import RDLogger
@@ -45,7 +45,7 @@ except:
     Utils.exception("You need to install rdkit and its dependencies.")
 
 try:
-    from gypsum_dl.molvs import standardize_smiles as ssmiles
+    from molscore.utils.gypsum_dl.molvs import standardize_smiles as ssmiles
 except:
     Utils.exception("You need to install molvs and its dependencies.")
 
