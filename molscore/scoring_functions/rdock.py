@@ -9,11 +9,11 @@ from typing import Union
 from itertools import takewhile
 from tempfile import TemporaryDirectory
 
-from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
-
 from rdkit import Chem
 
 from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.descriptors import MolecularDescriptors
+from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('rdock')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -27,7 +27,7 @@ class rDock:
     """
     Scores structures based on their rDock docking score
     """
-    return_metrics = ['SCORE', 'best_variant']
+    return_metrics = ['SCORE', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     @staticmethod
     def check_installation():
