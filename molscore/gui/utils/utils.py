@@ -247,7 +247,7 @@ def save_sdf(mol_paths, mol_names, out_file):
                     if mol:
                         mol.SetProp('_Name', name)
                         writer.write(mol)
-            elif '.sdf' in path:
+            elif ('.sdf' in path) or ('.sd' in path):
                 suppl = Chem.ForwardSDMolSupplier(path, removeHs=False)
                 mol = suppl.__next__()
                 if mol:
