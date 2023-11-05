@@ -192,13 +192,13 @@ def _find_sdf(query_dir, step, batch_idx):
     if query_dir is None:
          return
     # Search for an sdf file
-    possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sdf*'))
+    possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sd*'))
     # Try without variant
     if len(possible_files) == 0:
-        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*.sdf*'))
+        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*.sd*'))
     # Try another subdirectory
     if len(possible_files) == 0:
-        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*', '*.sdf*'))
+        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*', '*.sd*'))
     # Return first match (should be only match)
     if len(possible_files) > 1:
         # Likely different formats
