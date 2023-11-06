@@ -425,7 +425,6 @@ class GypsumDL(LigandPreparation):
                 try:
                     nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
                 except TimeoutError:
-                    print(f'Preperation killed after {time.time() - f.submit_time}s')
                     f.cancel()
                     nc = None
                 if nc:
@@ -451,7 +450,6 @@ class GypsumDL(LigandPreparation):
                 try:
                     nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
                 except TimeoutError:
-                    print(f'Embedding killed after {time.time() - f.submit_time}s')
                     f.cancel()
                     nc = None
                 if nc:
