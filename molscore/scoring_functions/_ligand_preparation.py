@@ -1,7 +1,6 @@
 import os
 import subprocess
 from dask.distributed import TimeoutError
-from multiprocessing import cpu_count
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
@@ -10,7 +9,7 @@ from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
 from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
 from molscore.utils.gypsum_dl.MolContainer import MolContainer
 
-from molscore.scoring_functions.utils import timedFunc, timedSubprocess, get_mol
+from molscore.scoring_functions.utils import timedSubprocess, get_mol
 
 # Protonation states: LigPrep / Epik / Moka / GypsumDL (Substruct Dist) / OBabel? / OpenEye?
 # Tautomers: LigPrep / Epik / Moka / GypsumDL (MolVS)
@@ -417,26 +416,25 @@ class GypsumDL(LigandPreparation):
             smiles_futures = []
             embed_futures = []
             for c in contnrs:
-                tprepare_smiles = timedFunc(prepare_smiles, self.timeout)
-                smiles_futures.append(self.dask_client.submit(tprepare_smiles, [c], self.gypsum_params))
-            # Gather prep futures with a timeout (timeout doesn't kill C++ subjobs like RDKit ...)
-            # See here for potential timeout https://stackoverflow.com/questions/51547126/timeout-a-c-function-from-python
+                smiles_futures.append(self.dask_client.submit(prepare_smiles, [c], self.gypsum_params))
             new_contnrs = []
             for oc, f in zip(contnrs, smiles_futures):
-                nc = f.result()
+                try:
+                    nc = f.result(self.timeout)
+                except TimeoutError:
+                    f.cancel()
+                    nc = None
                 if nc:
                     nc = nc[0]
                     new_contnrs.append(nc)
-                    #Send out for embedding here to compute something whilst waiting for slow C++ processes
-                    tprepare_3d = timedFunc(prepare_3d, self.timeout)
-                    embed_futures.append(self.dask_client.submit(tprepare_3d, [nc], self.gypsum_params))
+                    embed_futures.append(self.dask_client.submit(prepare_3d, [nc], self.gypsum_params))
                 else:
                     new_contnrs.append(oc)
                     embed_futures.append(None)
                     # Log error
                     if logger: 
                         logger.debug(f"Error preparing: {oc.orig_smi}")
-                        logger.debug(f"Dask future error:\n{f.traceback()}\n")
+                        # Could log f.traceback here and cancel() future after 
             # Gather embed futures with a timeout
             contnrs = []
             for oc, f in zip(new_contnrs, embed_futures):
@@ -444,7 +442,11 @@ class GypsumDL(LigandPreparation):
                 if not f:
                     contnrs.append(oc)
                     continue
-                nc = f.result()
+                try:
+                    nc = f.result(self.timeout)
+                except:
+                    f.cancel()
+                    nc = None
                 if nc:
                     nc = nc[0]
                     contnrs.append(nc)
@@ -452,8 +454,7 @@ class GypsumDL(LigandPreparation):
                     contnrs.append(oc)
                     # Log error
                     if logger: 
-                        logger.debug(f"Error embedding {oc.orig_smi}")
-                        logger.debug(f"Dask future error:\n{f.traceback()}\n")
+                        logger.debug(f"Error embedding: {oc.orig_smi}")
                     
         else:
             # Normal prepare and embed
