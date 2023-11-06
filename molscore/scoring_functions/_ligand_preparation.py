@@ -1,4 +1,5 @@
 import os
+import time
 import subprocess
 from dask.distributed import TimeoutError
 
@@ -416,18 +417,23 @@ class GypsumDL(LigandPreparation):
             smiles_futures = []
             embed_futures = []
             for c in contnrs:
-                smiles_futures.append(self.dask_client.submit(prepare_smiles, [c], self.gypsum_params))
+                sf = self.dask_client.submit(prepare_smiles, [c], self.gypsum_params)
+                sf.submit_time = time.time()
+                smiles_futures.append(sf) #self.dask_client.submit(prepare_smiles, [c], self.gypsum_params))
             new_contnrs = []
             for oc, f in zip(contnrs, smiles_futures):
                 try:
-                    nc = f.result(self.timeout)
+                    nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
                 except TimeoutError:
+                    print(f'Preperation killed after {time.time() - f.submit_time}s')
                     f.cancel()
                     nc = None
                 if nc:
                     nc = nc[0]
                     new_contnrs.append(nc)
-                    embed_futures.append(self.dask_client.submit(prepare_3d, [nc], self.gypsum_params))
+                    ef = self.dask_client.submit(prepare_3d, [nc], self.gypsum_params)
+                    ef.submit_time = time.time()
+                    embed_futures.append(ef)
                 else:
                     new_contnrs.append(oc)
                     embed_futures.append(None)
@@ -443,8 +449,9 @@ class GypsumDL(LigandPreparation):
                     contnrs.append(oc)
                     continue
                 try:
-                    nc = f.result(self.timeout)
-                except:
+                    nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
+                except TimeoutError:
+                    print(f'Embedding killed after {time.time() - f.submit_time}s')
                     f.cancel()
                     nc = None
                 if nc:
