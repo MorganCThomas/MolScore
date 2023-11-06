@@ -24,7 +24,7 @@ class BaseTests:
             for m in self.obj.return_metrics:
                 for o in self.output:
                     with self.subTest('Checking all outputs'):
-                        self.assertTrue(any([m.replace(".", "_") in k for k in o.keys()]),
+                        self.assertTrue(any([m in k for k in o.keys()]),
                                         'Metric should be in at least one key for all outputs')
 
         def test_prefix(self):
@@ -41,7 +41,7 @@ class BaseTests:
                 self.assertIn('smiles', o1.keys())
                 # Check all return metrics are in dict
                 for rm in self.obj.return_metrics:
-                    self.assertIn(f'{self.inst.prefix}_{rm.replace(".", "_")}', o1.keys(), f"{rm} not in output")
+                    self.assertIn(f'{self.inst.prefix}_{rm}', o1.keys(), f"{rm} not in output")
             with self.subTest('Checking return values'):
                 # Check they are not all 0, this is suspicious
                 o_values = 0
