@@ -209,7 +209,7 @@ END_SECTION
             if len(self.variants[name]) == 0:
                 logger.debug(f'{name}_docked.sd does not exist')
                 if best_score[name] is None:  # Only if no other score for prefix
-                    docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): 0.0 for k in self.return_metrics})
+                    docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
                     logger.debug(f'Returning 0.0 as no variants exist')
 
             # For each variant
@@ -226,7 +226,7 @@ END_SECTION
                             if best_score[name] is None:
                                 best_score[name] = dscore
                                 best_variants[i] = f'{name}-{variant}'
-                                docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): v
+                                docking_result.update({f'{self.prefix}_' + k: v
                                                         for k, v in mol.GetPropsAsDict().items()
                                                         if k in self.return_metrics})
                                 # Add charge info
@@ -240,7 +240,7 @@ END_SECTION
                             elif dscore < best_score[name]:
                                 best_score[name] = dscore
                                 best_variants[i] = f'{name}-{variant}'
-                                docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): v
+                                docking_result.update({f'{self.prefix}_' + k: v
                                                         for k, v in mol.GetPropsAsDict().items()
                                                         if k in self.return_metrics})
                                 # Add charge info
@@ -259,7 +259,7 @@ END_SECTION
                         logger.debug(f'Error processing {name}-{variant}_docked.sd file')
                         if best_score[name] is None:  # Only if no other score for prefix
                             best_variants[i] = f'{name}-{variant}'
-                            docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): 0.0 for k in self.return_metrics})
+                            docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
                             logger.debug(f'Returning 0.0 unless a successful variant is found')
 
                 # If path doesn't exist and nothing store, append 0
@@ -267,7 +267,7 @@ END_SECTION
                     logger.debug(f'{name}-{variant}_docked.sd does not exist')
                     if best_score[name] is None:  # Only if no other score for prefix
                         best_variants[i] = f'{name}-{variant}'
-                        docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): 0.0 for k in self.return_metrics})
+                        docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
                         logger.debug(f'Returning 0.0 unless a successful variant is found')
 
             # Add best variant information to docking result
