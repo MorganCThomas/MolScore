@@ -124,7 +124,7 @@ END_SECTION
         self.client = DaskUtils.setup_dask(
             cluster_address_or_n_workers=self.cluster,
             local_directory=self.temp_dir.name, 
-            processes=False, # Needed to run nested subprocess as in GypsumDL, only if local, otherwise --no-nanny via CLI
+            processes=True,
             logger=logger
             )
         if self.client is None: self.cluster = None
