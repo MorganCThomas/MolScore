@@ -133,7 +133,10 @@ class timedSubprocess(object):
             print('Process timed out...')
             out, err = ''.encode(), f'Timed out at {self.timeout}'.encode() # Encode for consistency
             if not self.shell:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
             else:
                 self.process.kill()
         return out, err
