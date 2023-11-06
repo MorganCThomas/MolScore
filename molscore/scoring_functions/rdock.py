@@ -162,11 +162,19 @@ END_SECTION
     
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .mol2"""
+        futures = []
         new_varient_files = []
         for vfile in varient_files:
             new_vfile = vfile.replace(".sdf", ".sd")
-            subprocess.run(["mv", vfile, new_vfile])
             new_varient_files.append(new_vfile)
+            if self.cluster:
+                futures.append(self.client.submit(shutil.move, vfile, new_vfile))
+            else:
+                shutil.move(vfile, new_vfile)
+        
+        # Wait for parallel jobs
+        if self.cluster: self.client.gather(futures)
+        
         return varients, new_varient_files
 
     def run_rDock(self, ligand_paths):
