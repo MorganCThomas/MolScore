@@ -10,7 +10,7 @@ from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
 from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
 from molscore.utils.gypsum_dl.MolContainer import MolContainer
 
-from molscore.scoring_functions.utils import timedSubprocess, get_mol
+from molscore.scoring_functions.utils import timedFunc, timedSubprocess, get_mol
 
 # Protonation states: LigPrep / Epik / Moka / GypsumDL (Substruct Dist) / OBabel? / OpenEye?
 # Tautomers: LigPrep / Epik / Moka / GypsumDL (MolVS)
@@ -417,22 +417,26 @@ class GypsumDL(LigandPreparation):
             smiles_futures = []
             embed_futures = []
             for c in contnrs:
-                sf = self.dask_client.submit(prepare_smiles, [c], self.gypsum_params)
-                sf.submit_time = time.time()
-                smiles_futures.append(sf) #self.dask_client.submit(prepare_smiles, [c], self.gypsum_params))
+                tprepare_smiles = timedFunc(prepare_smiles, self.timeout)
+                sf = self.dask_client.submit(tprepare_smiles, [c], self.gypsum_params)
+                #sf.submit_time = time.time()
+                smiles_futures.append(sf)
             new_contnrs = []
             for oc, f in zip(contnrs, smiles_futures):
-                try:
-                    nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
-                except TimeoutError:
-                    f.cancel()
-                    del f
-                    nc = None
+                # -- Dask timeout kills worker, can't be recovered with client.restart() ... idk --
+                #try:
+                #    nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
+                #except TimeoutError:
+                    #f.cancel()
+                #    del f
+                #    nc = None
+                nc = f.result()
                 if nc:
                     nc = nc[0]
                     new_contnrs.append(nc)
-                    ef = self.dask_client.submit(prepare_3d, [nc], self.gypsum_params)
-                    ef.submit_time = time.time()
+                    tprepare_3d = timedFunc(prepare_3d, self.timeout)
+                    ef = self.dask_client.submit(tprepare_3d, [nc], self.gypsum_params)
+                    #ef.submit_time = time.time()
                     embed_futures.append(ef)
                 else:
                     new_contnrs.append(oc)
@@ -448,12 +452,13 @@ class GypsumDL(LigandPreparation):
                 if not f:
                     contnrs.append(oc)
                     continue
-                try:
-                    nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
-                except TimeoutError:
-                    f.cancel()
-                    del f
-                    nc = None
+                #try:
+                #    nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
+                #except TimeoutError:
+                #    #f.cancel()
+                #    del f
+                #    nc = None
+                nc = f.result()
                 if nc:
                     nc = nc[0]
                     contnrs.append(nc)

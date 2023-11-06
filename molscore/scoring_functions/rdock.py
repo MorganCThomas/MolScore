@@ -121,10 +121,15 @@ END_SECTION
 
         # Setup dask
         self.cluster = cluster
+        if ligand_preparation == 'GypsumDL':
+            processes = False
+            if self.cluster: assert isinstance(cluster, (int, float)), "Must run local cluster to run GypsumDL"
+        else:
+            processes = True
         self.client = DaskUtils.setup_dask(
             cluster_address_or_n_workers=self.cluster,
             local_directory=self.temp_dir.name, 
-            processes=True,
+            processes=processes,
             logger=logger
             )
         if self.client is None: self.cluster = None
