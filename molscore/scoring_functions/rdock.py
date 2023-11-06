@@ -27,7 +27,13 @@ class rDock:
     """
     Scores structures based on their rDock docking score
     """
-    return_metrics = ['SCORE', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
+    return_metrics = [
+        'SCORE', 
+        'SCORE.INTER',
+        'SCORE.INTRA',
+        'NetCharge', 'PositiveCharge', 'NegativeCharge',
+        'best_variant'
+        ]
 
     @staticmethod
     def check_installation():
@@ -67,15 +73,18 @@ END_SECTION
         return config
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
-                 cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL',
+                 cluster: Union[str, int] = None, 
+                 dock_timeout: float = 120.0,
+                 ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
                  docking_protocol: Union[str, os.PathLike] = 'dock',  **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param receptor: Path to receptor file (.pdb, .pdbqt)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout (seconds) before killing an individual docking simulation
+        :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param prep_timeout: Timeout (seconds) before killing an ligand preparation process (e.g., long running RDKit jobs)
         :param docking_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         """
         # Check rDock installation
@@ -102,7 +111,9 @@ END_SECTION
         self.ref = os.path.abspath(ref_ligand)
         self.file_names = None
         self.variants = None
-        self.timeout = float(timeout)
+        self.dock_timeout = float(dock_timeout)
+        if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
+        self.prep_timeout = float(prep_timeout)
         self.temp_dir = TemporaryDirectory()
         self.n_runs = 1
         self.rdock_env = 'rbdock'
@@ -122,7 +133,7 @@ END_SECTION
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=30.0, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
 
@@ -173,7 +184,7 @@ END_SECTION
 
         # Initialize subprocess
         logger.debug('rDock called')
-        p = timedSubprocess(timeout=self.timeout)
+        p = timedSubprocess(timeout=self.dock_timeout)
         p = partial(p.run, cwd=self.directory)
 
         # Submit docking subprocesses
@@ -198,7 +209,7 @@ END_SECTION
             if len(self.variants[name]) == 0:
                 logger.debug(f'{name}_docked.sd does not exist')
                 if best_score[name] is None:  # Only if no other score for prefix
-                    docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
+                    docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): 0.0 for k in self.return_metrics})
                     logger.debug(f'Returning 0.0 as no variants exist')
 
             # For each variant
@@ -215,7 +226,7 @@ END_SECTION
                             if best_score[name] is None:
                                 best_score[name] = dscore
                                 best_variants[i] = f'{name}-{variant}'
-                                docking_result.update({f'{self.prefix}_' + k: v
+                                docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): v
                                                         for k, v in mol.GetPropsAsDict().items()
                                                         if k in self.return_metrics})
                                 # Add charge info
@@ -229,7 +240,7 @@ END_SECTION
                             elif dscore < best_score[name]:
                                 best_score[name] = dscore
                                 best_variants[i] = f'{name}-{variant}'
-                                docking_result.update({f'{self.prefix}_' + k: v
+                                docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): v
                                                         for k, v in mol.GetPropsAsDict().items()
                                                         if k in self.return_metrics})
                                 # Add charge info
@@ -248,7 +259,7 @@ END_SECTION
                         logger.debug(f'Error processing {name}-{variant}_docked.sd file')
                         if best_score[name] is None:  # Only if no other score for prefix
                             best_variants[i] = f'{name}-{variant}'
-                            docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
+                            docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): 0.0 for k in self.return_metrics})
                             logger.debug(f'Returning 0.0 unless a successful variant is found')
 
                 # If path doesn't exist and nothing store, append 0
@@ -256,7 +267,7 @@ END_SECTION
                     logger.debug(f'{name}-{variant}_docked.sd does not exist')
                     if best_score[name] is None:  # Only if no other score for prefix
                         best_variants[i] = f'{name}-{variant}'
-                        docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
+                        docking_result.update({f'{self.prefix}_' + k.replace(".", "_"): 0.0 for k in self.return_metrics})
                         logger.debug(f'Returning 0.0 unless a successful variant is found')
 
             # Add best variant information to docking result
