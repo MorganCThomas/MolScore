@@ -276,6 +276,7 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step'):
             yaxis_title=y
             )
     else:
+        if x == 'index': x = 'idx'
         fig = px.scatter(
             data_frame=main_df, x=x, y=y, color='run',
             hover_data=['run', 'step', 'batch_idx', y],
