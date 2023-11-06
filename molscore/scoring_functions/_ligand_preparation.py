@@ -426,6 +426,7 @@ class GypsumDL(LigandPreparation):
                     nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
                 except TimeoutError:
                     f.cancel()
+                    del f
                     nc = None
                 if nc:
                     nc = nc[0]
@@ -451,6 +452,7 @@ class GypsumDL(LigandPreparation):
                     nc = f.result(max(1, self.timeout - (time.time() - f.submit_time)))
                 except TimeoutError:
                     f.cancel()
+                    del f
                     nc = None
                 if nc:
                     nc = nc[0]
