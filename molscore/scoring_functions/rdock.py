@@ -74,18 +74,19 @@ END_SECTION
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cluster: Union[str, int] = None, 
-                 dock_timeout: float = 120.0,
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
-                 docking_protocol: Union[str, os.PathLike] = 'dock',  **kwargs):
+                 docking_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
+                 **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param receptor: Path to receptor file (.pdb, .pdbqt)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         :param prep_timeout: Timeout (seconds) before killing an ligand preparation process (e.g., long running RDKit jobs)
         :param docking_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
+        :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
+        :param n_runs: Number of docking trials (poses to return)
         """
         # Check rDock installation
         assert self.check_installation() is not None, "Could not find rDock path, please ensure proper installation"
@@ -115,7 +116,7 @@ END_SECTION
         if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
         self.prep_timeout = float(prep_timeout)
         self.temp_dir = TemporaryDirectory()
-        self.n_runs = 1
+        self.n_runs = n_runs
         self.rdock_env = 'rbdock'
         self.rcav_env = 'rbcavity'
 
@@ -231,8 +232,9 @@ END_SECTION
                 if os.path.exists(out_file):
                     # Try to load it in, and grab the score
                     try:
-                        rdock_out = Chem.ForwardSDMolSupplier(out_file)
-                        for mol in rdock_out:  # should just be one
+                        rdock_out = Chem.ForwardSDMolSupplier(out_file, sanitize=False) 
+                        for mol in rdock_out:  
+                            mol = _charge_rdock_mols(mol) # RDKit doesn't like rDock charged files
                             dscore = mol.GetPropsAsDict()['SCORE']
                             
                             # If molecule doesn't have a score yet append it and the variant
@@ -329,7 +331,7 @@ END_SECTION
             _ = self.client.gather(futures)
         return self
 
-    def __call__(self, smiles: list, directory: str, file_names: list):
+    def __call__(self, smiles: list, directory: str, file_names: list, **kwargs):
         # Assign some attributes
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
         self.file_names = file_names
@@ -369,3 +371,16 @@ END_SECTION
         assert len(smiles) == len(self.docking_results)
 
         return self.docking_results
+    
+
+def _charge_rdock_mols(mol):
+    PT = Chem.GetPeriodicTable()
+    for atom in mol.GetAtoms():
+        v = atom.GetExplicitValence()
+        dv = PT.GetDefaultValence(atom.GetAtomicNum())
+        if (v < dv) and (atom.GetFormalCharge() == 0):
+            atom.SetFormalCharge(-1)
+        if (v > dv) and (atom.GetFormalCharge() == 0):
+            atom.SetFormalCharge(1)
+    Chem.SanitizeMol(mol)
+    return Chem.RemoveHs(mol)
