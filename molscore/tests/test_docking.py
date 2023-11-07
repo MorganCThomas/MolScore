@@ -39,7 +39,7 @@ class TestGlideDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = list([test_files['DRD2_ref_smiles']] + mg.sample(4).extend(mg.sample(4))).extend(mg.sample(4)).extend(mg.sample(4))
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -80,7 +80,7 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -109,7 +109,7 @@ class TestSminaDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nSminaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -137,7 +137,7 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nSminaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -170,7 +170,7 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nPLANTSDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -202,7 +202,7 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nPLANTSDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -235,7 +235,7 @@ class TestGOLDDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -267,7 +267,7 @@ class TestGOLDDockParallel(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -301,7 +301,7 @@ class TestChemPLPGOLDDock(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -335,7 +335,7 @@ class TestASPGOLDDock(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -369,7 +369,7 @@ class TestChemScoreGOLDDock(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -403,7 +403,7 @@ class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -436,7 +436,7 @@ class TestOEDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -468,7 +468,7 @@ class TestOEDockParallel(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -496,11 +496,12 @@ class TestrDockSerial(BaseTests.TestScoringFunction):
             receptor=test_files['DRD2_receptor'],
             ref_ligand=test_files['DRD2_ref_ligand'],
             ligand_preparation='GypsumDL',
+            n_runs=2,
             cluster=1
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
@@ -526,11 +527,12 @@ class TestrDockParallel(BaseTests.TestScoringFunction):
             receptor=test_files['DRD2_receptor'],
             ref_ligand=test_files['DRD2_ref_ligand'],
             ligand_preparation='GypsumDL',
+            n_runs=2,
             cluster=4
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = mg.sample(5)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
