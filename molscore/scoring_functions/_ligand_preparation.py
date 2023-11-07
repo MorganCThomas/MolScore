@@ -371,7 +371,7 @@ class GypsumDL(LigandPreparation):
             "second_embed": False,
             "2d_output_only": False,
             "skip_optimize_geometry": True,
-            "skip_alternate_ring_conformations": False,
+            "skip_alternate_ring_conformations": True, # Errors
             "skip_adding_hydrogen": False,
             "skip_making_tautomers": False,
             "skip_enumerate_chiral_mol": False,
