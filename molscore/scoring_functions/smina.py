@@ -15,11 +15,11 @@ from typing import Union
 from itertools import takewhile
 from tempfile import TemporaryDirectory
 
-from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
-
 from rdkit import Chem
 
 from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.descriptors import MolecularDescriptors
+from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('smina')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -33,7 +33,7 @@ class SminaDock:
     """
     Score structures based on their Smina docking score, using Gypsum-DL for ligand preparation
     """
-    return_metrics = ['docking_score', 'best_variant']
+    return_metrics = ['docking_score', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cpus: int = 1, cluster: Union[str, int] = None, 
@@ -162,20 +162,35 @@ class SminaDock:
             # For each variant
             for variant in self.variants[name]:
                 try:
+                    # Get best score from log file
                     log_file = os.path.join(self.directory, f'{name}-{variant}_log.txt')
                     dscore = self.parse_log_file(log_file)
+                    # Get associated Mol
+                    mol_file = os.path.join(self.directory, f'{name}-{variant}_docked.sdf')
+                    smina_out = Chem.ForwardSDMolSupplier(mol_file)
+                    mol = next(smina_out) # Mol file is ordered by dscore
                     if dscore is not None:
                         # If molecule doesn't have a score yet append it and the variant
                         if best_score[name] is None:
                             best_score[name] = dscore
                             best_variants[i] = f'{name}-{variant}'
                             docking_result.update({f'{self.prefix}_docking_score': dscore})
+                            # Add charge info
+                            net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
+                            docking_result.update({f'{self.prefix}_NetCharge': net_charge,
+                                                    f'{self.prefix}_PositiveCharge': positive_charge,
+                                                    f'{self.prefix}_NegativeCharge': negative_charge})
                             logger.debug(f'Docking score for {name}-{variant}: {dscore}')
                         # If docking score is better change it...
                         elif dscore < best_score[name]:
                             best_score[name] = dscore
                             best_variants[i] = f'{name}-{variant}'
                             docking_result.update({f'{self.prefix}_docking_score': dscore})
+                            # Add charge info
+                            net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
+                            docking_result.update({f'{self.prefix}_NetCharge': net_charge,
+                                                    f'{self.prefix}_PositiveCharge': positive_charge,
+                                                    f'{self.prefix}_NegativeCharge': negative_charge})
                             logger.debug(f'Found better {name}-{variant}: {dscore}')
                         # Otherwise ignore
                         else:
@@ -185,14 +200,14 @@ class SminaDock:
                         logger.debug(f'{name}-{variant}_log.txt does not exist')
                         if best_score[name] is None:  # Only if no other score for prefix
                             best_variants[i] = f'{name}-{variant}'
-                            docking_result.update({f'{self.prefix}_docking_score': 0.0})
+                            docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
                             logger.debug(f'Returning 0.0 unless a successful variant is found')
                 # If parsing the molecule threw an error and nothing stored, append 0
                 except:
                     logger.debug(f'Error processing {name}-{variant}_log.txt')
                     if best_score[name] is None:  # Only if no other score for prefix
                         best_variants[i] = f'{name}-{variant}'
-                        docking_result.update({f'{self.prefix}_docking_score': 0.0})
+                        docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
                         logger.debug(f'Returning 0.0 unless a successful variant is found')
 
             # Add best variant information to docking result
@@ -243,7 +258,7 @@ class SminaDock:
             _ = self.client.gather(futures)
         return self
 
-    def __call__(self, smiles: list, directory: str, file_names: list):
+    def __call__(self, smiles: list, directory: str, file_names: list, cleanup: bool = True, **kwargs):
         # Assign some attributes
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
         self.file_names = file_names
@@ -271,7 +286,7 @@ class SminaDock:
         best_variants = self.get_docking_scores(smiles, return_best_variant=True)
 
         # Cleanup
-        self.remove_files(keep=best_variants, parallel=True)
+        if cleanup: self.remove_files(keep=best_variants, parallel=True)
         fh.close()
         logger.removeHandler(fh)
         self.directory = None
