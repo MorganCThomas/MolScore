@@ -35,16 +35,19 @@ class SminaDock:
     """
     return_metrics = ['docking_score', 'best_variant']
 
-    def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike], cpus: int = 1,
-                 cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL'):
+    def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
+                 cpus: int = 1, cluster: Union[str, int] = None, 
+                 ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
+                 dock_timeout: float = 120.0, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param receptor: Path to receptor file (.pdb, .pdbqt)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cpus: Number of Smina CPUs to use per simulation
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout (seconds) before killing an individual docking simulation
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
+        :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         """
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):
@@ -59,26 +62,36 @@ class SminaDock:
         self.file_names = None
         self.variants = None
         self.cpus = cpus
-        self.timeout = float(timeout)
+        self.dock_timeout = float(dock_timeout)
+        if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
+        self.prep_timeout = float(prep_timeout)
         self.temp_dir = TemporaryDirectory()
 
         # Setup dask
         self.cluster = cluster
-        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        processes = True
+        if ligand_preparation == 'GypsumDL':
+            processes = False
+        self.client = DaskUtils.setup_dask(
+            cluster_address_or_n_workers=self.cluster,
+            local_directory=self.temp_dir.name, 
+            processes=processes,
+            logger=logger
+            )
         if self.client is None: self.cluster = None
+        atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
-
-        atexit.register(self._close_dask)
 
     def _close_dask(self):
         if self.client:
             self.client.close()
+            self.client.cluster.close()
 
     def dock_ligands(self, ligand_paths):
         smina_commands = []
@@ -94,7 +107,7 @@ class SminaDock:
 
         # Initialize subprocess
         logger.debug('Smina called')
-        p = timedSubprocess(timeout=self.timeout).run
+        p = timedSubprocess(timeout=self.dock_timeout).run
 
         if self.cluster is not None:
             futures = self.client.map(p, smina_commands)

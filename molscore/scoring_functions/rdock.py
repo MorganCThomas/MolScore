@@ -83,7 +83,7 @@ END_SECTION
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
-        :param prep_timeout: Timeout (seconds) before killing an ligand preparation process (e.g., long running RDKit jobs)
+        :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param docking_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param n_runs: Number of docking trials (poses to return)
@@ -122,11 +122,9 @@ END_SECTION
 
         # Setup dask
         self.cluster = cluster
+        processes = True
         if ligand_preparation == 'GypsumDL':
             processes = False
-            if self.cluster: assert isinstance(cluster, (int, float)), "Must run local cluster to run GypsumDL"
-        else:
-            processes = True
         self.client = DaskUtils.setup_dask(
             cluster_address_or_n_workers=self.cluster,
             local_directory=self.temp_dir.name, 
@@ -161,6 +159,7 @@ END_SECTION
     def _close_dask(self):
         if self.client:
             self.client.close()
+            self.client.cluster.close()
     
     def _move_rdock_files(self, cwd):
         os.environ['RBT_HOME'] = cwd

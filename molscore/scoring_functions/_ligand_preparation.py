@@ -349,6 +349,8 @@ class GypsumDL(LigandPreparation):
         """
         super().__init__(timeout=timeout, logger=logger)
         self.dask_client = dask_client
+        if self.dask_client:
+            assert self.dask_client.cluster and (self.dask_client.cluster.processes == False), "Must run local cluster to run GypsumDL with processes=False"
         self.timeout = timeout
 
         n_jobs = 1

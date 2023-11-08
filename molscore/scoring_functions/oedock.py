@@ -28,15 +28,16 @@ class OEDock:
 
     def __init__(
         self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
-        ligand_preparation: str,
+        ligand_preparation: str, prep_timeout: float = 30.0,
         omega_energy_window: int = 10, omega_max_confs: int = 200, omega_strict_stereo: bool = False,
         dock_scoring_function: str = 'Chemgauss4', dock_search_resolution: str = 'Standard', dock_num_poses: int = 1,
-        cluster: Union[str, int] = None, timeout: float = 120.0, **kwargs):
+        cluster: Union[str, int] = None, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., Risperidone)
         :param receptor: Path to receptor file (.oeb, .oez, .pdb, .mol2, .mmcif)
         :param ref_ligand: Path to reference ligand file used to determine binding site (.sdf, .mol2, .pdb)
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param omega_energy_window: Sets the maximum allowable energy difference between the lowest and the highest energy conformers, in units of kcal/mol
         :param omega_max_confs: Sets the maximum number of conformers to be kept
         :param omega_strict_stereo: Sets whether conformer generation should fail if stereo is not specified on the input molecules
@@ -44,10 +45,10 @@ class OEDock:
         :param dock_search_resolution: Rotational/translational RMSD step sizes used during search and optimization [High, Standard, Low]
         :param dock_num_poses: Number of poses for docking to return
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout (seconds) before killing an individual docking simulation (only if using Dask for parallelisation)
         """
         self.prefix = prefix.replace(" ", "_")
-        self.timeout = timeout
+        self.prep_timeout = prep_timeout
+        if 'timeout' in kwargs.items(): self.prep_timeout = float(kwargs['timeout']) # Back compatability
         self.temp_dir = TemporaryDirectory()
         self.directory = None
         self.file_names = None
@@ -89,21 +90,29 @@ class OEDock:
 
         # Setup dask
         self.cluster = cluster
-        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        processes = True
+        if ligand_preparation == 'GypsumDL':
+            processes = False
+        self.client = DaskUtils.setup_dask(
+            cluster_address_or_n_workers=self.cluster,
+            local_directory=self.temp_dir.name, 
+            processes=processes,
+            logger=logger
+            )
         if self.client is None: self.cluster = None
+        atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
-
-        atexit.register(self._close_dask)
 
     def _close_dask(self):
         if self.client:
             self.client.close()
+            self.client.cluster.close()
 
     def load_prepared_ligand(self) -> oechem.OEMol:
         """
