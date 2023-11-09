@@ -73,13 +73,9 @@ class PLANTSDock:
 
         # Setup dask
         self.cluster = cluster
-        processes = True
-        if ligand_preparation == 'GypsumDL':
-            processes = False
         self.client = DaskUtils.setup_dask(
             cluster_address_or_n_workers=self.cluster,
             local_directory=self.temp_dir.name, 
-            processes=processes,
             logger=logger
             )
         if self.client is None: self.cluster = None

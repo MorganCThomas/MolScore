@@ -8,6 +8,7 @@ import signal
 import numpy as np
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
+from func_timeout import func_timeout, FunctionTimedOut
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors, rdmolops, DataStructs
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
@@ -77,6 +78,31 @@ class timedFunc:
             raise result
         return result
 
+
+class timedFunc2:
+    def __init__(self, func, timeout: Union[int, float]):
+        """
+        Wrap a function by a timeout using timed_func which should also work with C++ bindings i.e, RDKit
+        :param func: A function to be run with timeout
+        :param timeout: Timeout
+        """
+        self.func = func
+        self.timeout = timeout
+
+    def __call__(self, *args, **kwargs):
+        """
+        Run the timeout wrapped function with input args and kwargs
+        :param args: Function args
+        :param kwargs: Function kwargs
+        :return: Function result or None if timedout
+        """
+        try:
+            result = func_timeout(self.timeout, self.func, args, kwargs)
+        except FunctionTimedOut:
+            return None
+        
+        return result
+    
 
 class timedThread(object):
     """

@@ -109,7 +109,7 @@ class TestGypsumDLParallel(BaseTests.TestLigandPreparation):
             self.obj = GypsumDL
             logger = logging.getLogger('test')
             logger.setLevel(logging.DEBUG)
-            self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=4, local_directory=self.output_directory, processes=False, logger=logger)
+            self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=4, local_directory=self.output_directory, logger=logger)
             self.inst = GypsumDL(
                 dask_client=self.client,
                 logger=logger
