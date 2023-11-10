@@ -171,14 +171,47 @@ class TestVinaDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] #+ mg.sample(4)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=False)
         print(f"\nVinaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
-        pass #os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+    
+
+class TestVinaDockParallel(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+        # Check installation
+        if not ('vina' in list(os.environ.keys())):
+            raise unittest.SkipTest("Vina installation not found, please install and add to os environment (e.g., export vina=<path_to_plants_exe>)")
+        # Clean output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = VinaDock
+        cls.inst = VinaDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            file_preparation='mgltools',
+            cpus=1,
+            cluster=4,
+            ligand_preparation='GypsumDL',
+            dock_scoring='vina'
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=False)
+        print(f"\nVinaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
 class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
@@ -209,6 +242,8 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
+        cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
