@@ -3,6 +3,7 @@ from molscore.scoring_functions.plants import PLANTSDock
 from molscore.scoring_functions.gold import GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
 from molscore.scoring_functions.rdock import rDock
 from molscore.scoring_functions.smina import SminaDock
+from molscore.scoring_functions.vina import VinaDock
 from molscore.scoring_functions.similarity import MolecularSimilarity, TanimotoSimilarity
 from molscore.scoring_functions.applicability_domain import ApplicabilityDomain
 from molscore.scoring_functions.external_server import POSTServer
@@ -34,6 +35,7 @@ all_scoring_functions = [
     Align3D,
     GlideDock,
     SminaDock,
+    VinaDock,
     rDock,
     PLANTSDock,
     GOLDDock,

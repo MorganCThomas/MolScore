@@ -295,6 +295,25 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     return mol
 
 
+def read_mol(mol_path: os.PathLike, i=0):
+    if mol_path.endswith('.mol2') or mol_path.endswith('.mol'):
+        mol = Chem.MolFromMolFile(mol_path, sanitize=False, strictParsing=False)
+
+    elif mol_path.endswith('.sdf'):
+        suppl = Chem.ForwardSDMolSupplier(mol_path, sanitize=False)
+        for i, mol in enumerate(suppl):
+            if i == i:
+                break
+
+    elif mol_path.endswith('.pdb'):
+        mol = Chem.MolFromPDBFile(mol_path, sanitize=False)
+
+    else:
+        raise TypeError(f"Cannot read molecule, unknown input file type: {mol_path}")
+    
+    return mol
+
+
 class Fingerprints:
     """
     Class to organise Fingerprint generation

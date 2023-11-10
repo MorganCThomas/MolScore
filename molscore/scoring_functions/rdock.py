@@ -229,7 +229,7 @@ END_SECTION
                     try:
                         rdock_out = Chem.ForwardSDMolSupplier(out_file, sanitize=False) 
                         for mol in rdock_out:  
-                            mol = _charge_rdock_mols(mol) # RDKit doesn't like rDock charged files
+                            mol = manually_charge_mol(mol) # RDKit doesn't like rDock charged files
                             dscore = mol.GetPropsAsDict()['SCORE']
                             
                             # If molecule doesn't have a score yet append it and the variant
@@ -367,8 +367,7 @@ END_SECTION
 
         return self.docking_results
     
-
-def _charge_rdock_mols(mol):
+def manually_charge_mol(mol):
     PT = Chem.GetPeriodicTable()
     for atom in mol.GetAtoms():
         v = atom.GetExplicitValence()
