@@ -46,7 +46,7 @@ class PLANTSDock:
         :param kwargs:
         """        
         # Convert necessary file formats
-        self.subprocess = timedSubprocess(timeout=timeout, shell=True)
+        self.subprocess = timedSubprocess(shell=True)
         if receptor.endswith('.pdb'):
             mol2_receptor = receptor.replace('.pdb', '.mol2')
             self.subprocess.run(cmd=f"obabel {receptor} -O {mol2_receptor} --partialcharge none")
