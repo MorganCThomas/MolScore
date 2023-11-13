@@ -108,7 +108,9 @@ class OEDock:
     def _close_dask(self):
         if self.client:
             self.client.close()
-            self.client.cluster.close()
+            # If local cluster close that too, can't close remote cluster
+            try: self.client.cluster.close()
+            except: pass
 
     def load_prepared_ligand(self) -> oechem.OEMol:
         """

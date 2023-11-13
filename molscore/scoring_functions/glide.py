@@ -81,7 +81,9 @@ class GlideDock:
     def _close_dask(self):
         if self.client:
             self.client.close()
-            self.client.cluster.close()
+            # If local cluster close that too, can't close remote cluster
+            try: self.client.cluster.close()
+            except: pass
 
     @staticmethod
     def modify_glide_in(glide_in: str, glide_property: str, glide_value: str):
