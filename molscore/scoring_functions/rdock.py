@@ -71,11 +71,56 @@ SECTION CAVITY
 END_SECTION
 """
         return config
+    
+    @staticmethod
+    def add_pharmacophore_constraint(config, constraints=None, optional_constraints=None, n_optional=1):
+        if constraints and optional_constraints:
+             config += \
+f"""
+#################################
+## PHARMACOPHORIC RESTRAINTS
+#################################
+SECTION PHARMA
+    SCORING_FUNCTION RbtPharmaSF
+    WEIGHT 1.0
+    CONSTRAINTS_FILE {os.path.basename(constraints)}
+    OPTIONAL_FILE {os.path.basename(optional_constraints)}
+    NOPT {n_optional}
+END_SECTION
+"""
+        elif optional_constraints and not constraints:
+            config += \
+f"""
+#################################
+## PHARMACOPHORIC RESTRAINTS
+#################################
+SECTION PHARMA
+    SCORING_FUNCTION RbtPharmaSF
+    WEIGHT 1.0
+    OPTIONAL_FILE {os.path.basename(optional_constraints)}
+    NOPT {n_optional}
+END_SECTION
+"""
+        else:
+            config += \
+f"""
+#################################
+## PHARMACOPHORIC RESTRAINTS
+#################################
+SECTION PHARMA
+    SCORING_FUNCTION RbtPharmaSF
+    WEIGHT 1.0
+    CONSTRAINTS_FILE {os.path.basename(constraints)}
+END_SECTION
+"""
+        return config
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
-                 docking_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
+                 dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
+                 dock_constraints: Union[str, os.PathLike] = None,
+                 dock_opt_constraints: Union[str, os.PathLike] = None, dock_n_opt_constraints: int = 1,
                  **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
@@ -84,9 +129,12 @@ END_SECTION
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
-        :param docking_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
+        :param dock_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param n_runs: Number of docking trials (poses to return)
+        :param dock_constrains: Path to rDock pharmacophoric constriants file that are mandatory
+        :param dock_opt_constraints: Path to rDock pharmacophoric constriants file that are optional
+        :param dock_n_opt_constraints: Number of optional constraints required
         """
         # Check rDock installation
         assert self.check_installation() is not None, "Could not find rDock path, please ensure proper installation"
@@ -119,6 +167,10 @@ END_SECTION
         self.n_runs = n_runs
         self.rdock_env = 'rbdock'
         self.rcav_env = 'rbcavity'
+        self.dock_constraints = os.path.abspath(dock_constraints) if dock_constraints else dock_constraints
+        self.dock_opt_constraints = os.path.abspath(dock_opt_constraints) if dock_opt_constraints else dock_opt_constraints
+        self.dock_n_opt_constraints = dock_n_opt_constraints
+        self.rdock_files = [self.receptor, self.ref]
 
         # Setup dask
         self.cluster = cluster
@@ -138,19 +190,31 @@ END_SECTION
             self.ligand_protocol = self.ligand_protocol(logger=logger)
 
         # Select docking protocol
-        if docking_protocol in ['dock', 'dock_solv', 'dock_grid', 'dock_solv_grid', 'minimise', 'minimise_solv', 'score', 'score_solv']:
-            self.docking_protocol = docking_protocol + ".prm"
+        if dock_protocol in ['dock', 'dock_solv', 'dock_grid', 'dock_solv_grid', 'minimise', 'minimise_solv', 'score', 'score_solv']:
+            self.dock_protocol = dock_protocol + ".prm"
         else:
-            self.docking_protocol = os.path.abspath(docking_protocol)
+            self.dock_protocol = os.path.abspath(dock_protocol)
         
         # Prepare grid file in tempfiles
         os.environ['RBT_HOME'] = self.temp_dir.name
-        self.subprocess.run(f'cp {self.receptor} {self.ref} {self.temp_dir.name}')
-        self.receptor_prm = os.path.join(self.temp_dir.name, 'cavity.prm')
-        with open(self.receptor_prm, 'wt') as f:
-            f.write(self.cavity_config(self.receptor, self.ref))
-        self.subprocess.run(f"{self.rcav_env} -was -r {self.receptor_prm}")
+        # Write config
+        rec_prm = self.cavity_config(self.receptor, self.ref)
+        # Add PH4 constriants
+        if self.dock_constraints or self.dock_opt_constraints:
+            rec_prm = self.add_pharmacophore_constraint(rec_prm, self.dock_constraints, self.dock_opt_constraints, self.dock_n_opt_constraints)
+            if self.dock_constraints: self.rdock_files.append(self.dock_constraints)
+            if self.dock_opt_constraints: self.rdock_files.append(self.dock_opt_constraints)
+        # Copy files to RBT home
+        self.subprocess.run(f'cp {" ".join(self.rdock_files)} {self.temp_dir.name}')
+        # Write config
+        self.rec_prm = os.path.join(self.temp_dir.name, 'cavity.prm')
+        with open(self.rec_prm, 'wt') as f:
+            f.write(rec_prm)
+        self.rdock_files.append(self.rec_prm)
+        # Prepare cavity
+        self.subprocess.run(f"{self.rcav_env} -was -r {self.rec_prm}")
         self.cavity = os.path.join(self.temp_dir.name, 'cavity.as')
+        self.rdock_files.append(self.cavity)
 
     def _close_dask(self):
         if self.client:
@@ -159,19 +223,20 @@ END_SECTION
     
     def _move_rdock_files(self, cwd):
         os.environ['RBT_HOME'] = cwd
-        subprocess.run(['cp', self.receptor, self.ref, self.receptor_prm, self.cavity, cwd])
+        self.subprocess.run(f'cp {" ".join(self.rdock_files)} {cwd}')
     
     def reformat_ligands(self, varients, varient_files):
-        """Reformat prepared ligands to .mol2"""
+        """Reformat prepared ligands to .sd via obabel (RDKit doesn't write charge in a rDock friendly way)"""
         futures = []
         new_varient_files = []
         for vfile in varient_files:
             new_vfile = vfile.replace(".sdf", ".sd")
             new_varient_files.append(new_vfile)
             if self.cluster:
-                futures.append(self.client.submit(shutil.move, vfile, new_vfile))
+                p = timedSubprocess()
+                futures.append(self.client.submit(p.run, f"obabel {vfile} -O {new_vfile}"))
             else:
-                shutil.move(vfile, new_vfile)
+                self.subprocess.run(f"obabel -i {vfile} -O {new_vfile}")
         
         # Wait for parallel jobs
         if self.cluster: self.client.gather(futures)
@@ -188,7 +253,7 @@ END_SECTION
                 in_lig = os.path.join(self.directory, f'{name}-{variant}_prepared.sd')
                 out_lig = os.path.join(self.directory, f'{name}-{variant}_docked')
                 out_log = os.path.join(self.directory, f'{name}-{variant}_rbdock.log')
-                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p dock.prm -n {self.n_runs} --allH'
+                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} --allH'
                 rdock_commands.append(command)
 
         # Initialize subprocess
@@ -326,7 +391,7 @@ END_SECTION
             _ = self.client.gather(futures)
         return self
 
-    def __call__(self, smiles: list, directory: str, file_names: list, **kwargs):
+    def __call__(self, smiles: list, directory: str, file_names: list, cleanup: bool = True, **kwargs):
         # Assign some attributes
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
         self.file_names = file_names
@@ -355,7 +420,7 @@ END_SECTION
         best_variants = self.get_docking_scores(smiles, return_best_variant=True)
 
         # Cleanup
-        self.remove_files(keep=best_variants, parallel=True)
+        if cleanup: self.remove_files(keep=best_variants, parallel=True)
         fh.close()
         logger.removeHandler(fh)
         self.directory = None
