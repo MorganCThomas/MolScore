@@ -433,8 +433,13 @@ END_SECTION
         return self.docking_results
     
 def manually_charge_mol(mol):
+    """Manually charge non-full valent atoms, assuming all explicit hydrogens are present"""
     PT = Chem.GetPeriodicTable()
     for atom in mol.GetAtoms():
+        e = atom.GetSymbol()
+        # Skip sulfur
+        if e == 'S':
+            continue
         v = atom.GetExplicitValence()
         dv = PT.GetDefaultValence(atom.GetAtomicNum())
         if (v < dv) and (atom.GetFormalCharge() == 0):
