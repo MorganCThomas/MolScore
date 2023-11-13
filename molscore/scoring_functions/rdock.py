@@ -124,7 +124,7 @@ END_SECTION
                  **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param receptor: Path to receptor file (.pdb, .pdbqt)
+        :param receptor: Path to receptor file (.pdb)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
