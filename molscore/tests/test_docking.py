@@ -211,6 +211,8 @@ class TestVinaDockParallel(BaseTests.TestScoringFunction):
 
     @classmethod
     def tearDownClass(cls):
+        cls.inst.client.close()
+        cls.inst.client.cluster.close()
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
