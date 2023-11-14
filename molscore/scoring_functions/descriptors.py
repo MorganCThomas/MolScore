@@ -186,7 +186,7 @@ class MolecularDescriptors:
         charge_pattern = Chem.MolFromSmarts("[+1!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]")
 
         # Accept smiles / mol
-        mol = get_mol(mol)
+        if mol: mol = get_mol(mol)
         if mol is None:
             return 0, 0, 0
 

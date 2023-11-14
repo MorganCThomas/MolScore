@@ -184,11 +184,11 @@ class DaskUtils:
             print(f"Dask worker dashboard: {client.dashboard_link}")
         # Or a number
         elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
-            if int(cluster_address_or_n_workers) > 1:
-                # processes=False may be needed to run nested subprocesses, only if local, otherwise --no-nanny via CLI
-                cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), processes=processes, threads_per_worker=1, local_directory=local_directory)
-                client = Client(cluster)
-                print(f"Dask worker dashboard: {client.dashboard_link}")
+            #if int(cluster_address_or_n_workers) > 1:
+            # processes=False may be needed to run nested subprocesses, only if local, otherwise --no-nanny via CLI
+            cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), processes=processes, threads_per_worker=1, local_directory=local_directory)
+            client = Client(cluster)
+            print(f"Dask worker dashboard: {client.dashboard_link}")
         # Or is unrecognized
         else:
             if (logger is not None) and (cluster_address_or_n_workers is not None):
