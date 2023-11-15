@@ -58,15 +58,15 @@ scores = ms.score(SMILES)
 **Note: A generative language model with MolScore already implemented can be found [here](https://github.com/MorganCThomas/SMILES-RNN).**
 
 ## Usage
-Once `molscore` has been implemented into a generative model, the objective needs to be defined! Writing a JSON file is a pain though so instead a streamlit app is provided do help.
+Here is a GIF demonstrating writing a config file with the help of the GUI, running MolScore in a mock example (scoring randomly sampled SMILES), and monitoring the output with another GUI.
 
-```
-streamlit run molscore/gui/config.py
-```
+![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/molscore_demo.gif)
+
+Once `molscore` has been implemented into a generative model, the objective needs to be defined! Writing a JSON file is a pain though so instead a streamlit app is provided do help. Simply call `molscore_config` from the command line (a simple wrapper to `streamlit run molscore/gui/config.py`)
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/config_v1_albuterol.png?raw=True)
 
-Once the configuration file is saved, simply point to this file path and run *de novo* molecule optimization. If running with the monitor app you'll be able to investigate molecules as they're being generated. This can also be run manually with `streamlit run molscore/gui/monitor.py`.
+Once the configuration file is saved, simply point to this file path and run *de novo* molecule optimization. If running with the monitor app you'll be able to investigate molecules as they're being generated. Simply call `molscore_monitor` from the command line (a wrapper to `streamlit run molscore/gui/monitor.py`).
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/monitor_v1_5HT2A_main.png?raw=True)
 
@@ -75,7 +75,7 @@ Scoring functionality present in **molscore**, some scoring functions require ex
 
 |Type|Method|
 |---|---|
-|Docking|Glide, Smina, OpenEye, GOLD, PLANTS, rDock|
+|Docking|Glide, Smina, OpenEye, GOLD, PLANTS, rDock, Vina, Gnina|
 |Ligand preparation|RDKit->Epik, Moka->Corina, Ligprep, [Gypsum-DL](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3)|
 |3D Similarity|ROCS, Open3DAlign|
 |2D Similarity|Fingerprint similarity (any RDKit fingerprint and similarity measure), substructure match/filter, [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)|
