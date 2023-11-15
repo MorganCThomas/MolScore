@@ -32,13 +32,16 @@ class GlideDock:
                       'r_i_glide_energy', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
     def __init__(self, prefix: str, glide_template: Union[os.PathLike, str], cluster: Union[str, int] = None,
-                 timeout: float = 120.0, ligand_preparation: str = 'LigPrep', **kwargs):
+                 ligand_preparation: str = 'LigPrep', prep_timeout: float = 30.0,
+                 dock_timeout: float = 120.0,
+                 **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param glide_template: Path to a template docking file (.in)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout (seconds) before killing an individual docking simulation (only if using Dask for parallelisation)
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GysumDL]
+        :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
+        :param dock_timeout: Timeout (seconds) before killing an individual docking simulation (only if using Dask for parallelisation)
         :param kwargs:
         """
         # Read in glide template (.in)
@@ -51,28 +54,36 @@ class GlideDock:
         self.prefix = prefix.replace(" ", "_")
         self.glide_metrics = GlideDock.return_metrics
         self.glide_env = os.path.join(os.environ['SCHRODINGER'], 'glide')
-        self.timeout = float(timeout)
+        self.dock_timeout = float(dock_timeout)
+        if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
+        self.prep_timeout = float(prep_timeout)
         self.variants = None
         self.docking_results = None
         self.temp_dir = TemporaryDirectory()
 
         # Setup dask
         self.cluster = cluster
-        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        self.client = DaskUtils.setup_dask(
+            cluster_address_or_n_workers=self.cluster,
+            local_directory=self.temp_dir.name, 
+            logger=logger
+            )
         if self.client is None: self.cluster = None
+        atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
-
-        atexit.register(self._close_dask)
 
     def _close_dask(self):
         if self.client:
             self.client.close()
+            # If local cluster close that too, can't close remote cluster
+            try: self.client.cluster.close()
+            except: pass
 
     @staticmethod
     def modify_glide_in(glide_in: str, glide_property: str, glide_value: str):
@@ -129,7 +140,7 @@ class GlideDock:
 
         # Initialize subprocess
         logger.debug('Glide called')
-        p = timedSubprocess(timeout=self.timeout, shell=True).run
+        p = timedSubprocess(timeout=self.dock_timeout, shell=True).run
 
         if self.cluster is not None:
             futures = self.client.map(p, glide_commands)

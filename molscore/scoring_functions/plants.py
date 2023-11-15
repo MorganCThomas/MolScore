@@ -33,19 +33,20 @@ class PLANTSDock:
         ]
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike], cluster: Union[str, int] = None,
-                 timeout: float = 120.0, ligand_preparation: str = 'GypsumDL',
+                 ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0, dock_timeout: float = 120.0,
                  **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param receptor: Protein receptor (.pdb, .mol2)
         :param ref_ligand: Reference ligand for identifying binding site (.sdf, .pdb, .mol2)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
+        :param dock_timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param kwargs:
         """        
         # Convert necessary file formats
-        self.subprocess = timedSubprocess(timeout=timeout, shell=True)
+        self.subprocess = timedSubprocess(shell=True)
         if receptor.endswith('.pdb'):
             mol2_receptor = receptor.replace('.pdb', '.mol2')
             self.subprocess.run(cmd=f"obabel {receptor} -O {mol2_receptor} --partialcharge none")
@@ -61,7 +62,9 @@ class PLANTSDock:
         self.prefix = prefix.replace(" ", "_")
         self.plants_metrics = self.return_metrics
         self.plants_env = os.environ['PLANTS']
-        self.timeout = float(timeout)
+        self.dock_timeout = float(dock_timeout)
+        if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
+        self.prep_timeout = float(prep_timeout)
         self.receptor = os.path.abspath(receptor)
         self.ref_ligand = os.path.abspath(ref_ligand)
         self.temp_dir = TemporaryDirectory()
@@ -70,8 +73,13 @@ class PLANTSDock:
 
         # Setup dask
         self.cluster = cluster
-        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        self.client = DaskUtils.setup_dask(
+            cluster_address_or_n_workers=self.cluster,
+            local_directory=self.temp_dir.name, 
+            logger=logger
+            )
         if self.client is None: self.cluster = None
+        atexit.register(self._close_dask)
 
         # Set default PLANTS params & find binding site center
         self.params = {
@@ -95,15 +103,16 @@ class PLANTSDock:
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
-
-        atexit.register(self._close_dask)
 
     def _close_dask(self):
         if self.client:
             self.client.close()
+            # If local cluster close that too, can't close remote cluster
+            try: self.client.cluster.close()
+            except: pass
 
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .mol2"""
@@ -135,7 +144,7 @@ class PLANTSDock:
 
         # Initialize subprocess
         logger.debug('PLANTS called')
-        p = timedSubprocess(timeout=self.timeout).run
+        p = timedSubprocess(timeout=self.dock_timeout).run
 
         if self.cluster is not None:
             futures = self.client.map(p, plants_commands)

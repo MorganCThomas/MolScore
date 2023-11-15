@@ -1,5 +1,7 @@
 import os
+import time
 import subprocess
+from dask.distributed import TimeoutError
 
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions, GetStereoisomerCount
@@ -8,7 +10,7 @@ from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
 from molscore.utils.gypsum_dl.Start import prepare_smiles, prepare_3d, add_mol_id_props
 from molscore.utils.gypsum_dl.MolContainer import MolContainer
 
-from molscore.scoring_functions.utils import timedSubprocess, get_mol
+from molscore.scoring_functions.utils import timedFunc, timedFunc2, timedSubprocess, get_mol
 
 # Protonation states: LigPrep / Epik / Moka / GypsumDL (Substruct Dist) / OBabel? / OpenEye?
 # Tautomers: LigPrep / Epik / Moka / GypsumDL (MolVS)
@@ -29,8 +31,8 @@ class LigandPreparation:
         # This should be overwritten by specific classes
         raise NotImplementedError
 
-    def __call__(self, smiles: list, file_names: list, directory: os.PathLike):
-        return self.prepare(smiles=smiles, directory=directory, file_names=file_names)
+    def __call__(self, smiles: list, file_names: list, directory: os.PathLike, logger=None):
+        return self.prepare(smiles=smiles, directory=directory, file_names=file_names, logger=logger)
 
 
 class LigPrep(LigandPreparation):
@@ -56,7 +58,7 @@ class LigPrep(LigandPreparation):
         except KeyError:
             raise KeyError("Please ensure you have a Schrodinger installation and license")
 
-    def prepare(self, smiles: list, directory: str, file_names: list):
+    def prepare(self, smiles: list, directory: str, file_names: list, **kwargs):
         """
         Call ligprep to prepare molecules.
         :param smiles: List of SMILES strings
@@ -196,7 +198,7 @@ class Epik(LigandPreparation):
         else:
             return name, [], [], []
 
-    def prepare(self, smiles: list, directory: os.PathLike, file_names: list):
+    def prepare(self, smiles: list, directory: os.PathLike, file_names: list, **kwargs):
         """
         Use RDKit and Epik to prepare molecules.
         :param smiles: List of SMILES strings
@@ -266,7 +268,7 @@ class Moka(LigandPreparation):
                                             stdout=subprocess.PIPE).stdout.decode().strip('\n')
         assert self.corina_env != '', "Please ensure you have a Corina installation and license"
 
-    def prepare(self, smiles, directory, file_names):
+    def prepare(self, smiles, directory, file_names, **kwargs):
         """
         Call Moka and Corina to prepare molecules.
         :param smiles: List of SMILES strings
@@ -336,21 +338,21 @@ class GypsumDL(LigandPreparation):
         https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3
         https://durrantlab.pitt.edu/gypsum-dl/
     """
-    def __init__(self, dask_client=None, logger=None, pH: float = 7.0, pHt: float = 1.0, **kwargs):
+    def __init__(self, dask_client=None, timeout=30.0, logger=None, pH: float = 7.0, pHt: float = 1.0, **kwargs):
         """
         Initialize LigPrep ligand preparation
         :param dask_client: Scheduler address for dask parallelization or number of workers
-        :param timeout: Timeout for subprocess before killing
+        :param timeout: Timeout for subprocess before killing, only relevant if using dask (currently ignored)
         :param logger: Currently used logger if present
         :param pH: pH at which to protonate molecules at
         :param pHt: pH Tolerance
         """
-        # Note here we use GypsumDL' in-built parallelizer
-        if dask_client is not None:
-            n_jobs = len(dask_client.ncores())
-        else:
-            n_jobs = -1
-        super().__init__(logger=logger)
+        super().__init__(timeout=timeout, logger=logger)
+        self.dask_client = dask_client
+        self.timeout = timeout
+
+        n_jobs = 1
+        job_manager="serial"
         self.gypsum_params = {
             "source": "",
             "output_folder": "./",
@@ -369,23 +371,24 @@ class GypsumDL(LigandPreparation):
             "second_embed": False,
             "2d_output_only": False,
             "skip_optimize_geometry": True,
-            "skip_alternate_ring_conformations": True,
+            "skip_alternate_ring_conformations": True, # Errors
             "skip_adding_hydrogen": False,
             "skip_making_tautomers": False,
             "skip_enumerate_chiral_mol": False,
             "skip_enumerate_double_bonds": False,
             "let_tautomers_change_chirality": False,
             "use_durrant_lab_filters": True,
-            "job_manager": "multiprocessing",
+            "job_manager": job_manager,
             "cache_prerun": False,
             "test": False,
         }
         self.gypsum_params["Parallelizer"] = Parallelizer(
-            self.gypsum_params["job_manager"], self.gypsum_params["num_processors"], True
-        )
+                self.gypsum_params["job_manager"], self.gypsum_params["num_processors"], True
+            )
+        # Can use GypsumDLDaskParallelizer(client=self.dask_client) wrapper (see below)
 
     
-    def prepare(self, smiles: list, directory: os.PathLike, file_names: list):
+    def prepare(self, smiles: list, directory: os.PathLike, file_names: list, logger=None, **kwargs):
         """
         Prepare smiles using GypsumDL's open-source ligand preparation protocol.
         :param smiles: List of SMILES strings
@@ -406,16 +409,62 @@ class GypsumDL(LigandPreparation):
         # Remove None types from failed conversion
         contnrs = [x for x in contnrs if x.orig_smi_canonical != None]
 
-        # Prepare including protonation, tautomers and stereoenumeration
-        prepare_smiles(contnrs, self.gypsum_params)
-
-        # Convert the processed SMILES strings to 3D.
-        prepare_3d(contnrs, self.gypsum_params)
+        # Prepare including protonation, tautomers and stereoenumeration then embed in 3D
+        if self.dask_client:
+            # Using Dask
+            if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL and Dask')
+            # Send out preparation jobs
+            smiles_futures = []
+            embed_futures = []
+            for c in contnrs:
+                tprepare_smiles = timedFunc2(prepare_smiles, self.timeout)
+                sf = self.dask_client.submit(tprepare_smiles, [c], self.gypsum_params)
+                smiles_futures.append(sf)
+            new_contnrs = []
+            for oc, f in zip(contnrs, smiles_futures):
+                nc = f.result()
+                if nc:
+                    nc = nc[0]
+                    new_contnrs.append(nc)
+                    tprepare_3d = timedFunc2(prepare_3d, self.timeout)
+                    ef = self.dask_client.submit(tprepare_3d, [nc], self.gypsum_params)
+                    embed_futures.append(ef)
+                else:
+                    new_contnrs.append(oc)
+                    embed_futures.append(None)
+                    # Log error
+                    if logger: 
+                        logger.debug(f"Error preparing: {oc.orig_smi}")
+                        # Could log f.traceback here and cancel() future after 
+            # Gather embed futures with a timeout
+            contnrs = []
+            for oc, f in zip(new_contnrs, embed_futures):
+                # If failed prepare and future is None
+                if not f:
+                    contnrs.append(oc)
+                    continue
+                nc = f.result()
+                if nc:
+                    nc = nc[0]
+                    contnrs.append(nc)
+                else:
+                    contnrs.append(oc)
+                    # Log error
+                    if logger: 
+                        logger.debug(f"Error embedding: {oc.orig_smi}")
+                    
+        else:
+            # Normal prepare and embed
+            if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL')
+            prepare_smiles(contnrs, self.gypsum_params)
+            if logger: logger.debug('Preparing 3D embedding with Gypsum-DL')
+            prepare_3d(contnrs, self.gypsum_params)
 
         # Add in name and unique id to each molecule.
         add_mol_id_props(contnrs)
 
         # Save the output.
+        if logger: logger.debug('Writing prepared molecules with Gypsum-DL')
         variants = {name: [] for name in file_names}
         variant_files = []
         for i, contnr in enumerate(contnrs):
@@ -433,5 +482,22 @@ class GypsumDL(LigandPreparation):
                     w.close()
                     if self.logger: self.logger.debug(f'Written {contnr.name}-{v}')
         return variants, variant_files
+    
+class GypsumDLDaskParallelizer:
+    def __init__(self, client):
+        """Wrapper to modify dask to apply to Gypsum-DL"""
+        self.client = client
+
+    def run(self, args, func, num_procs=None, mode=None):
+        """
+        :param args: List of lists or list of tuples to be supplied to func
+        :param func: Function to ro run args too
+        :return: List of results
+        """
+        futures = []
+        for inputs in args:
+            futures.append(self.client.submit(func, *inputs))
+        results = self.client.gather(futures)
+        return results
 
 ligand_preparation_protocols = [LigPrep, Epik, Moka, GypsumDL]

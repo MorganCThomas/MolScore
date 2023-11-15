@@ -9,6 +9,8 @@ setup(
     author_email='morganthomas263@gmail.com',
     description='A scoring framework for goal directed generative models',
     include_package_data=True,
+    scripts=['molscore/gui/config.py', 'molscore/gui/molscore_config', 
+             'molscore/gui/monitor.py', 'molscore/gui/molscore_monitor'],
     package_data={
         'molscore': [
             'data/sample.smi',

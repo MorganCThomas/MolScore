@@ -23,10 +23,10 @@ import __future__
 import copy
 import warnings
 
-import gypsum_dl.Parallelizer as Parallelizer
-import gypsum_dl.Utils as Utils
-import gypsum_dl.ChemUtils as ChemUtils
-from gypsum_dl.MyMol import MyConformer
+import molscore.utils.gypsum_dl.Parallelizer as Parallelizer
+import molscore.utils.gypsum_dl.Utils as Utils
+import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
+from molscore.utils.gypsum_dl.MyMol import MyConformer
 
 try:
     from rdkit import Chem

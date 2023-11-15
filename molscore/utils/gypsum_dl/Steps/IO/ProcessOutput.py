@@ -19,10 +19,10 @@ disk (output).
 
 import __future__
 
-from gypsum_dl.Steps.IO.SaveToSDF import save_to_sdf
-from gypsum_dl.Steps.IO.SaveToPDB import convert_sdfs_to_PDBs
-from gypsum_dl.Steps.IO.Web2DOutput import web_2d_output
-from gypsum_dl import Utils
+from molscore.utils.gypsum_dl.Steps.IO.SaveToSDF import save_to_sdf
+from molscore.utils.gypsum_dl.Steps.IO.SaveToPDB import convert_sdfs_to_PDBs
+from molscore.utils.gypsum_dl.Steps.IO.Web2DOutput import web_2d_output
+from molscore.utils.gypsum_dl import Utils
 
 
 def proccess_output(contnrs, params):

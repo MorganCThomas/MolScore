@@ -192,13 +192,13 @@ def _find_sdf(query_dir, step, batch_idx):
     if query_dir is None:
          return
     # Search for an sdf file
-    possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sdf*'))
+    possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sd*'))
     # Try without variant
     if len(possible_files) == 0:
-        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*.sdf*'))
+        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*.sd*'))
     # Try another subdirectory
     if len(possible_files) == 0:
-        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*', '*.sdf*'))
+        possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}*', '*.sd*'))
     # Return first match (should be only match)
     if len(possible_files) > 1:
         # Likely different formats
@@ -247,7 +247,7 @@ def save_sdf(mol_paths, mol_names, out_file):
                     if mol:
                         mol.SetProp('_Name', name)
                         writer.write(mol)
-            elif '.sdf' in path:
+            elif ('.sdf' in path) or ('.sd' in path):
                 suppl = Chem.ForwardSDMolSupplier(path, removeHs=False)
                 mol = suppl.__next__()
                 if mol:
@@ -276,6 +276,7 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step'):
             yaxis_title=y
             )
     else:
+        if x == 'index': x = 'idx'
         fig = px.scatter(
             data_frame=main_df, x=x, y=y, color='run',
             hover_data=['run', 'step', 'batch_idx', y],

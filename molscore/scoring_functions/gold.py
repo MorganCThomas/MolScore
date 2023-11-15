@@ -115,7 +115,7 @@ class GOLDDock:
 
     def __init__(
         self, prefix: str, gold_template: Union[None, str, os.PathLike] = None, receptor: Union[str, os.PathLike] = None,  ref_ligand: Union[str, os.PathLike] = None,
-        cluster: Union[str, int] = None, timeout: float = 120.0, ligand_preparation: str = 'GypsumDL', **kwargs
+        cluster: Union[str, int] = None, ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0, dock_timeout: float = 120.0, **kwargs
         ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
@@ -123,13 +123,14 @@ class GOLDDock:
         :param receptor: Protein receptor (.pdb, .mol2)
         :param ref_ligand: Reference ligand for identifying binding site (.sdf, .pdb, .mol2)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
-        :param timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
+        :param dock_timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param kwargs:
         """
         assert (gold_template is not None) or ((receptor is not None) and (ref_ligand is not None)), "Must specify gold template config, or both receptor and ref_ligand" 
         # Convert any necessary file formats
-        self.subprocess = timedSubprocess(timeout=timeout, shell=True)
+        self.subprocess = timedSubprocess(shell=True)
         if ref_ligand.endswith('.pdb') or ref_ligand.endswith('.sdf'):
             ext = '.' + ref_ligand.split(".")[-1]
             mol2_ligand = ref_ligand.replace(ext, '.mol2')
@@ -140,7 +141,9 @@ class GOLDDock:
         self.prefix = prefix.replace(" ", "_")
         self.gold_metrics = self.return_metrics
         self.gold_env = os.environ['GOLD']
-        self.timeout = float(timeout)
+        self.dock_timeout = float(dock_timeout)
+        if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
+        self.prep_timeout = float(prep_timeout)
         self.gold_template = gold_template
         self.receptor = os.path.abspath(receptor)
         self.ref_ligand = os.path.abspath(ref_ligand)
@@ -150,8 +153,13 @@ class GOLDDock:
 
         # Setup dask
         self.cluster = cluster
-        self.client = DaskUtils.setup_dask(cluster_address_or_n_workers=self.cluster, local_directory=self.temp_dir.name, logger=logger)
+        self.client = DaskUtils.setup_dask(
+            cluster_address_or_n_workers=self.cluster,
+            local_directory=self.temp_dir.name, 
+            logger=logger
+            )
         if self.client is None: self.cluster = None
+        atexit.register(self._close_dask)
 
         # Set GOLD params
         if self.gold_template:
@@ -164,15 +172,16 @@ class GOLDDock:
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
-        
-        atexit.register(self._close_dask)
     
     def _close_dask(self):
         if self.client:
             self.client.close()
+            # If local cluster close that too, can't close remote cluster
+            try: self.client.cluster.close()
+            except: pass
 
     @staticmethod
     def read_gold_config(gold_config):
@@ -247,7 +256,7 @@ class GOLDDock:
 
         # Initialize subprocess
         logger.debug('GOLD called')
-        p = timedSubprocess(timeout=self.timeout).run
+        p = timedSubprocess(timeout=self.dock_timeout).run
 
         # Submit docking subprocesses
         if self.cluster is not None:

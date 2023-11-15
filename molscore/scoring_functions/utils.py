@@ -1,4 +1,5 @@
 from typing import Union, Sequence, Callable
+from functools import partial
 import subprocess
 import multiprocessing
 import threading
@@ -7,6 +8,7 @@ import signal
 import numpy as np
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
+from func_timeout import func_timeout, FunctionTimedOut
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors, rdmolops, DataStructs
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
@@ -23,6 +25,84 @@ def Pool(*args):
     context = multiprocessing.get_context("fork")
     return context.Pool(*args)
 
+
+def test_func():
+    mol = Chem.MolFromSmiles('CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CC[C@@H](O)C[C@@H](O)CC(=O)O')
+    Chem.AddHs(mol)
+    Chem.EmbedMultipleConfs(mol, numConfs=100)
+    Chem.MMFFOptimizeMoleculeConfs(mol)
+    return True
+
+
+class timedFunc:
+    @staticmethod
+    def _func_wrapper(func, child_conn):
+        try:
+            result = func()
+            child_conn.send(result)
+        except Exception as e:
+            child_conn.send(e)
+        child_conn.close()
+    
+    def __init__(self, func, timeout: Union[int, float]):
+        """
+        Wrap a function by a timeout clause to also ideally work with C++ bindings i.e, RDKit
+        Based on: https://stackoverflow.com/questions/51547126/timeout-a-c-function-from-python
+        :param func: A function to be run with timeout
+        :param timeout: Timeout
+        """
+        self.func = func
+        self.timeout = timeout
+
+    def __call__(self, *args, **kwargs):
+        """
+        Run the timeout wrapped function with input args and kwargs
+        :param args: Function args
+        :param kwargs: Function kwargs
+        :return: Function result or None if timedout
+        """
+        pfunc = partial(self.func, *args, **kwargs)
+        parent_conn, child_conn = multiprocessing.Pipe()
+        process = multiprocessing.Process(target=self._func_wrapper, args=(pfunc, child_conn))
+        process.start()
+        process.join(self.timeout)
+
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            return None  # Return None if the timeout was reached
+
+        result = parent_conn.recv()
+        parent_conn.close()
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+class timedFunc2:
+    def __init__(self, func, timeout: Union[int, float]):
+        """
+        Wrap a function by a timeout using timed_func which should also work with C++ bindings i.e, RDKit
+        :param func: A function to be run with timeout
+        :param timeout: Timeout
+        """
+        self.func = func
+        self.timeout = timeout
+
+    def __call__(self, *args, **kwargs):
+        """
+        Run the timeout wrapped function with input args and kwargs
+        :param args: Function args
+        :param kwargs: Function kwargs
+        :return: Function result or None if timedout
+        """
+        try:
+            result = func_timeout(self.timeout, self.func, args, kwargs)
+        except FunctionTimedOut:
+            return None
+        
+        return result
+    
 
 class timedThread(object):
     """
@@ -79,7 +159,10 @@ class timedSubprocess(object):
             print('Process timed out...')
             out, err = ''.encode(), f'Timed out at {self.timeout}'.encode() # Encode for consistency
             if not self.shell:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
             else:
                 self.process.kill()
         return out, err
@@ -88,9 +171,11 @@ class timedSubprocess(object):
 class DaskUtils:
 
     # TODO add dask-jobqueue templates https://jobqueue.dask.org/en/latest/
+    # TODO add dask-ssh cluster
 
     @classmethod
-    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, logger=None):
+    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, processes=True, logger=None):
+        """Processes=False must be used if launching child subprocesses"""
         client = None
 
         # Check if it's a string
@@ -99,10 +184,11 @@ class DaskUtils:
             print(f"Dask worker dashboard: {client.dashboard_link}")
         # Or a number
         elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
-            if int(cluster_address_or_n_workers) > 1:
-                cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), threads_per_worker=1, local_directory=local_directory)
-                client = Client(cluster)
-                print(f"Dask worker dashboard: {client.dashboard_link}")
+            #if int(cluster_address_or_n_workers) > 1:
+            # processes=False may be needed to run nested subprocesses, only if local, otherwise --no-nanny via CLI
+            cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), processes=processes, threads_per_worker=1, local_directory=local_directory)
+            client = Client(cluster)
+            print(f"Dask worker dashboard: {client.dashboard_link}")
         # Or is unrecognized
         else:
             if (logger is not None) and (cluster_address_or_n_workers is not None):
@@ -206,6 +292,25 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     if not mol:
         mol = None
 
+    return mol
+
+
+def read_mol(mol_path: os.PathLike, i=0):
+    if mol_path.endswith('.mol2') or mol_path.endswith('.mol'):
+        mol = Chem.MolFromMolFile(mol_path, sanitize=False, strictParsing=False)
+
+    elif mol_path.endswith('.sdf'):
+        suppl = Chem.ForwardSDMolSupplier(mol_path, sanitize=False)
+        for i, mol in enumerate(suppl):
+            if i == i:
+                break
+
+    elif mol_path.endswith('.pdb'):
+        mol = Chem.MolFromPDBFile(mol_path, sanitize=False)
+
+    else:
+        raise TypeError(f"Cannot read molecule, unknown input file type: {mol_path}")
+    
     return mol
 
 
