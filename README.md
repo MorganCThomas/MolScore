@@ -1,5 +1,5 @@
 # MolScore: A scoring and evaluation framework for de novo drug design
-![alt text](https://github.com/MorganCThomas/MolScore/blob/version-1.0/molscore/data/images/GraphAbv2.png?raw=True)
+![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
 ## Overview
 
 The aim of this codebase is to simply and flexibly 
@@ -64,11 +64,11 @@ Once `molscore` has been implemented into a generative model, the objective need
 streamlit run molscore/gui/config.py
 ```
 
-![alt text](https://github.com/MorganCThomas/MolScore/blob/version-1.0/molscore/data/images/config_v1_albuterol.png?raw=True)
+![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/config_v1_albuterol.png?raw=True)
 
 Once the configuration file is saved, simply point to this file path and run *de novo* molecule optimization. If running with the monitor app you'll be able to investigate molecules as they're being generated. This can also be run manually with `streamlit run molscore/gui/monitor.py`.
 
-![alt text](https://github.com/MorganCThomas/MolScore/blob/version-1.0/molscore/data/images/monitor_v1_5HT2A_main.png?raw=True)
+![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/monitor_v1_5HT2A_main.png?raw=True)
 
 ## Functionality
 Scoring functionality present in **molscore**, some scoring functions require external softwares and necessary licenses.  
