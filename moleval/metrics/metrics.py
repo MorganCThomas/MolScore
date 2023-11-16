@@ -9,6 +9,8 @@ import numpy as np
 import rdkit
 from scipy.spatial.distance import cosine as cos_distance
 from scipy.stats import wasserstein_distance
+from scipy import linalg
+from rdkit.Chem import DataStructs
 
 from molbloom import buy
 
@@ -138,7 +140,7 @@ class GetMetrics(object):
             self.target_sw = SillyWalks(reference_mols=self.target, n_jobs=self.n_jobs)
             if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, verbose=False):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, verbose=False):
         """
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles
@@ -189,11 +191,19 @@ class GetMetrics(object):
         if verbose: print("Calculating Diversity")
         metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
-        if (se_k is not None) and (len(mols) < se_k):
+        
+        if se_k and (len(mols) < se_k):
             warnings.warn(f'Less than {se_k} molecules so SEDiv is non-standard.')
             metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
-        if (se_k is not None) and (len(gen) >= se_k):
+        if se_k and (len(gen) >= se_k):
             metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
+        
+        if sp_k and (len(mols) < sp_k):
+            warnings.warn(f'Less than {sp_k} molecules so SPDiv is non-standard.')
+            metrics['SPDiv'] = sp_diversity(gen=mols, n_jobs=self.pool)
+        if sp_k and (len(mols) >= sp_k):
+            metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, n_jobs=self.pool)
+        
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
         metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
@@ -368,7 +378,7 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
                  dist_threshold=0.65, normalize=True):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
-     Tanimoto distance.
+     Tanimoto distance on the first k molecules.
 
     :param k:
     :param gen:
@@ -388,7 +398,8 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
                 f"Can't compute SEDiv@{k/1000:.0f} "
                 f"gen contains only {len(gen)} molecules"
             )
-        gen = gen[:k]
+        np.random.seed(123)
+        gen = np.random.choice(gen, k, replace=False)
 
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
@@ -402,6 +413,49 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     else:
         return no_diverse
 
+def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
+    """
+    Computes Solow Polasky diversity on the first k molecules.
+
+    :param k:
+    :param gen:
+    :param n_jobs:
+    :param device:
+    :param fp_type:
+    :param gen_fps:
+    :param dist_threshold:
+    :param normalize:
+    :return:
+    """
+    assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray)
+
+    if k is not None:
+        if len(gen) < k:
+            warnings.warn(
+                f"Can't compute SEDiv@{k/1000:.0f} "
+                f"gen contains only {len(gen)} molecules"
+            )
+        np.random.seed(123)
+        gen = np.random.choice(gen, k, replace=False)
+
+    if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
+        gen_fps = fingerprints(gen, fp_type='morgan', n_jobs=n_jobs, morgan__r=3, morgan__n=2048)
+    else:
+        gen_fps = gen
+
+    bvs = numpy_fps_to_bitvectors(gen_fps, n_jobs=n_jobs)
+    # Compute distances
+    dist = 1 - np.array([DataStructs.BulkTanimotoSimilarity(f, bvs) for f in bvs])
+    # Finds unique rows in arr and return their indices
+    arr_ = np.ascontiguousarray(dist).view(np.dtype((np.void, dist.dtype.itemsize * dist.shape[1])))
+    _, idxs = np.unique(arr_, return_index=True)
+    idxs = np.sort(idxs)
+    dist = dist[idxs, :][:, idxs]
+    f_ = np.linalg.inv(np.e ** (-10 * dist))
+    if normalize:
+        return np.sum(f_) / len(gen)
+    else:
+        return np.sum(f_)
 
 def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     """
