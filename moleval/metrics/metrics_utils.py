@@ -283,7 +283,7 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
     if agg == 'mean':
         agg_tanimoto /= total
     if p != 1:
-        agg_tanimoto = (agg_tanimoto) ** (1 / p)
+        return np.mean(agg_tanimoto), np.mean((agg_tanimoto) ** (1 / p))
     return np.mean(agg_tanimoto)
 
 
