@@ -50,7 +50,8 @@ class GetMetrics(object):
             None, will not run comparitive statistics
         train (None or list): train SMILES. Only compute novelty as this is usually a very large dataset, to run comparative statistics, submit a sample as test
         target (None or list): target SMILES. If none, will not run comparative statistics
-        fcd (bool): Whether to compute FCD if pre-statistics aren't supplied
+        run_fcd (bool): Whether to compute FCD if pre-statistics aren't supplied
+        cumulative (bool): Keep a memory of previously generated SMILES and add to them with every .calculate() call.
     Available metrics:
         ----- Intrinsic metrics ----
         * # - Number of molecules
@@ -80,10 +81,12 @@ class GetMetrics(object):
     """
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
                  test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
-                 target=None, ptarget=None, run_fcd=True):
+                 target=None, ptarget=None, run_fcd=True, cumulative=False):
         """
         Prepare to calculate metrics by declaring reference datasets and running pre-statistics
         """
+        self.gen = []
+        self.cumulative = cumulative
         self.n_jobs = n_jobs
         self.device = device
         self.batch_size = batch_size
@@ -151,6 +154,10 @@ class GetMetrics(object):
         :param verbose: Print updates
         """
         
+        if self.cumulative:
+            self.gen += gen
+            gen = self.gen
+
         metrics = {}
         metrics['#'] = len(gen)
 
