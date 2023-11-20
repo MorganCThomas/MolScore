@@ -5,6 +5,7 @@ https://github.com/molecularsets/moses
 
 import warnings
 from multiprocessing import Pool
+from collections import Counter
 import numpy as np
 import rdkit
 from scipy.spatial.distance import cosine as cos_distance
@@ -85,6 +86,7 @@ class GetMetrics(object):
         """
         Prepare to calculate metrics by declaring reference datasets and running pre-statistics
         """
+        self.n_gen = 0
         self.gen = []
         self.cumulative = cumulative
         self.n_jobs = n_jobs
@@ -143,7 +145,7 @@ class GetMetrics(object):
             self.target_sw = SillyWalks(reference_mols=self.target, n_jobs=self.n_jobs)
             if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, verbose=False):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
         """
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles
@@ -161,49 +163,42 @@ class GetMetrics(object):
         metrics = {}
         metrics['#'] = len(gen)
 
+        gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, n_jobs=self.n_jobs)
+
         # ----- Intrinsic properties -----
 
         # Calculate validity
         if verbose: print("Calculating Validity")
-        if calc_valid:
-            metrics['Validity'] = fraction_valid(gen, self.pool)
-
-        gen = remove_invalid(gen, canonize=True, n_jobs=self.n_jobs)
-        metrics['# valid'] = len(gen)
+        if calc_valid: metrics['Validity'] = fraction_valid
+        metrics['# valid'] = n_valid
 
         # Calculate Uniqueness
         if verbose: print("Calculating Uniqueness")
-        if calc_unique:
-            metrics['Uniqueness'] = fraction_unique(gen=gen, k=None, n_jobs=self.pool)
-            if unique_k is not None:
-                metrics[f'Unique@{unique_k/1000:.0f}k'] = fraction_unique(gen=gen, k=unique_k, n_jobs=self.pool)
+        if calc_unique: metrics['Uniqueness'] = fraction_unique
+        metrics['# valid & unique'] = len(gen)
 
-        # Now subset only unique molecules
+        # Compute pre-statistics
         if verbose: print("Computing pre-statistics")
-        gen = list(set(gen))
-        mols = mapper(self.pool)(get_mol, gen)
-        # Precalculate some things
         mol_fps = fingerprints(mols, self.pool, already_unique=True, fp_type='morgan')
         scaffs = compute_scaffolds(mols, n_jobs=self.n_jobs)
         scaff_gen = list(scaffs.keys())
         fgs = compute_functional_groups(mols, n_jobs=self.n_jobs)
         rss = compute_ring_systems(mols, n_jobs=self.n_jobs)
         scaff_mols = mapper(self.pool)(get_mol, scaff_gen)
-        metrics['# valid & unique'] = len(gen)
+        
+        # Calculate novelty
+        if verbose: print("Calculating Novelty")
+        if self.train is not None: metrics['Novelty'] = novelty(gen, self.train, self.pool)
 
         # Calculate diversity related metrics
-        if verbose: print("Calculating Novelty")
-        if self.train is not None:
-            metrics['Novelty'] = novelty(gen, self.train, self.pool)
         if verbose: print("Calculating Diversity")
-        metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
-        metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
+        metrics['IntDiv1'], metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
         
         if se_k and (len(mols) < se_k):
             warnings.warn(f'Less than {se_k} molecules so SEDiv is non-standard.')
-            metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
+            metrics['SEDiv'] = se_diversity(gen=mol_fps, n_jobs=self.pool)
         if se_k and (len(gen) >= se_k):
-            metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
+            metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mol_fps, k=se_k, n_jobs=self.pool, normalize=True)
         
         if sp_k and (len(mols) < sp_k):
             warnings.warn(f'Less than {sp_k} molecules so SPDiv is non-standard.')
@@ -211,6 +206,7 @@ class GetMetrics(object):
         if sp_k and (len(mols) >= sp_k):
             metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, n_jobs=self.pool)
         
+        metrics['# scaffolds']  = len(scaff_gen)
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
         metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
@@ -251,12 +247,13 @@ class GetMetrics(object):
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
             metrics['OutlierBits_test'] = self.test_sw.score_mols(mols)
-            for name, func in [('logP', logP),
-                               ('NP', NP),
-                               ('SA', SA),
-                               ('QED', QED),
-                               ('Weight', weight)]:
-                metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
+            if properties:
+                for name, func in [('logP', logP),
+                                ('NP', NP),
+                                ('SA', SA),
+                                ('QED', QED),
+                                ('Weight', weight)]:
+                    metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
 
         # Test scaff metrics
         if self.test_scaffolds_int is not None:
@@ -278,12 +275,13 @@ class GetMetrics(object):
             metrics['Frag_target'] = FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag'])
             metrics['Scaf_target'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf'])
             metrics['OutlierBits_target'] = self.target_sw.score_mols(mols)
-            for name, func in [('logP', logP),
-                               ('NP', NP),
-                               ('SA', SA),
-                               ('QED', QED),
-                               ('Weight', weight)]:
-                metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
+            if properties:
+                for name, func in [('logP', logP),
+                                ('NP', NP),
+                                ('SA', SA),
+                                ('QED', QED),
+                                ('Weight', weight)]:
+                    metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
 
         return metrics
 
@@ -365,7 +363,7 @@ def fraction_passes_filters(gen, n_jobs=1):
     return np.mean(passes)
 
 
-def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
+def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan'):
     """
     Computes internal diversity as:
     1/|A|^2 sum_{x, y in AxA} (1-tanimoto(x, y))
@@ -377,8 +375,9 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
     else:
         gen_fps = gen
 
-    return 1 - (average_agg_tanimoto(gen_fps, gen_fps,
-                                     agg='mean', device=device, p=p)).mean()
+    av_p1, av_p2 = average_agg_tanimoto(gen_fps, gen_fps, agg='mean', device=device, p=2)
+
+    return 1 - av_p1.mean(), 1 - av_p2.mean()
 
 
 def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
@@ -406,7 +405,11 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
                 f"gen contains only {len(gen)} molecules"
             )
         np.random.seed(123)
-        gen = np.random.choice(gen, k, replace=False)
+        idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+        if isinstance(gen[0], rdkit.Chem.rdchem.Mol): 
+            gen = [gen[i] for i in idxs]
+        else: 
+            gen = gen[idxs]
 
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
@@ -463,6 +466,54 @@ def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
         return np.sum(f_) / len(gen)
     else:
         return np.sum(f_)
+    
+def preprocess_gen(gen, canonize=True, n_jobs=1):
+    """
+    Convert to valid, unique and return mols in one function (save compute redundancy)
+    :return: (gen, mols, n_valid, fraction_valid, fraction_unique)
+    """
+    # Convert to mols
+    mols = mapper(n_jobs)(get_mol, gen)
+    fraction_invalid = 1 - mols.count(None) / len(mols)
+    n_valid = len(mols) - mols.count(None)
+    # Remove invalid
+    if canonize:
+        gen = [x for x in mapper(n_jobs)(canonic_smiles, mols) if x is not None]
+    else:
+        gen = [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
+    mols = [mol for mol in mols if mol is not None]
+    # Count unique (Note this is fraction of valid SMILES), keeping order
+    c = Counter()
+    unique_gen = []
+    unique_mols = []
+    for smi, mol in zip(gen, mols):
+        # Add to counter
+        c.update([smi])
+        if c[smi] < 2:
+            unique_gen.append(smi)
+            unique_mols.append(mol)
+    fraction_unique = len(unique_gen) / len(gen)
+    return gen, mols, n_valid, fraction_invalid, fraction_unique
+
+def fraction_valid(gen, n_jobs=1):
+    """
+    Computes a number of valid molecules
+    Parameters:
+        gen: list of SMILES
+        n_jobs: number of threads for calculation
+    """
+    gen = mapper(n_jobs)(get_mol, gen)
+    return 1 - gen.count(None) / len(gen)
+
+def remove_invalid(gen, canonize=True, n_jobs=1):
+    """
+    Removes invalid molecules from the dataset
+    """
+    if not canonize:
+        mols = mapper(n_jobs)(get_mol, gen)
+        return [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
+    return [x for x in mapper(n_jobs)(canonic_smiles, gen) if
+            x is not None]
 
 def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     """
@@ -486,17 +537,6 @@ def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     return len(canonic) / len(gen)
 
 
-def fraction_valid(gen, n_jobs=1):
-    """
-    Computes a number of valid molecules
-    Parameters:
-        gen: list of SMILES
-        n_jobs: number of threads for calculation
-    """
-    gen = mapper(n_jobs)(get_mol, gen)
-    return 1 - gen.count(None) / len(gen)
-
-
 def novelty(gen, train, n_jobs=1):
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_smiles = mapper(n_jobs)(canonic_smiles, gen)
@@ -505,17 +545,6 @@ def novelty(gen, train, n_jobs=1):
     gen_smiles_set = set(gen_smiles) - {None}
     train_set = set(train)
     return len(gen_smiles_set - train_set) / len(gen_smiles_set)
-
-
-def remove_invalid(gen, canonize=True, n_jobs=1):
-    """
-    Removes invalid molecules from the dataset
-    """
-    if not canonize:
-        mols = mapper(n_jobs)(get_mol, gen)
-        return [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
-    return [x for x in mapper(n_jobs)(canonic_smiles, gen) if
-            x is not None]
 
 
 class Metric:
