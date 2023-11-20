@@ -4,7 +4,7 @@ https://github.com/molecularsets/moses
 """
 
 import warnings
-from multiprocessing import Pool
+import multiprocessing
 from collections import Counter
 import numpy as np
 import rdkit
@@ -120,7 +120,7 @@ class GetMetrics(object):
         disable_rdkit_log()
         if self.pool is None:
             if self.n_jobs != 1:
-                self.pool = Pool(n_jobs)
+                self.pool = multiprocessing.get_context("fork").Pool(n_jobs)
                 self.close_pool = True
             else:
                 self.pool = 1
