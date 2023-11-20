@@ -4,7 +4,7 @@ https://github.com/molecularsets/moses
 """
 
 import warnings
-from multiprocessing import Pool
+import multiprocessing
 from collections import Counter
 import numpy as np
 import rdkit
@@ -86,7 +86,6 @@ class GetMetrics(object):
         """
         Prepare to calculate metrics by declaring reference datasets and running pre-statistics
         """
-        self.n_gen = 0
         self.gen = []
         self.cumulative = cumulative
         self.n_jobs = n_jobs
@@ -120,7 +119,7 @@ class GetMetrics(object):
         disable_rdkit_log()
         if self.pool is None:
             if self.n_jobs != 1:
-                self.pool = Pool(n_jobs)
+                self.pool = multiprocessing.get_context("fork").Pool(n_jobs)
                 self.close_pool = True
             else:
                 self.pool = 1
@@ -155,30 +154,29 @@ class GetMetrics(object):
         :param se_k: Sub-sample size for sphere exclusion diversity
         :param verbose: Print updates
         """
-        
+
         if self.cumulative:
             self.gen += gen
             gen = self.gen
-
+        
         metrics = {}
         metrics['#'] = len(gen)
 
+        if verbose: print("Calculating Validity & Uniqueness")
         gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, n_jobs=self.n_jobs)
 
         # ----- Intrinsic properties -----
 
-        # Calculate validity
-        if verbose: print("Calculating Validity")
+        # Report validity
         if calc_valid: metrics['Validity'] = fraction_valid
         metrics['# valid'] = n_valid
 
-        # Calculate Uniqueness
-        if verbose: print("Calculating Uniqueness")
+        # ReportuUniqueness
         if calc_unique: metrics['Uniqueness'] = fraction_unique
         metrics['# valid & unique'] = len(gen)
 
         # Compute pre-statistics
-        if verbose: print("Computing pre-statistics")
+        if verbose: print("Computing pre-statistics (fps, ring systems etc.)")
         mol_fps = fingerprints(mols, self.pool, already_unique=True, fp_type='morgan')
         scaffs = compute_scaffolds(mols, n_jobs=self.n_jobs)
         scaff_gen = list(scaffs.keys())
@@ -324,7 +322,7 @@ def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
     close_pool = False
     if pool is None:
         if n_jobs != 1:
-            pool = Pool(n_jobs)
+            pool = multiprocessing.get_context("fork").Pool(n_jobs)
             close_pool = True
         else:
             pool = 1
@@ -493,11 +491,11 @@ def preprocess_gen(gen, canonize=True, n_jobs=1):
     for smi, mol in zip(gen, mols):
         # Add to counter
         c.update([smi])
-        if c[smi] < 2:
+        if c[smi] == 1:
             unique_gen.append(smi)
             unique_mols.append(mol)
     fraction_unique = len(unique_gen) / len(gen)
-    return gen, mols, n_valid, fraction_invalid, fraction_unique
+    return unique_gen, unique_mols, n_valid, fraction_invalid, fraction_unique
 
 def fraction_valid(gen, n_jobs=1):
     """
