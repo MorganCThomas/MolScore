@@ -204,10 +204,10 @@ class GetMetrics(object):
             warnings.warn(f'Less than {sp_k} molecules so SPDiv is non-standard.')
             metrics['SPDiv'] = sp_diversity(gen=mols, n_jobs=self.pool)
         if sp_k and (len(mols) >= sp_k):
-            metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, n_jobs=self.pool)
+            metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, k=1000, n_jobs=self.pool)
         
         metrics['# scaffolds']  = len(scaff_gen)
-        metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
+        metrics['ScaffDiv'], _ = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
                                                  fp_type='morgan')
         metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
         # Calculate number of FG and RS relative to sample size
@@ -447,6 +447,10 @@ def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
             )
         np.random.seed(123)
         gen = np.random.choice(gen, k, replace=False)
+        if isinstance(gen[0], rdkit.Chem.rdchem.Mol): 
+            gen = [gen[i] for i in idxs]
+        else: 
+            gen = gen[idxs]
 
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_fps = fingerprints(gen, fp_type='morgan', n_jobs=n_jobs, morgan__r=3, morgan__n=2048)
