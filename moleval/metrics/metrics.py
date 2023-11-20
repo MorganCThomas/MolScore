@@ -446,7 +446,7 @@ def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
                 f"gen contains only {len(gen)} molecules"
             )
         np.random.seed(123)
-        idxs = np.random.choice(gen, k, replace=False)
+        idxs = np.random.choice(list(range(len(gen))), k, replace=False)
         if isinstance(gen[0], rdkit.Chem.rdchem.Mol): 
             gen = [gen[i] for i in idxs]
         else: 
