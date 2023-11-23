@@ -258,7 +258,6 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
         stock_vecs: numpy array <n_vectors x dim>
         gen_vecs: numpy array <n_vectors' x dim>
         agg: max or mean
-        p: power for averaging: (mean x^p)^(1/p)
     """
     assert agg in ['max', 'mean'], "Can aggregate only max or mean"
     agg_tanimoto = np.zeros(len(gen_vecs))
@@ -282,9 +281,7 @@ def average_agg_tanimoto(stock_vecs, gen_vecs,
                 total[i:i + y_gen.shape[1]] += jac.shape[0]
     if agg == 'mean':
         agg_tanimoto /= total
-    if p != 1:
-        return np.mean(agg_tanimoto), np.mean((agg_tanimoto) ** (1 / p))
-    return np.mean(agg_tanimoto)
+    return agg_tanimoto
 
 
 def analogues_tanimoto(stock_vecs, gen_vecs,
@@ -319,7 +316,7 @@ def analogues_tanimoto(stock_vecs, gen_vecs,
             stock_analogues[j:j + x_stock.shape[0]] = np.maximum(stock_analogues[j:j + x_stock.shape[0]],
                                                                  jac_thresh.max(1))
 
-    return gen_analogues.mean(), stock_analogues.mean()
+    return gen_analogues, stock_analogues
 
 
 def fingerprint(smiles_or_mol, fp_type='maccs', dtype=None, morgan__r=2,
@@ -581,7 +578,7 @@ class SillyWalks:
             score = len(silly_bits) / len(on_bits)
             return score, silly_bits, bi
 
-    def score_mols(self, mols: list) -> float:
+    def score_mols(self, mols: list, normalize=True) -> float:
         """
         Return the average ratio of outlier FP bits for a list of molecules
         :param: List of SMILES or RDKit Mols
@@ -589,5 +586,8 @@ class SillyWalks:
         """
         mols = [m for m in mapper(self._n_jobs)(get_mol, mols) if m is not None]
         scores = [s[0] for s in mapper(self._n_jobs)(partial(self._score, count_dict=self.count_dict), mols)]
-        return np.mean(scores)
+        if normalize:
+            return np.mean(scores)
+        else:
+            return np.sum(scores)
 
