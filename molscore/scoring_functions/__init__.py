@@ -10,6 +10,7 @@ from molscore.scoring_functions.applicability_domain import ApplicabilityDomain
 from molscore.scoring_functions.external_server import POSTServer
 from molscore.scoring_functions.align3d import Align3D
 from molscore.scoring_functions.pidgin import PIDGIN
+from molscore.scoring_functions.legacy_qsar import LegacyQSAR
 from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors
 from molscore.scoring_functions.isomer import Isomer
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
@@ -29,6 +30,7 @@ all_scoring_functions = [
     SubstructureMatch,
     SKLearnModel,
     EnsembleSKLearnModel,
+    LegacyQSAR,
     POSTServer,
     PIDGIN,
     RAScore_XGB,
