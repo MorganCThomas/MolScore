@@ -1,0 +1,11 @@
+name: lib-invent
+channels:
+  - rdkit
+  - conda-forge
+  - anaconda
+  - defaults
+dependencies:
+  - python=3.7
+  - scikit-learn=0.21.2
+  - rdkit=2020.03.3.0
+  - flask=2.2.5

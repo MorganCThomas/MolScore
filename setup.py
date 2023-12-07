@@ -15,7 +15,8 @@ setup(
         'molscore': [
             'data/sample.smi',
             'data/models/RAScore/*/*.pkl',
-            'data/models/aizynth/*'],
+            'data/models/aizynth/*',
+            'data/models/libinvent/*'],
         'moleval': [
             'test/data/sample.smi',
             'metrics/mcf.csv',
