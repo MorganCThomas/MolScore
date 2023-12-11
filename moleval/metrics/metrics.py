@@ -214,11 +214,19 @@ class GetMetrics(object):
             metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, k=1000, n_jobs=self.pool, normalize=self.normalize)
         
         metrics['# scaffolds']  = len(scaff_gen)
+        
         metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, p=1, device=self.device, fp_type='morgan')
-        metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
+        
+        if len(scaff_gen): metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
+        else: metrics['ScaffUniqueness'] = 0.
+        
         # Calculate number of FG and RS relative to sample size
-        metrics['FG'] = len(list(fgs.keys()))/sum(fgs.values()) if self.normalize else len(list(fgs.keys()))
-        metrics['RS'] = len(list(rss.keys()))/sum(rss.values()) if self.normalize else len(list(rss.keys()))
+        if sum(fgs.values()): metrics['FG'] = len(list(fgs.keys()))/sum(fgs.values()) if self.normalize else len(list(fgs.keys()))
+        else: metrics['FG'] = 0.
+
+        if sum(rss.values()): metrics['RS'] = len(list(rss.keys()))/sum(rss.values()) if self.normalize else len(list(rss.keys()))
+        else: metrics['RS'] = 0.
+        
         # Calculate filters
         if verbose: print("Calculating Filters")
         metrics['Filters'] = fraction_passes_filters(mols, self.pool, normalize=self.normalize)
