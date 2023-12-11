@@ -275,6 +275,8 @@ class MolScore:
 
         :return:
         """
+        # Drop any duplicates in results
+        self.results_df = self.results_df.drop_duplicates(subset='smiles')
 
         # Grab data for pre-existing smiles
         if len(self.exists_df) > 1:
@@ -285,8 +287,7 @@ class MolScore:
             if len(dup_idx) > 0:
                 self.exists_df.drop(index=dup_idx, inplace=True)
             # Append to results, assuming no duplicates in results_df...
-            self.results_df = pd.concat([self.results_df, self.exists_df], axis=0, ignore_index=True, sort=False) # self.results_df.append(self.exists_df, ignore_index=True, sort=False)
-            self.results_df = self.results_df.drop_duplicates(subset='smiles')
+            self.results_df = pd.concat([self.results_df, self.exists_df], axis=0, ignore_index=True, sort=False)
 
         # Merge with batch_df
         logger.debug('    Merging results to batch df')
