@@ -39,7 +39,7 @@ class TestGlideDockSerial(BaseTests.TestScoringFunction):
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = list([test_files['DRD2_ref_smiles']] + mg.sample(4).extend(mg.sample(4))).extend(mg.sample(4)).extend(mg.sample(4))
+        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
         cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
         print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
