@@ -18,6 +18,7 @@ from molscore.scoring_functions.substructure_match import SubstructureMatch
 from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLearnModel, SKLearnClassifier, SKLearnRegressor
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.scoring_functions.aizynthfinder import AiZynthFinder
+from molscore.scoring_functions.reaction_filter import DecoratedReactionFilter
 
 all_scoring_functions = [
     MolecularSimilarity, 
@@ -35,6 +36,7 @@ all_scoring_functions = [
     PIDGIN,
     RAScore_XGB,
     AiZynthFinder,
+    DecoratedReactionFilter,
     Align3D,
     GlideDock,
     SminaDock,
