@@ -1,4 +1,5 @@
 import os
+import ast
 import re
 import json
 import inspect
@@ -76,7 +77,7 @@ def type2widget(ptype, label, key, default=None, options=None):
                 value=default if default is not None else "",
                 key=key
             )
-        if ptype == list:
+        if ptype in [list, dict]:
             widget = st.text_area(
                 label=label,
                 value=default if default is not None else "",
@@ -241,6 +242,12 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                 # Check if empty and handle properly
                 if result_dict[p] == [''] or result_dict[p] == ['[]'] or result_dict[p] == ['', '']:
                     result_dict[p] = []
+            if pinfo['type'] == dict:
+                try:
+                   result_dict[p] = ast.literal_eval(result_dict[p])
+                except (SyntaxError,ValueError) as e:
+                    st.write("Please input as if typing in python, e.g., {0: \"A string\", 1: [4, 5], 2: [\"A list of strings\",]}")
+                    pass #raise e
 
     return result_dict
 

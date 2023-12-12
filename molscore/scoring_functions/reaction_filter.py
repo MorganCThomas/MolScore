@@ -1,3 +1,4 @@
+import re
 import logging
 import numpy as np
 from typing import Union
@@ -71,6 +72,7 @@ class DecoratedReactionFilter():
         self.n_jobs = n_jobs
         self.reaction_smirks = []
         self.scaffold = get_mol(scaffold)
+        assert self.scaffold, f"Error parsing scaffold {scaffold}"
         if custom_reactions:
             self.reaction_smirks.extend(custom_reactions)
         if libinvent_reactions:
@@ -81,13 +83,13 @@ class DecoratedReactionFilter():
     def _identify_new_bonds(self, molecule):
         """Identify attachment points in scaffold"""
         attachment_points = []
-        scaffold_atoms_idxs = molecule.GetSubstructMatch(self.scaffold) 
-        for idx in scaffold_atoms_idxs:
+        match_idxs = molecule.GetSubstructMatch(self.scaffold) 
+        for idx in match_idxs:
             atom = molecule.GetAtomWithIdx(idx)
             neighbour_atoms = atom.GetNeighbors()
             for natom in neighbour_atoms:
                 nidx = natom.GetIdx()
-                if nidx not in scaffold_atoms_idxs:
+                if nidx not in match_idxs:
                     attachment_points.append((idx, nidx))
         return attachment_points
 
@@ -143,6 +145,98 @@ class DecoratedReactionFilter():
         for smi, score in zip(smiles, scores):
             results.append({'smiles': smi, f'{self.prefix}_score': score})
         return results
+
+
+class SelectiveDecoratedReactionFilter(DecoratedReactionFilter):
+
+    def __init__(self, prefix: str, scaffold: str, allowed_reactions: dict = {}, n_jobs: int = 1, **kwargs):
+        """
+        :param prefix: Name given to scoring function
+        :param scaffold: Assumes de novo molecule generation is decorative from this scaffold with labeled attachment points 
+        :param allowed_reactions: A dictionary mapping attachment points to a list of allowed reactions e.g., {0: list(reaction)}}
+        :param n_jobs: Number of parallel jobs to run
+        """
+        self.prefix = prefix.replace(" ", "_")
+        self.n_jobs = n_jobs
+        self.reaction_smirks = []
+        self.scaffold = get_mol(scaffold)
+        assert self.scaffold, f"Error parsing scaffold {scaffold}"
+        assert allowed_reactions, "Please provide a dictionary of allowed reactions mapped to reaction vectors"
+        self.reactions = {int(idx): [Chem.ReactionFromSmarts(s) for s in smirks] for idx, smirks in allowed_reactions.items()}
+
+        # RDKit GetSubstructureMatch doesn't work with atom mapped molecules, so we need to remove the atom mapping and keep a record
+        self.scaffidx_to_vector = {}
+        for atom in self.scaffold.GetAtoms():
+            if atom.HasProp('molAtomMapNumber'):
+                self.scaffidx_to_vector[atom.GetIdx()] = int(atom.GetProp('molAtomMapNumber'))
+        # Strip scaffold of atom mapping
+        scaffold = re.sub(r"\[([a-zA-Z]):[0-9]\]", "\\1", scaffold)
+        self.scaffold = get_mol(scaffold)
+        assert self.scaffold, f"Error parsing scaffold {scaffold}"
+
+    def _identify_new_bonds(self, molecule):
+        """
+        Identify attachment points in scaffold
+        :returns: {Attachment point: (scaffold idx, new atom idx),}
+        """
+        attachment_points = {}
+        match_idxs = molecule.GetSubstructMatch(self.scaffold)
+        vector_to_moleculeidx = {match_idxs[sidx]: vidx for sidx, vidx in self.scaffidx_to_vector.items()}
+        for idx in match_idxs:
+            atom = molecule.GetAtomWithIdx(idx)
+            neighbour_atoms = atom.GetNeighbors()
+            for natom in neighbour_atoms:
+                nidx = natom.GetIdx()
+                if nidx not in match_idxs:
+                    attachment_points[vector_to_moleculeidx[idx]] = (idx, nidx)
+        return attachment_points
+
+    def _get_all_possible_synthons(self, molecule, vidx):
+        """Apply all reactions"""
+        synthons = []
+        for reaction in self.reactions[vidx]:
+            synthons.extend(self._get_synthons(molecule, reaction))
+        return synthons
+
+    def _analyze_synthons(self, synthons, new_bond):
+        """Check to see if any synthons involved disconnecting the new bonds"""
+        available_disconnections = False
+        aidx1, aidx2 = new_bond
+
+        for synth1, synth2 in synthons:
+            synth1_idxs = set([int(atom.GetProp("react_atom_idx")) for atom in synth1.GetAtoms() if atom.HasProp("react_atom_idx")])
+            synth2_idxs = set([int(atom.GetProp("react_atom_idx")) for atom in synth2.GetAtoms() if atom.HasProp("react_atom_idx")])
+            # Stop as soon as we find a possible disconnection
+            if (aidx1 in synth1_idxs) and (aidx2 in synth2_idxs):
+                available_disconnections = True
+                break
+            elif (aidx1 in synth2_idxs) and (aidx2 in synth1_idxs):
+                available_disconnections = True
+                break
+            else:
+                pass
+        return available_disconnections
+
+    def _score_smiles(self, smiles: str):
+        """Score a single SMILES string"""
+        molecule = get_mol(smiles)
+        if molecule:
+            new_bonds = self._identify_new_bonds(molecule)
+            if not new_bonds:
+                return 0.0
+            available_disconnections = []
+            for vidx, bond in new_bonds.items():
+                # Get specified synthons per attachment point
+                synthons = self._get_all_possible_synthons(molecule, vidx)
+                # Get available disconnections per attachment points
+                available_disconnections.append(self._analyze_synthons(synthons, bond))
+            return np.sum(available_disconnections)/len(available_disconnections)
+        else:
+            return 0.0
+
+        
+
+
 
 
     
