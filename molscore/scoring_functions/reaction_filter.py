@@ -162,6 +162,7 @@ class SelectiveDecoratedReactionFilter(DecoratedReactionFilter):
         self.scaffold = get_mol(scaffold)
         assert self.scaffold, f"Error parsing scaffold {scaffold}"
         assert allowed_reactions, "Please provide a dictionary of allowed reactions mapped to reaction vectors"
+        assert all([isinstance(reactions, list) for reactions in allowed_reactions.values()]), "Reactions provided must be a list per reaction vector"
         self.reactions = {int(idx): [Chem.ReactionFromSmarts(s) for s in smirks] for idx, smirks in allowed_reactions.items()}
 
         # RDKit GetSubstructureMatch doesn't work with atom mapped molecules, so we need to remove the atom mapping and keep a record
@@ -181,14 +182,14 @@ class SelectiveDecoratedReactionFilter(DecoratedReactionFilter):
         """
         attachment_points = {}
         match_idxs = molecule.GetSubstructMatch(self.scaffold)
-        vector_to_moleculeidx = {match_idxs[sidx]: vidx for sidx, vidx in self.scaffidx_to_vector.items()}
+        molidx_to_vector = {match_idxs[sidx]: vidx for sidx, vidx in self.scaffidx_to_vector.items()}
         for idx in match_idxs:
             atom = molecule.GetAtomWithIdx(idx)
             neighbour_atoms = atom.GetNeighbors()
             for natom in neighbour_atoms:
                 nidx = natom.GetIdx()
-                if nidx not in match_idxs:
-                    attachment_points[vector_to_moleculeidx[idx]] = (idx, nidx)
+                if (nidx not in match_idxs) and (idx in molidx_to_vector):
+                    attachment_points[molidx_to_vector[idx]] = (idx, nidx)
         return attachment_points
 
     def _get_all_possible_synthons(self, molecule, vidx):
