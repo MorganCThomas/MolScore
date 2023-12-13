@@ -19,11 +19,13 @@ from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLea
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.scoring_functions.aizynthfinder import AiZynthFinder
 from molscore.scoring_functions.reaction_filter import DecoratedReactionFilter, SelectiveDecoratedReactionFilter
+from molscore.scoring_functions.silly_bits import SillyBits
 
 all_scoring_functions = [
     MolecularSimilarity, 
     TanimotoSimilarity, # Back compatability
     MolecularDescriptors,
+    SillyBits,
     RDKitDescriptors, # Back compatability
     ApplicabilityDomain,
     Isomer,
