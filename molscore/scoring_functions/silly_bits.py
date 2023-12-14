@@ -35,9 +35,9 @@ class SillyBits:
         # Load reference dataset
         reference_mols = read_smiles(reference_smiles)
         # Convert to mols from reference dataset and count fp bits
+        logger.info('Pre-processing SillyBits reference dataset')
         with Pool(self.n_jobs) as pool:
-            mols = [m for m in pool.imap(get_mol, reference_mols) if m is not None]
-            bit_counts = [bits for bits in pool.imap(self.count_bits, mols)]
+            bit_counts = [bits for bits in pool.imap(self.count_bits, reference_mols)]
         for count_dict in bit_counts:
             for k, v in count_dict.items():
                 self.count_dict[k] += v
@@ -45,6 +45,7 @@ class SillyBits:
     @staticmethod
     def count_bits(mol):
         count_dict = {}
+        mol = get_mol(mol)
         if mol is not None:
             fp = Chem.GetMorganFingerprint(mol, 2)
             for k, v in fp.GetNonzeroElements().items():
