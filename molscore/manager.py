@@ -12,6 +12,8 @@ from molscore import utils
 from molscore.gui import monitor_path
 import molscore.scaffold_memory as scaffold_memory
 
+from moleval.metrics.score_metrics import ScoreMetrics
+
 import pandas as pd
 from rdkit.Chem import AllChem as Chem
 
@@ -514,6 +516,31 @@ class MolScore:
                 logger.error(f'Monitor may not have opened/closed properly: {e}')
             self.monitor_app = None
 
+    def score_only(self, smiles: list, step: int = None, flt: bool = False):
+        batch_start = time.time()
+        if step is not None:
+            self.step = step
+        logger.info(f'   Scoring: {len(smiles)} SMILES')
+        file_names = [f'{self.step}_{i}' for i, smi in enumerate(smiles)]
+        self.run_scoring_functions(smiles=smiles, file_names=file_names)
+        logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
+        self.update_maxmin(self.results_df)
+        self.results_df = self.compute_score(self.results_df)
+        if self.diversity_filter is not None:
+            self.results_df = self.run_diversity_filter(self.results_df)
+            scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
+        else:
+            scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
+        if not flt:
+            scores = np.array(scores, dtype=np.float32)
+        logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
+
+        # Clean up class
+        self.batch_df = None
+        self.exists_df = None
+        self.results_df = None
+        return scores
+    
     def score(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
               score_only: bool = False):
         """
@@ -530,132 +557,109 @@ class MolScore:
         :return: Scores (either float list or np.array)
         """
         if score_only:
-            batch_start = time.time()
-            if step is not None:
-                self.step = step
-            logger.info(f'   Scoring: {len(smiles)} SMILES')
-            file_names = [f'{self.step}_{i}' for i, smi in enumerate(smiles)]
-            self.run_scoring_functions(smiles=smiles, file_names=file_names)
-            logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
-            self.update_maxmin(self.results_df)
-            self.results_df = self.compute_score(self.results_df)
-            if self.diversity_filter is not None:
-                self.results_df = self.run_diversity_filter(self.results_df)
-                scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
-            else:
-                scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
-            if not flt:
-                scores = np.array(scores, dtype=np.float32)
-            logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
+            return self.score_only(smiles=smiles, step=step, flt=flt)
 
-            # Clean up class
-            self.batch_df = None
-            self.exists_df = None
-            self.results_df = None
-            return scores
-
+        # Set some values
+        batch_start = time.time()
+        if step is not None:
+            self.step = step
         else:
-            # Set some values
-            batch_start = time.time()
-            if step is not None:
-                self.step = step
-            else:
-                self.step += 1
-            logger.info(f'STEP {self.step}')
-            logger.info(f'    Received: {len(smiles)} SMILES')
+            self.step += 1
+        logger.info(f'STEP {self.step}')
+        logger.info(f'    Received: {len(smiles)} SMILES')
 
-            # Parse smiles and initiate batch df
-            self.parse_smiles(smiles=smiles, step=self.step)
-            logger.debug(f'    Pre-processed: {len(self.batch_df)} SMILES')
-            logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
+        # Parse smiles and initiate batch df
+        self.parse_smiles(smiles=smiles, step=self.step)
+        logger.debug(f'    Pre-processed: {len(self.batch_df)} SMILES')
+        logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
 
-            # If a main df exists check if some molecules have already been sampled
-            if isinstance(self.main_df, pd.core.frame.DataFrame):
-                self.check_uniqueness()
-                logger.debug(f'    Uniqueness updated: {len(self.batch_df)} SMILES')
-            logger.info(f'    Duplicates found: {(self.batch_df.unique == "false").sum()} SMILES')
+        # If a main df exists check if some molecules have already been sampled
+        if isinstance(self.main_df, pd.core.frame.DataFrame):
+            self.check_uniqueness()
+            logger.debug(f'    Uniqueness updated: {len(self.batch_df)} SMILES')
+        logger.info(f'    Duplicates found: {(self.batch_df.unique == "false").sum()} SMILES')
 
-            # Subset only unique and valid smiles
-            if recalculate:
-                smiles_to_process = self.batch_df.loc[self.batch_df.valid.isin(['true', 'sanitized']),
-                                                      'smiles'].tolist()
-                smiles_to_process_index = self.batch_df.loc[self.batch_df.valid.isin(['true', 'sanitized']),
-                                                            'batch_idx'].tolist()
-            else:
-                smiles_to_process = self.batch_df.loc[(self.batch_df.valid.isin(['true', 'sanitized'])) &
-                                                      (self.batch_df.unique == 'true'), 'smiles'].tolist()
-                smiles_to_process_index = self.batch_df.loc[(self.batch_df.valid.isin(['true', 'sanitized'])) &
-                                                            (self.batch_df.unique == 'true'), 'batch_idx'].tolist()
-            if len(smiles_to_process) == 0:
-                # If no smiles to process then instead submit 10 (scoring function should handle invalid)
-                logger.info(f'    No smiles to score so submitting first 10 SMILES')
-                smiles_to_process = self.batch_df.loc[:9, 'smiles'].tolist()
-                smiles_to_process_index = self.batch_df.loc[:9, 'batch_idx'].tolist()
+        # Subset only unique and valid smiles
+        if recalculate:
+            smiles_to_process = self.batch_df.loc[self.batch_df.valid.isin(['true', 'sanitized']),
+                                                    'smiles'].tolist()
+            smiles_to_process_index = self.batch_df.loc[self.batch_df.valid.isin(['true', 'sanitized']),
+                                                        'batch_idx'].tolist()
+        else:
+            smiles_to_process = self.batch_df.loc[(self.batch_df.valid.isin(['true', 'sanitized'])) &
+                                                    (self.batch_df.unique == 'true'), 'smiles'].tolist()
+            smiles_to_process_index = self.batch_df.loc[(self.batch_df.valid.isin(['true', 'sanitized'])) &
+                                                        (self.batch_df.unique == 'true'), 'batch_idx'].tolist()
+        if len(smiles_to_process) == 0:
+            # If no smiles to process then instead submit 10 (scoring function should handle invalid)
+            logger.info(f'    No smiles to score so submitting first 10 SMILES')
+            smiles_to_process = self.batch_df.loc[:9, 'smiles'].tolist()
+            smiles_to_process_index = self.batch_df.loc[:9, 'batch_idx'].tolist()
 
-            assert len(smiles_to_process) == len(smiles_to_process_index)
-            file_names = [f'{self.step}_{i}' for i in smiles_to_process_index]
-            logger.info(f'    Scoring: {len(smiles_to_process)} SMILES')
+        assert len(smiles_to_process) == len(smiles_to_process_index)
+        file_names = [f'{self.step}_{i}' for i in smiles_to_process_index]
+        logger.info(f'    Scoring: {len(smiles_to_process)} SMILES')
 
-            # Run scoring function
-            scoring_start = time.time()
-            self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names)
-            logger.debug(f'    Returned score for {len(self.results_df)} SMILES')
-            logger.debug(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
+        # Run scoring function
+        scoring_start = time.time()
+        self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names)
+        logger.debug(f'    Returned score for {len(self.results_df)} SMILES')
+        logger.debug(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
 
-            # Append scoring results
-            if isinstance(self.main_df, pd.core.frame.DataFrame) and not recalculate:
-                self.concurrent_update()
-            else:
-                self.first_update()
-            logger.debug(f'    Scores updated: {len(self.batch_df)} SMILES')
+        # Append scoring results
+        if isinstance(self.main_df, pd.core.frame.DataFrame) and not recalculate:
+            self.concurrent_update()
+        else:
+            self.first_update()
+        logger.debug(f'    Scores updated: {len(self.batch_df)} SMILES')
 
-            # Compute average / score
-            self.update_maxmin(df=self.batch_df)
-            self.batch_df = self.compute_score(df=self.batch_df)
-            logger.debug(f'    Aggregate score calculated: {len(self.batch_df)} SMILES')
-            if self.diversity_filter is not None:
-                self.batch_df = self.run_diversity_filter(self.batch_df)
-                logger.info(f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} SMILES')
+        # Compute average / score
+        self.update_maxmin(df=self.batch_df)
+        self.batch_df = self.compute_score(df=self.batch_df)
+        logger.debug(f'    Aggregate score calculated: {len(self.batch_df)} SMILES')
+        if self.diversity_filter is not None:
+            self.batch_df = self.run_diversity_filter(self.batch_df)
+            logger.info(f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} SMILES')
 
-            # Add information of scoring time
-            self.batch_df['score_time'] = time.time() - scoring_start
+        # Add information of scoring time
+        self.batch_df['score_time'] = time.time() - scoring_start
 
-            # Append batch df to main df if it exists, else initialise it.
-            if isinstance(self.main_df, pd.core.frame.DataFrame):
-                # update indexing based on most recent index
-                self.batch_df.index = self.batch_df.index + self.main_df.index[-1] + 1
-                self.main_df = pd.concat([self.main_df, self.batch_df], axis=0) # self.main_df.append(self.batch_df)
-            else:
-                self.main_df = self.batch_df.copy()
+        # Append batch df to main df if it exists, else initialise it.
+        if isinstance(self.main_df, pd.core.frame.DataFrame):
+            # update indexing based on most recent index
+            self.batch_df.index = self.batch_df.index + self.main_df.index[-1] + 1
+            self.main_df = pd.concat([self.main_df, self.batch_df], axis=0) # self.main_df.append(self.batch_df)
+        else:
+            self.main_df = self.batch_df.copy()
 
-            # Write out csv log for each iteration
-            self.batch_df.to_csv(os.path.join(self.save_dir, 'iterations', f'{self.step:06d}_scores.csv'))
+        # Write out csv log for each iteration
+        self.batch_df.to_csv(os.path.join(self.save_dir, 'iterations', f'{self.step:06d}_scores.csv'))
 
-            # Start dash_utils monitor to track iteration files once first one is written!
-            if self.monitor_app is True:
-                self.run_monitor()
+        # Start dash_utils monitor to track iteration files once first one is written!
+        if self.monitor_app is True:
+            self.run_monitor()
 
-            # Fetch score
-            if self.diversity_filter is not None:
-                scores = self.batch_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
-            else:
-                scores = self.batch_df.loc[:, self.configs['scoring']['method']].tolist()
-            if not flt:
-                scores = np.array(scores, dtype=np.float32)
-            logger.debug(f'    Returning: {len(scores)} scores')
-            logger.info(f'    MolScore elapsed time: {time.time() - batch_start:.02f}s')
+        # Fetch score
+        if self.diversity_filter is not None:
+            scores = self.batch_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
+        else:
+            scores = self.batch_df.loc[:, self.configs['scoring']['method']].tolist()
+        if not flt:
+            scores = np.array(scores, dtype=np.float32)
+        logger.debug(f'    Returning: {len(scores)} scores')
+        logger.info(f'    MolScore elapsed time: {time.time() - batch_start:.02f}s')
 
-            # Write out memory intermittently
-            if self.step % 5 == 0:
-                if (self.diversity_filter is not None) and (self.diversity_filter not in ['Unique', 'Occurrence']):
-                    self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
+        # Write out memory intermittently
+        if self.step % 5 == 0:
+            if (self.diversity_filter is not None) and (self.diversity_filter not in ['Unique', 'Occurrence']):
+                self.diversity_filter.savetocsv(os.path.join(self.save_dir, 'scaffold_memory.csv'))
 
-            # Clean up class
-            self.batch_df = None
-            self.exists_df = None
-            self.results_df = None
+        # Clean up class
+        self.batch_df = None
+        self.exists_df = None
+        self.results_df = None
 
-            return scores
+        return scores
     
     def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
                  score_only: bool = False):
@@ -676,4 +680,29 @@ class MolScore:
             logger.warning(f'Calling MolScore directly will be removed in the future, please use .score() instead.')
             self.call2score_warning = False
         return self.score(smiles=smiles, step=step, flt=flt, recalculate=recalculate, score_only=score_only)
+
+    # Additional methods only run if called directly
+
+    def compute_metrics(self, endpoints: list = None, thresholds: list = None, chemistry_filters_basic=True, budget=None, n_jobs=1, target_smiles=None):
+        """
+        Compute a suite of metrics
+
+        :param endpoints: List of endpoints to compute metrics for e.g., 'amean', 'docking_score' etc.
+        :param thresholds: List of thresholds to compute metrics for
+        :param chemistry_filters_basic: Whether to apply basic chemistry filters
+        :budget: Budget to compute metrics for
+        :n_jobs: Number of jobs to use for parallelisation
+        :target_smiles: List of target smiles to compute metrics for
+        """
+        if endpoints is None:
+            endpoints = [self.configs["scoring"]["method"]]
+        else:
+            assert all([ep in self.main_df.columns for ep in endpoints])
+        if thresholds is None:
+            thresholds = [0.0]
+        SM = ScoreMetrics(scores=self.main_df, budget=budget, n_jobs=n_jobs, target_smiles=target_smiles)
+        results = SM.get_metrics(endpoints=endpoints, thresholds=thresholds, chemistry_filters_basic=chemistry_filters_basic)
+        # Change the name of the default score to "Score"
+        results = {k.replace(self.configs["scoring"]["method"], "Score"): v for k,v in results.items()}
+        return results
         

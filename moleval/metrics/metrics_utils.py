@@ -34,7 +34,7 @@ def mapper(n_jobs):
     Returns function for map call.
     If n_jobs == 1, will use standard map
     If n_jobs > 1, will use multiprocessing pool
-    If n_jobs is a pool object, will return its map function
+    If n_jobs is a pool False, will return its map function
     '''
     if n_jobs == 1:
         def _mapper(*args, **kwargs):
@@ -536,9 +536,7 @@ class SillyWalks:
     def __init__(self, reference_mols, n_jobs=1):
         self.count_dict = defaultdict(int)
         self._n_jobs = n_jobs
-        #print('Computing baseline FP bits')
-        mols = [m for m in mapper(self._n_jobs)(get_mol, reference_mols) if m is not None]
-        bit_counts = mapper(self._n_jobs)(self.count_bits, mols)
+        bit_counts = mapper(self._n_jobs)(self.count_bits, reference_mols)
         for count_dict in bit_counts:
             for k, v in count_dict.items():
                 self.count_dict[k] += v
@@ -546,6 +544,7 @@ class SillyWalks:
     @staticmethod
     def count_bits(mol):
         count_dict = {}
+        mol = get_mol(mol)
         if mol is not None:
             fp = AllChem.GetMorganFingerprint(mol, 2)
             for k, v in fp.GetNonzeroElements().items():

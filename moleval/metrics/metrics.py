@@ -460,7 +460,7 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     :param normalize:
     :return:
     """
-    assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray)
+    assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray) or isinstance(gen[0], str)
 
     if k is not None:
         if len(gen) < k:
@@ -470,13 +470,16 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
             )
         np.random.seed(123)
         idxs = np.random.choice(list(range(len(gen))), k, replace=False)
-        if isinstance(gen[0], rdkit.Chem.rdchem.Mol): 
+        if isinstance(gen[0], (rdkit.Chem.rdchem.Mol, str)): 
             gen = [gen[i] for i in idxs]
         else: 
             gen = gen[idxs]
 
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
+    elif isinstance(gen[0], str):
+        gen_mols = mapper(n_jobs)(get_mol, gen)
+        gen_fps = fingerprints(gen_mols, fp_type=fp_type, n_jobs=n_jobs)
     else:
         gen_fps = gen
 
