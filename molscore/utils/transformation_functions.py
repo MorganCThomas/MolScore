@@ -155,6 +155,7 @@ def plot_mod(mod, func_kwargs: dict):
     plt.xlabel('E.g input')
     plt.ylabel('E.g output')
     plt.title(mod.__name__)
+    plt.grid()
     #plt.legend()
     return fig
 
