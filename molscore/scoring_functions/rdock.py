@@ -8,6 +8,7 @@ from functools import partial
 from typing import Union
 from itertools import takewhile
 from tempfile import TemporaryDirectory
+from importlib import resources
 
 from rdkit import Chem
 
@@ -34,6 +35,21 @@ class rDock:
         'NetCharge', 'PositiveCharge', 'NegativeCharge',
         'best_variant'
         ]
+    presets = {
+        "5HT2A": {
+            "receptor": resources.files('molscore.data.structures.6A93').joinpath("6A93p_rec.pdb"),
+            "ref_ligand": resources.files('molscore.data.structures.6A93').joinpath('6A93p_risperidone.sdf'),
+        },
+        "5HT2A-3x32": {
+            "receptor": resources.files('molscore.data.structures.6A93').joinpath('6A93p_rec.pdb'),
+            "ref_ligand": resources.files('molscore.data.structures.6A93').joinpath('6A93p_risperidone.sdf'),
+            "dock_constraints": resources.files('molscore.data.structures.6A93').joinpath('6A93p_3x32Cat.restr'),
+        },
+        "DRD2": {
+            "receptor": resources.files('molscore.data.structures.6CM4').joinpath('6CM4p_rec.pdb'),
+            "ref_ligand": resources.files('molscore.data.structures.6CM4').joinpath('6CM4p_risperidone.sdf'),
+        }
+    }
 
     @staticmethod
     def check_installation():
@@ -115,7 +131,7 @@ END_SECTION
 """
         return config
 
-    def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
+    def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None,
                  cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
                  dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
@@ -124,6 +140,7 @@ END_SECTION
                  **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2]
         :param receptor: Path to receptor file (.pdb)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
@@ -132,12 +149,23 @@ END_SECTION
         :param dock_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param n_runs: Number of docking trials (poses to return)
-        :param dock_constrains: Path to rDock pharmacophoric constriants file that are mandatory
+        :param dock_constraints: Path to rDock pharmacophoric constriants file that are mandatory
         :param dock_opt_constraints: Path to rDock pharmacophoric constriants file that are optional
         :param dock_n_opt_constraints: Number of optional constraints required
         """
         # Check rDock installation
         assert self.check_installation() is not None, "Could not find rDock path, please ensure proper installation"
+
+        # Check if preset is provided
+        assert preset or (receptor and ref_ligand), "Either preset or receptor and ref_ligand must be provided"
+        if preset:
+            assert preset in self.presets.keys(), f"preset must be one of {self.presets.keys()}"
+            receptor = str(self.presets[preset]['receptor'])
+            ref_ligand = str(self.presets[preset]['ref_ligand'])
+            if 'dock_constraints' in self.presets[preset].keys():
+                dock_constraints = str(self.presets[preset]['dock_constraints'])
+            if 'dock_opt_constraints' in self.presets[preset].keys():
+                dock_opt_constraints = str(self.presets[preset]['dock_opt_constraints'])
 
         # Control subprocess in/out
         self.subprocess = timedSubprocess(timeout=None, shell=True)

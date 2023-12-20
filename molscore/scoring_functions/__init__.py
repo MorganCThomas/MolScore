@@ -1,3 +1,4 @@
+#################### List of all scoring functions ####################
 from molscore.scoring_functions.glide import GlideDock
 from molscore.scoring_functions.plants import PLANTSDock
 from molscore.scoring_functions.gold import GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
@@ -60,7 +61,7 @@ try:
     from molscore.scoring_functions.oedock import OEDock
     all_scoring_functions += [ROCS, GlideDockFromROCS, OEDock]
 except ImportError:
-    pass # print("To use openeye scoring functions please install openeye and acquire a license")
+    print("To use openeye scoring functions please install openeye and acquire a license")
 
 try:
     from molscore.scoring_functions.chemprop import ChemPropModel

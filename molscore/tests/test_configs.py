@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import tempfile
 from tqdm import tqdm
 from glob import glob
 
@@ -11,27 +12,37 @@ from molscore.manager import MolScore
 def main(configs: list):
     mg = MockGenerator()
     for config in configs:
-        # Ensure output directory is correct
+        print(f"\nTesting: {config}")
+        # Ensure output directory re-directed to test_out
         with open(config, 'rt') as f:
             cf = json.load(f)
         cf['output_dir'] = os.path.join(os.path.dirname(__file__), 'test_out')
-        with open(config, 'wt') as f:
-            json.dump(cf, f, indent=2)
-        # Run
-        print(f"Running {os.path.basename(config).split('.')[0]}:")
-        ms = MolScore(model_name='test', task_config=config)
-        # Score 5 smiles 5 times
-        for i in tqdm(range(5)):
-            ms(mg.sample(5))
-        ms.write_scores()
-        ms.kill_monitor()
+        with tempfile.NamedTemporaryFile(mode='wt') as tconfig:
+            with open(tconfig.name, 'wt') as f:
+                json.dump(cf, f, indent=2)
+            # Run
+            print(f"Running {os.path.basename(config).split('.')[0]}:")
+            ms = MolScore(model_name='test', task_config=tconfig.name)
+            # Score 5 smiles 5 times
+            for i in tqdm(range(5)):
+                output = ms(mg.sample(5))
+            ms.write_scores()
+            ms.kill_monitor()
+            print(f"Output:\n{ms.main_df.head()}\n")
     return
 
 
 if __name__ == '__main__':
+    configs = []
     if len(sys.argv) == 1:
-        os.chdir(os.path.join(os.path.dirname(__file__), 'configs'))
-        configs = glob('*.json')
+        print('No config files or directories of config files provided')
     else:
-        configs = sys.argv[1:]
+        for arg in sys.argv[1:]:
+            if not os.path.exists(arg):
+                print(f'{arg} does not exist')
+            else:
+                if os.path.isdir(arg):
+                    configs.extend(glob(os.path.join(arg, '*.json')))
+                else:
+                    configs.append(arg)
     main(configs)
