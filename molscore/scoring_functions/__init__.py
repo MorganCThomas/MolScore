@@ -11,7 +11,7 @@ from molscore.scoring_functions.external_server import POSTServer
 from molscore.scoring_functions.align3d import Align3D
 from molscore.scoring_functions.pidgin import PIDGIN
 from molscore.scoring_functions.legacy_qsar import LegacyQSAR
-from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors
+from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors, LinkerDescriptors
 from molscore.scoring_functions.isomer import Isomer
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
 from molscore.scoring_functions.substructure_match import SubstructureMatch
@@ -25,6 +25,7 @@ all_scoring_functions = [
     MolecularSimilarity, 
     TanimotoSimilarity, # Back compatability
     MolecularDescriptors,
+    LinkerDescriptors,
     SillyBits,
     RDKitDescriptors, # Back compatability
     ApplicabilityDomain,
