@@ -241,7 +241,7 @@ class MolScore:
                     self.batch_df.loc[self.batch_df.smiles == smi, 'occurrences'] += len(tdf)
         return self
 
-    def run_scoring_functions(self, smiles: list, file_names: list):
+    def run_scoring_functions(self, smiles: list, file_names: list, additional_formats: dict = None):
         """
         Calculate respective scoring function scores for a list of unique smiles
          (with file names for logging if necessary).
@@ -251,7 +251,7 @@ class MolScore:
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
         for function in self.scoring_functions:
-            results = function(smiles=smiles, directory=self.save_dir, file_names=file_names)
+            results = function(smiles=smiles, directory=self.save_dir, file_names=file_names, additional_formats=additional_formats)
             results_df = pd.DataFrame(results)
 
             if self.results_df is None:
@@ -542,7 +542,7 @@ class MolScore:
         return scores
     
     def score(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
-              score_only: bool = False):
+              score_only: bool = False,  additional_formats=None, **kwargs):
         """
         Calling this method will result in the primary function of scoring smiles and logging data in
          an automated fashion, and returning output values.
@@ -600,9 +600,13 @@ class MolScore:
         file_names = [f'{self.step}_{i}' for i in smiles_to_process_index]
         logger.info(f'    Scoring: {len(smiles_to_process)} SMILES')
 
+        # If additional formats are specified, then index and run these too
+        if additional_formats is not None:
+            additional_formats = {k: [m for i, m in enumerate(v) if i in smiles_to_process_index] for k, v in additional_formats.items()}
+
         # Run scoring function
         scoring_start = time.time()
-        self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names)
+        self.run_scoring_functions(smiles=smiles_to_process, file_names=file_names, additional_formats=additional_formats)
         logger.debug(f'    Returned score for {len(self.results_df)} SMILES')
         logger.debug(f'    Scoring elapsed time: {time.time() - scoring_start:.02f}s')
 
@@ -662,7 +666,7 @@ class MolScore:
         return scores
     
     def __call__(self, smiles: list, step: int = None, flt: bool = False, recalculate: bool = False,
-                 score_only: bool = False):
+                 score_only: bool = False, additional_formats=None):
         """
         Calling MolScore will result in the primary function of scoring smiles and logging data in
          an automated fashion, and returning output values.
@@ -676,10 +680,10 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return
         :return: Scores (either float list or np.array)
         """
-        if self.call2score_warning:
-            logger.warning(f'Calling MolScore directly will be removed in the future, please use .score() instead.')
-            self.call2score_warning = False
-        return self.score(smiles=smiles, step=step, flt=flt, recalculate=recalculate, score_only=score_only)
+        #if self.call2score_warning:
+        #    logger.warning(f'Calling MolScore directly will be removed in the future, please use .score() instead.')
+        #    self.call2score_warning = False
+        return self.score(smiles=smiles, step=step, flt=flt, recalculate=recalculate, score_only=score_only, additional_formats=additional_formats)
 
     # Additional methods only run if called directly
 
