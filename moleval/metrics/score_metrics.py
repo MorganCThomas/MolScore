@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from functools import partial
 from molbloom import buy
 
+from moleval.utils import Fingerprints, maxmin_picker
 from moleval.metrics.metrics import se_diversity, FingerprintAnaloguesMetric
 from moleval.metrics.metrics_utils import compute_scaffold, mapper, neutralize_atoms
 from moleval.metrics.chemistry_filters import ChemistryFilter
@@ -31,7 +33,7 @@ class ScoreMetrics:
     def tcf_scores(self):
         if self._tcf_scores is None:
             self._tcf_scores = self.scores.iloc[self.chemistry_filter.filter_molecules(self.scores.smiles.tolist(), basic=False, target=True)]
-        return self.tcf_scores
+        return self._tcf_scores
 
     @property
     def btcf_scores(self):
@@ -113,7 +115,8 @@ class ScoreMetrics:
                 cumsum[i] += (self.budget - len(tdf)) * n_now
         return [x/self.budget for x in cumsum]
 
-    def mol_yield(self, endpoint, threshold, scaffold=False, basic_filter=False, target_filter=False):
+    def tyield(self, endpoint, threshold, scaffold=False, basic_filter=False, target_filter=False):
+        """Threshold yield"""
         # Filter by chemistry
         tdf = self.filter(basic=basic_filter, target=target_filter)
         # Get number of hits
@@ -121,6 +124,47 @@ class ScoreMetrics:
         if scaffold:
             hits = hits.scaffold.dropna().unique()
         return len(hits) / self.budget
+
+    def tyield_auc(self, endpoint, threshold, window=100, extrapolate=True, scaffold=False, basic_filter=False, target_filter=False, return_trajectory=False):
+        """Return the AUC of the thresholded yield"""
+        # Filter by chemistry
+        tdf = self.filter(basic=basic_filter, target=target_filter)
+
+        cumsum = 0
+        prev = 0
+        called = 0
+        indices = []
+        yields = []
+        # Per log freq
+        for idx in range(window, min(len(tdf), self.budget), window):
+            temp_result = tdf.iloc[:idx]
+            # Get number of hits
+            temp_hits = temp_result.loc[temp_result[endpoint] >= threshold]
+            if scaffold:
+                temp_hits = temp_hits.scaffold.dropna().unique()
+            temp_yield = len(temp_hits)
+            cumsum += window * (temp_yield + prev) / 2
+            prev = temp_yield
+            called = idx
+            indices.append(idx)
+            yields.append(temp_yield)
+        # Final cumsum
+        hits = tdf.loc[tdf[endpoint] >= threshold]
+        if scaffold:
+            hits = hits.scaffold.dropna().unique()
+        tyield = len(hits)
+        cumsum += (len(tdf) - called) * (tyield + prev) / 2
+        indices.append(len(tdf))
+        yields.append(tyield)
+        # If finished early, extrapolate
+        if extrapolate and len(tdf) < self.budget:
+            cumsum += (self.budget - len(tdf)) * tyield
+            indices.append(self.budget)
+            yields.append(tyield)
+        if return_trajectory:
+            return cumsum / self.budget, indices, yields
+        else:
+            return cumsum / self.budget
 
     def targets_rediscovered(self, smiles, scaffold=False):
         # Neutralize & canonize smiles
@@ -171,8 +215,10 @@ class ScoreMetrics:
                 # Yield ('Hits' / 'Budget')
                 try:
                     metrics.update({
-                        prefix+f"Yield {endpoint}": self.mol_yield(endpoint=endpoint, threshold=thresholds[i], basic_filter=basic, target_filter=target),
-                        prefix+f"Yield Scaffold {endpoint}": self.mol_yield(endpoint=endpoint, threshold=thresholds[i], scaffold=True, basic_filter=basic, target_filter=target)
+                        prefix+f"Yield {endpoint}": self.tyield(endpoint=endpoint, threshold=thresholds[i], basic_filter=basic, target_filter=target),
+                        prefix+f"Yield AUC {endpoint}": self.tyield_auc(endpoint=endpoint, threshold=thresholds[i], window=100, extrapolate=True, basic_filter=basic, target_filter=target),
+                        prefix+f"Yield Scaffold {endpoint}": self.tyield(endpoint=endpoint, threshold=thresholds[i], scaffold=True, basic_filter=basic, target_filter=target),
+                        prefix+f"Yield AUC Scaffold {endpoint}": self.tyield_auc(endpoint=endpoint, threshold=thresholds[i], scaffold=True, window=100, extrapolate=True, basic_filter=basic, target_filter=target)
                         })
                 except IndexError:
                     pass
@@ -207,19 +253,165 @@ class ScoreMetrics:
             metrics['Predicted Purchasability'] = np.mean(mapper(self.n_jobs)(buy, self.scores.smiles.tolist()))
         return metrics
 
-    def plot_endpoint(self, x=None, y=None, label=None):
-        """Return the axis of a plot"""
-        # X = ["Step", "Index"]
-        # Y = ["Any endpoint"]
-        # TODO endpoint optimization
-        raise NotImplementedError
+    def plot_endpoint(self, endpoint, x='index', label=None, chemistry_filters_basic=False, chemistry_filter_target=False,
+                      window=100):
+        """
+        Return the axis of a plot
+        :param x: Either "index" or "step"
+        :param y: Endpoint to plot
+        :param label: Label for the legend
+        :param chemistry_filters_basic:
+        :param chemistry_filters_target:
+        :param window: If plotting index, what window to average values over
+        """
+        if label is None:
+            label = endpoint
 
-    def plot_yield():
-        # TODO
-        raise NotImplementedError
+        tdf = self.filter(basic=chemistry_filters_basic, target=chemistry_filter_target)
+        
+        if endpoint not in tdf.columns:
+            print(f"Couldn't find endpoint {endpoint} for plotting")
+            return
+        
+        if x == 'index':
+            tdf['window'] = (np.arange(len(tdf))//window) + 1
+            ax = sns.lineplot(data=tdf, x='window', y=endpoint, label=label.capitalize(), palette='husl')
+            xlabels = [f'{int(x)*window/1000:.1f}k' for x in ax.get_xticks()]
+            ax.set_xticklabels(xlabels)
+        
+        else:
+            ax = sns.lineplot(data=tdf, x=x, y=endpoint, label=label.capitalize(), palette='husl')
+        
+        ax.set_xlabel(x.capitalize())
+        ax.set_ylabel("Value")
+        ax.set_xlim(0, None)
+        return ax
 
-    def get_chemistry():
-        # TODO top? molecules for each chemistry filter? or a diverse selection? or a random selection? or most similar to target?
-        raise NotImplementedError
+    def plot_yield(self,
+        endpoint, threshold, label=None, window=100, extrapolate=True, scaffold=False,
+        chemistry_filters_basic=False, chemistry_filter_target=False
+    ):
+        """
+        Plot the yield according to some endpoint and threshold, example, ratio of molecules with reward > 0.8.
+        """
+        if label is None:
+            label = endpoint
+
+        if endpoint not in self.scores.columns:
+            print(f"Couldn't find endpoint {y} for plotting")
+            return
+            
+        tyield, x, y = self.tyield_auc(
+            endpoint=endpoint, threshold=threshold, window=window, extrapolate=extrapolate, scaffold=scaffold,
+            basic_filter=chemistry_filters_basic, target_filter=chemistry_filter_target, return_trajectory=True
+        )
+        
+        ax = sns.lineplot(x=x,y=y, palette='husl', label=label.capitalize())
+        ax.set_ylabel("Yield")
+        ax.set_xlabel("Index")
+        ax.set_xticklabels([f'{int(x)/1000}k' for x in ax.get_xticks()])
+        return ax
+
+    def _get_chemistry(self, tdf, n=5, scaffold=False, selection=None):
+        mol_key = 'smiles' if not scaffold else 'scaffold'
+        # If diverse or random
+        if selection:
+            if selection == 'diverse':
+                mols = maxmin_picker(dataset=tdf[mol_key].tolist(), n=n)
+                mols = [Chem.MolToSmiles(m) for m in mols]
+            elif selection == 'random':
+                mols = tdf[mol_key].sample(n).tolist()
+            elif selection == 'similar':
+                assert self.target_smiles, "Target SMILES are needed to identify similar chemistry"
+                # Calculate fps
+                ECFP = partial(Fingerprints.ECFP4, nBits=1024)
+                query_fps = [fp for fp in mapper(self.n_jobs)(ECFP, tdf[mol_key].tolist())]
+                ref_fps = [fp for fp in mapper(self.n_jobs)(ECFP, self.target_smiles if not scaffold else self.target_scaffolds)]
+                # Calculate SNNs
+                tdf['SNNs'] = [DataStructs.BulkTanimotoSimilarity(qfp, ref_fps) for qfp in query_fps]
+                # Sort by SNN
+                mols = tdf.sort_values(by='SNNs', ascending=False)[mol_key].iloc[:n].tolist()
+            else:
+                raise ValueError(f"Unknown type of selection method {selection}, please select out of [diverse, random, similar]")
+        else: # Top
+            mols = tdf[mol_key].iloc[:n].tolist()
+        return mols
+
+    def get_chemistry(
+        self,
+        endpoint,
+        n=5,
+        scaffold=False,
+        window=100,
+        selection=None,
+        chemistry_filters_basic=False,
+        chemistry_filters_target=False,
+        bad_only=False
+        ):
+        """
+        Return some example chemistry
+        :param endpoint: Used to sort molecules in descending order assuming higher is better
+        :param n: How many molecules to return
+        :param scaffold: Scaffold chemistry
+        :param window: A subset to search in, e.g., 100 results in a random selection within the top 100 molecules.
+        :param selection: How to select molecules in the window. Random, Diverse, Similarity to target or None (Top N)
+        :param chemistry_filters_basic: 
+        :param chemistry_filters_target:
+        :param bad_only: Only return chemistry that fails chemistry_filters_basic
+        """
+        tdf = self.scores
+        # Chemisry Filters
+        if bad_only:
+            bad_idxs = [i for i in range(len(tdf)) if i not in self.chemistry_filter.filter_molecules(tdf.smiles.tolist(), basic=True, target=False)]
+            tdf = tdf.iloc[bad_idxs]
+        else:
+            tdf = self.filter(basic=chemistry_filters_basic, target=chemistry_filters_target)
+        
+        # Sort by endpoint
+        tdf = tdf.sort_values(by=endpoint, ascending=False)
+        
+        # If scaffold, drop duplicate scaffolds (largest score is kept)
+        if scaffold:
+            tdf = tdf.drop_duplicates(subset='scaffold')
+        
+        # Subset window
+        if window:
+            tdf = tdf.iloc[:window]
+            
+        return self._get_chemistry(tdf, n=n, scaffold=scaffold, selection=selection)
+
+    def get_chemistry_trajectory(
+        self,
+        endpoint,
+        n=5,
+        scaffold=False,
+        window=100,
+        selection=None,
+        chemistry_filters_basic=False,
+        chemistry_filters_target=False,
+        bad_only=False
+        ):
+        """
+        The same as get_chemistry but repeated over the course of de novo generation
+        """
+        tdf = self.scores
+        # Chemisry Filters
+        if bad_only:
+            bad_idxs = [i for i in range(len(tdf)) if i not in self.chemistry_filter.filter_molecules(tdf.smiles.tolist(), basic=True, target=False)]
+            tdf = tdf.iloc[bad_idxs]
+        else:
+            tdf = self.filter(basic=chemistry_filters_basic, target=chemistry_filters_target)
+        
+        # Sort by endpoint
+        tdf = tdf.sort_values(by=endpoint, ascending=False)
+        
+        # If scaffold, drop duplicate scaffolds (largest score is kept)
+        if scaffold:
+            tdf = tdf.drop_duplicates(subset='scaffold')
+
+        trajectory_mols = []
+        for idx in range(0, len(tdf), window):
+            trajectory_mols.append(self._get_chemistry(tdf.iloc[idx:idx+window], n=n, scaffold=scaffold, selection=selection))
+        return trajectory_mols
 
         
