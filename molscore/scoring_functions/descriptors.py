@@ -279,7 +279,7 @@ class LinkerDescriptors(MolecularDescriptors):
         for idx1, idx2 in combinations(at_pts, 2):
             effective_lengths.append(distances[idx1, idx2])
         if effective_lengths: 
-            effective_length = max(effective_lengths)
+            effective_length = min(effective_lengths)
         else:
             effective_length = 0.0
         descs["EffectiveLength"] = int(effective_length)
