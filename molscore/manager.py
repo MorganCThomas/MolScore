@@ -333,10 +333,12 @@ class MolScore:
         """
 
         mpo_columns = {"names": [], "weights": []}
+        # TODO add filter columns with names
         # Iterate through specified metrics and apply modifier
         transformed_columns = []
         for metric in self.configs['scoring']['metrics']:
             mod_name = f"{metric['modifier']}_{metric['name']}"
+            # TODO if filter add to filter_columns else mpo_columns
             mpo_columns["names"].append(mod_name)
             mpo_columns["weights"].append(metric['weight'])
 
@@ -376,6 +378,14 @@ class MolScore:
             axis=1,
             raw=True
         )
+
+        # TODO for each metric in filter_columns, merge filters into one column 'filter', multiply final score
+        
+        # Penalize invalid molecules explicitly with a score of 0.0
+        df[self.configs['scoring']['method']] = df.apply(
+            lambda x: x[self.configs['scoring']['method']] if x['valid'] == 'true' else 0.0,
+            axis=1
+            )
 
         return df
 
