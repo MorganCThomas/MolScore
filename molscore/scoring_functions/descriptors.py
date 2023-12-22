@@ -329,10 +329,11 @@ class LinkerDescriptors(MolecularDescriptors):
         if lmol.GetNumBonds() > 0:
             descs["NumRotatableBonds"] = self._linker_rotatable_bonds(lmol)
             descs["RatioRotatableBonds"] = descs["NumRotatableBonds"] / lmol.GetNumBonds()
+            descs["MaxConsecutiveRotatableBonds"] = self._linker_rotatable_bonds(lmol, max_consecutive=True)
         else:
             descs["NumRotatableBonds"] = 0.0
             descs["RatioRotatableBonds"] = 0.0
-        descs["MaxConsecutiveRotatableBonds"] = self._linker_rotatable_bonds(lmol, max_consecutive=True)
+            descs["MaxConsecutiveRotatableBonds"] = 0.0
         
         return descs
 
