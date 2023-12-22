@@ -175,26 +175,68 @@ class DaskUtils:
     # TODO add dask-ssh cluster
 
     @classmethod
-    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, processes=True, logger=None):
-        """Processes=False must be used if launching child subprocesses"""
+    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, logger=None):
         client = None
+        client = cls._setup_from_environment(local_directory=local_directory)
+        if client is None:
+            client = cls._setup_from_arguments(cluster_address_or_n_workers, local_directory=local_directory)
+        if (logger is not None) and (client is None) and (cluster_address_or_n_workers is not None):
+            logger.warning(f"Unrecognized dask input: {cluster_address_or_n_workers}")
+        return client
 
-        # Check if it's a string
-        if isinstance(cluster_address_or_n_workers, str):
-            client = Client(cluster_address_or_n_workers)
-            print(f"Dask worker dashboard: {client.dashboard_link}")
-        # Or a number
-        elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
-            #if int(cluster_address_or_n_workers) > 1:
-            # processes=False may be needed to run nested subprocesses, only if local, otherwise --no-nanny via CLI
-            cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), processes=processes, threads_per_worker=1, local_directory=local_directory)
-            client = Client(cluster)
-            print(f"Dask worker dashboard: {client.dashboard_link}")
-        # Or is unrecognized
+    @staticmethod
+    def _local_client(n_workers: float, local_directory=None):
+        cluster = LocalCluster(n_workers=int(n_workers), processes=True, threads_per_worker=1, local_directory=local_directory)
+        client = Client(cluster)
+        print(f"Dask worker dashboard: {client.dashboard_link}")
+        return client
+
+    @staticmethod
+    def _distributed_client(address: str):
+        client = Client(address)
+        print(f"Dask worker dashboard: {client.dashboard_link}")
+        return client
+
+    @staticmethod
+    def _environment_address():
+        if 'MOLSCORE_CLUSTER' in os.environ.keys():
+            return os.environ['MOLSCORE_CLUSTER']
         else:
-            if (logger is not None) and (cluster_address_or_n_workers is not None):
-                logger.warning(f"Unrecognized dask input {cluster_address_or_n_workers}")
+            return False
 
+    @staticmethod
+    def _environment_njobs():
+        if 'MOLSCORE_NJOBS' in os.environ.keys():
+            return int(os.environ['MOLSCORE_NJOBS'])
+        else:
+            return False
+
+    @classmethod
+    def _setup_from_environment(cls, local_directory=None):
+        env_cluster = cls._environment_address()
+        env_njobs = cls._environment_njobs()
+        if env_cluster:
+            print(f"Identified an environment cluster address ({env_cluster}), this overrides any config parameters.")
+            client = cls._distributed_client(env_cluster)
+            nworkers = len(client.scheduler_info()['workers'])
+            print(f"Connected to scheduler {env_cluster} with {nworkers} workers, to change this behaviour remove this variable via <unset MOLSCORE_CLUSTER>")
+        elif env_njobs:
+            print(f"Identified an environment specifying {env_njobs} workers, this overrides any config parameters.")
+            client = cls._local_client(n_workers=int(env_njobs), local_directory=local_directory)
+            nworkers = len(client.scheduler_info()['workers'])
+            print(f"Local cluster created with {nworkers} workers, to change this behaviour remove this variable via <unset MOLSCORE_NJOBS>")
+        else:
+            client = None
+        return client
+
+    @classmethod
+    def _setup_from_arguments(cls, cluster_address_or_n_workers=None, local_directory=None):
+        if isinstance(cluster_address_or_n_workers, str):
+            client = cls._distributed_client(fcluster_address_or_n_workers)
+        elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
+            client = cls._local_client(cluster_address_or_n_workers)
+        else:
+            client = None
         return client
 
 # ----- Zenodo related ------
