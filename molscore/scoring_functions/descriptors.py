@@ -257,6 +257,26 @@ class LinkerDescriptors(MolecularDescriptors):
         smiles = smiles.replace("(*)", "").replace("*", "")
         return smiles
 
+    @staticmethod
+    def _linker_rotatable_bonds(lmol, max_consecutive: bool = False):
+        if max_consecutive:
+            rotatable_bonds = MolecularDescriptors.max_consecutive_rotatable_bonds(lmol)
+        else:
+            rotatable_bonds = Descriptors.NumRotatableBonds(lmol)
+
+        # Add correction assuming bond to fragment is rotatable if not a ring connection
+        correction = 0
+        if lmol.GetNumBonds() > 1:
+            for atom in lmol.GetAtoms():
+                if (atom.GetSymbol() == "*") and not (atom.IsInRing()):
+                    correction += 1
+        else:
+            bond = lmol.GetBonds()[0]
+            if bond.GetBondType() == Chem.rdchem.BondType.SINGLE:
+                correction = 1
+
+        return rotatable_bonds + correction
+
     def _score(self, linker: str):
         descs = {}
         if not linker:
@@ -267,7 +287,6 @@ class LinkerDescriptors(MolecularDescriptors):
         if not lmol:
             return {m: 0.0 for m in self.return_metrics}
 
-        # ----- With at pts
         # Get attachment point indices
         at_pts = []
         for atom in lmol.GetAtoms():
@@ -288,13 +307,6 @@ class LinkerDescriptors(MolecularDescriptors):
         descs["MaxLength"] = int(max_length)
         # Calculate ratio
         descs["LengthRatio"] = effective_length / max_length
-        
-        # ----- Without at pts
-        # Strip attachment points to linker
-        linker = self._strip_attachment_points(linker)
-        lmol = Chem.MolFromSmiles(linker)
-        if not lmol:
-            return {m: 0.0 for m in self.return_metrics}
         # Calculate # rings
         descs["RingCount"] = Descriptors.RingCount(lmol)
         # Calculate # aromatic rings
@@ -302,7 +314,7 @@ class LinkerDescriptors(MolecularDescriptors):
         # Calculate # aliphatic rings
         descs["NumAliphaticRings"] = Descriptors.NumAliphaticRings(lmol)
         # Calculate # heterotoms
-        descs["NumHetatoms"] = Descriptors.NumHeteroatoms(lmol)
+        descs["NumHetatoms"] = Descriptors.NumHeteroatoms(lmol) - linker.count("*")
         # Calculate # sp atoms
         descs["NumSP"] = len([atom for atom in lmol.GetAtoms() if atom.GetHybridization() == Chem.HybridizationType.SP])
         descs["NumSP2"] = len([atom for atom in lmol.GetAtoms() if atom.GetHybridization() == Chem.HybridizationType.SP2])
@@ -314,12 +326,13 @@ class LinkerDescriptors(MolecularDescriptors):
         descs["MolWt"] = Descriptors.MolWt(lmol)
         descs["HeavyAtomCount"] = Descriptors.HeavyAtomCount(lmol)
         # Calculate Ratio of rotatable bonds
-        descs["NumRotatableBonds"] = Descriptors.NumRotatableBonds(lmol)
         if lmol.GetNumBonds() > 0:
+            descs["NumRotatableBonds"] = self._linker_rotatable_bonds(lmol)
             descs["RatioRotatableBonds"] = descs["NumRotatableBonds"] / lmol.GetNumBonds()
         else:
+            descs["NumRotatableBonds"] = 0.0
             descs["RatioRotatableBonds"] = 0.0
-        descs["MaxConsecutiveRotatableBonds"] = self.max_consecutive_rotatable_bonds(lmol)
+        descs["MaxConsecutiveRotatableBonds"] = self._linker_rotatable_bonds(lmol, max_consecutive=True)
         
         return descs
 
