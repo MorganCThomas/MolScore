@@ -54,7 +54,7 @@ def compute():
     y_probs = model.clf.predict_proba(np.asarray(fps))[:, 1]
     logger.debug(f'Predictions collected:\n\t{y_probs}')
     for i, prob in zip(valid, y_probs):
-        results[i].update({f'{model.prefix}_pred_proba': prob})
+        results[i].update({f'{model.prefix}_pred_proba': str(prob)})
     logger.debug(f'Mapped to valid molecules:\n\t{results}')
     logger.debug(f'Returning results')
     return jsonify(results)

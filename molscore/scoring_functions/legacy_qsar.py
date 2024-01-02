@@ -108,5 +108,7 @@ class LegacyQSAR:
         return results
 
     def __call__(self, smiles, directory, file_names, **kwargs):
-        results = self.send_smiles_to_server(smiles) 
+        results = self.send_smiles_to_server(smiles)
+        # Convert strings back to interpreted type
+        results = [{k: ast.literal_eval(v) if k!='smiles' else v for k, v in r.items()} for r in results]
         return results
