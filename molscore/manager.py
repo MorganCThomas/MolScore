@@ -1,11 +1,13 @@
 import os
 import signal
+import tempfile
 import time
 import json
 import atexit
 import logging
 import numpy as np
 import subprocess
+from importlib import resources
 
 import molscore.scoring_functions as scoring_functions
 from molscore import utils
@@ -26,10 +28,11 @@ class MolScore:
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
 
-    def __init__(self, model_name: str, task_config: os.PathLike):
+    def __init__(self, model_name: str, task_config: os.PathLike, budget: int = None):
         """
         :param model_name: Name of generative model, used for file naming and documentation
         :param task_config: Path to task config file
+        :param budget: Budget number of molecules to run MolScore task for until molscore.finished is True
         """
         # Load in configuration file (json)
         assert os.path.exists(task_config), f"Configuration file {task_config} doesn't exist"
@@ -40,6 +43,8 @@ class MolScore:
         # Here are attributes used
         self.model_name = model_name
         self.step = 0
+        self.budget = budget
+        self.finished = False
         self.init_time = time.time()
         self.results_df = None
         self.batch_df = None
@@ -672,6 +677,8 @@ class MolScore:
         self.batch_df = None
         self.exists_df = None
         self.results_df = None
+        if self.budget and (len(self.main_df) >= self.budget):
+            self.finished = True
 
         return scores
     
@@ -719,4 +726,127 @@ class MolScore:
         # Change the name of the default score to "Score"
         results = {k.replace(self.configs["scoring"]["method"], "Score"): v for k,v in results.items()}
         return results
+        
+
+class MolScoreBenchmark:
+    
+    presets = {
+        "GuacaMol": resources.files('molscore.configs.GuacaMol'),
+        "5HT2A_PhysChem": resources.files('molscore.configs.5HT2A.PhysChem'),
+        "5HT2A_Selectivity": resources.files('molscore.configs.5HT2A.PIDGIN_Selectivity'),
+        "5HT2A_Docking": resources.files('molscore.configs.5HT2A.Docking_Selectivity_rDock')
+    }
+
+    def __init__(
+        self,
+        model_name: str,
+        output_dir: os.PathLike,
+        budget: int,
+        model_parameters: dict = {},
+        benchmark: str = None,
+        custom_benchmark: os.PathLike = None,
+        custom_tasks: list = [],
+        include: list = [],
+        exclude: list = [],
+        ):
+        """
+        Run MolScore in benchmark mode, which will run MolScore on a set of tasks and benchmarks.
+        :param model_name: Name of model to run
+        :param output_dir: Directory to save results to
+        :param budget: Budget number of molecules to run MolScore task for
+        :param model_parameters: Parameters of the model for record
+        :param benchmark: Name of benchmark to run
+        :param custom_benchmark: Path to custom benchmark directory
+        :param custom_tasks: List of custom tasks to run
+        :param include: List of tasks to only include
+        :param exclude: List of tasks to exclude
+        """
+        self.model_name = model_name
+        self.model_parameters = model_parameters
+        self.output_dir = output_dir
+        self.benchmark = benchmark
+        self.custom_benchmark = custom_benchmark
+        self.custom_tasks = custom_tasks
+        self.include = include
+        self.exclude = exclude
+        self.budget = budget
+        self.configs = []
+        self.results = []
+        self.next = 0
+        atexit.register(self._summarize)
+
+        # Process configs and tasks to run
+        if self.benchmark:
+            assert self.benchmark in self.presets.keys(), f"Benchmark {self.benchmark} not found in presets"
+            for config in self.presets[self.benchmark].glob("*.json"):
+                self.configs.append(str(config))
+
+        if self.custom_benchmark:
+            assert os.isdir(self.custom_benchmark), f"Custom benchmark directory {self.custom_benchmark} not found"
+            for config in os.listdir(self.custom_benchmark):
+                if config.endswith(".json"):
+                    self.configs.append(os.path.join(self.custom_benchmark, config))
+        
+        if self.custom_tasks:
+            for task in os.listdir(self.custom_tasks):
+                assert os.path.exists(task), f"Custom taks {task} not found"
+                if task.endswith(".json"):
+                    self.configs.append(os.path.join(self.custom_tasks, task))
+
+        if self.include:
+            for config in self.configs:
+                name = os.path.basename(config)
+                if (name not in self.include) or (name.strip(".json") not in self.include):
+                    self.configs.remove(config)
+
+        if self.exclude:
+            for config in self.configs:
+                name = os.path.basename(config)
+                if (name in self.exclude) or (name.strip(".json") in self.exclude):
+                    self.configs.remove(config)
+
+        # Add name to ouput dir
+        self.output_dir = os.path.join(self.output_dir, f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}")
+
+    def __iter__(self):
+        for config_path in self.configs:
+            # Modify save dir
+            with tempfile.NamedTemporaryFile() as tfile:
+                with open(config_path, "rt") as f:
+                    configs = json.load(f)
+                configs["output_dir"] = self.output_dir
+                with open(tfile.name, "wt") as f:
+                    json.dump(configs, f)
+                # Instantiate MolScore
+                MS = MolScore(model_name=self.model_name, task_config=tfile.name, budget=self.budget)
+                self.results.append(MS)
+            yield MS
+
+    def summarize(self, endpoints=None, thresholds=None, chemistry_filters_basic=True, n_jobs=1, target_smiles=None):
+        """
+        For each result, compute metrics and summary of all results
+        """
+        print(f"Calculating summary metrics")
+        results = []
+        # Compute results
+        for MS in self.results:
+            metrics = MS.compute_metrics(endpoints=endpoints, thresholds=thresholds, chemistry_filters_basic=chemistry_filters_basic, budget=self.budget, n_jobs=n_jobs, target_smiles=target_smiles)
+            metrics.update({"model_name": self.model_name, "model_parameters": self.model_parameters, "task": MS.configs["task"]})
+            results.append(metrics)
+        # Save results
+        with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
+            json.dump(results, f, indent=2)
+        # Print results
+        print(f"Preview of Results:\n{pd.DataFrame(results)}")
+        return results
+    
+    def _summarize(self):
+        """
+        If results aren't saved, save just incase
+        """
+        if not os.path.exists(os.path.join(self.output_dir, "results.json")):
+            results = self.summarize()
+            with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
+                json.dump(results, f, indent=2)
+        
         

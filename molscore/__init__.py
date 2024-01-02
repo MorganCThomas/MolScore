@@ -1,1 +1,1 @@
-from molscore.manager import MolScore
+from molscore.manager import MolScore, MolScoreBenchmark

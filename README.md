@@ -28,23 +28,12 @@ python setup.py develop
 ```
 **Note:** Depending if you have conda already installed, you may have to use `conda activate` instead and point to the env path directly for example, `conda activate ~/mambaforge/envs/molscore`
 
-## Tests
-Unittests are currently available for some functionality, but not all.
-```
-cd molscore/tests
-python -m unittest
-```
-
-Or any individual test, for example
-```
-python test_docking.py
-```
 ## Implementation into a generative model
 
 Implementing `molscore` is as simple as importing it, instantiating it (pointing to the configuration file) and then scoring molecules. This should easily fit into most generative model pipelines.
 
 ```python
-from molscore.manager import MolScore
+from molscore import MolScore
 
 # Instantiate MolScore, assign the model name and point to configuration file describing the objective
 ms = MolScore(model_name='test', task_config='molscore/configs/QED.json')
@@ -53,6 +42,23 @@ ms = MolScore(model_name='test', task_config='molscore/configs/QED.json')
 scores = ms.score(SMILES)
     
 # When the program exits, all recorded smiles will be saved and the monitor app (if selected) will be closed
+```
+
+A benchmark mode is also available that can be used to iterate over a selection of tasks defined in config files. 
+
+```python
+from molscore import MolScoreBenchmark
+
+# As an example, configs re-implementing GuacaMol are available as a preset benchmark, or custom tasks can be provided 
+msb = MolScoreBenchmark(model_name='test', benchmark='GuacaMol', budget=10000)
+for task in msb:
+    # < Load generative model >
+    while not task.finished:
+        # < Sample smiles from generative model >
+        scores = task.score(smiles)
+        # < Update generative model >
+
+# When the program exits, a summary of performance will be saved
 ```
 
 **Note: A generative language model with MolScore already implemented can be found [here](https://github.com/MorganCThomas/SMILES-RNN).**
@@ -101,6 +107,17 @@ Performance metrics present in **moleval**, many of which are from [GuacaMol](ht
 <sup>e</sup> Similar to [Blaschke et al.](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0)  
 <sup>f</sup> Based on [SillyWalks](https://github.com/PatWalters/silly_walks) by Pat Walters
 
+## Tests
+Unittests are currently available for some functionality, but not all.
+```
+cd molscore/tests
+python -m unittest
+```
+
+Or any individual test, for example
+```
+python test_docking.py
+```
 
 
 
