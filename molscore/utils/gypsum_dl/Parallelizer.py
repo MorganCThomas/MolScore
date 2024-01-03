@@ -29,6 +29,9 @@ system. (Description provided by Harrison Green.)
 
 import __future__
 import multiprocessing
+# ------- Explicitly set fork context -------
+multiprocessing = multiprocessing.get_context("fork")
+# -------------------------------------------
 import sys
 
 MPI_installed = False
