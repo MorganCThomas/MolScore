@@ -315,19 +315,19 @@ class MolScore:
 
                 if 'max' not in metric['parameters'].keys():
                     metric['parameters'].update({'max': df_max})
-                    logger.debug(f"    Updated max to {df_max}")
+                    logger.debug(f"    Updated {metric['name']} max to {df_max}")
                 elif df_max > metric['parameters']['max']:
                     metric['parameters'].update({'max': df_max})
-                    logger.debug(f"    Updated max to {df_max}")
+                    logger.debug(f"    Updated {metric['name']} max to {df_max}")
                 else:
                     pass
 
                 if 'min' not in metric['parameters'].keys():
                     metric['parameters'].update({'min': df_min})
-                    logger.debug(f"    Updated min to {df_min}")
+                    logger.debug(f"    Updated {metric['name']} min to {df_min}")
                 elif df_min < metric['parameters']['min']:
                     metric['parameters'].update({'min': df_min})
-                    logger.debug(f"    Updated min to {df_min}")
+                    logger.debug(f"    Updated {metric['name']} min to {df_min}")
                 else:
                     pass
         return self
