@@ -189,6 +189,9 @@ class DaskUtils:
         cluster = LocalCluster(n_workers=int(n_workers), processes=True, threads_per_worker=1, local_directory=local_directory)
         client = Client(cluster)
         print(f"Dask worker dashboard: {client.dashboard_link}")
+        # ---- Export to env for further scoring functions to also connect to -----
+        os.environ['MOLSCORE_CLUSTER'] = client.scheduler.address
+        # --------------------------------------------------------------------------
         return client
 
     @staticmethod
@@ -219,12 +222,12 @@ class DaskUtils:
             print(f"Identified an environment cluster address ({env_cluster}), this overrides any config parameters.")
             client = cls._distributed_client(env_cluster)
             nworkers = len(client.scheduler_info()['workers'])
-            print(f"Connected to scheduler {env_cluster} with {nworkers} workers, to change this behaviour remove this variable via <unset MOLSCORE_CLUSTER>")
+            print(f"Connected to scheduler {env_cluster} with {nworkers} workers") #, to change this behaviour remove this variable via <unset MOLSCORE_CLUSTER>")
         elif env_njobs:
             print(f"Identified an environment specifying {env_njobs} workers, this overrides any config parameters.")
             client = cls._local_client(n_workers=int(env_njobs), local_directory=local_directory)
             nworkers = len(client.scheduler_info()['workers'])
-            print(f"Local cluster created with {nworkers} workers, to change this behaviour remove this variable via <unset MOLSCORE_NJOBS>")
+            print(f"Local cluster created with {nworkers} workers") #, to change this behaviour remove this variable via <unset MOLSCORE_NJOBS>")
         else:
             client = None
         return client
