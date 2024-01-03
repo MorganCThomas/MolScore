@@ -428,7 +428,7 @@ END_SECTION
         self.docking_results = []
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'rDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_rDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 

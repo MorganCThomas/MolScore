@@ -338,7 +338,7 @@ class VinaDock:
         self.docking_results = []
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'VinaDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_VinaDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
