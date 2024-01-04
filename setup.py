@@ -16,7 +16,8 @@ setup(
             'data/sample.smi',
             'data/models/RAScore/*/*.pkl',
             'data/models/aizynth/*',
-            'data/models/libinvent/*'
+            'data/models/libinvent/*',
+            'data/models/molopt/*'
             'configs/*/*',
             'configs/*/*/*',],
         'moleval': [

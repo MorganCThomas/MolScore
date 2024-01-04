@@ -732,6 +732,7 @@ class MolScoreBenchmark:
     
     presets = {
         "GuacaMol": resources.files('molscore.configs.GuacaMol'),
+        "MolOpt": resources.files('molscore.configs.MolOpt'),
         "5HT2A_PhysChem": resources.files('molscore.configs.5HT2A.PhysChem'),
         "5HT2A_Selectivity": resources.files('molscore.configs.5HT2A.PIDGIN_Selectivity'),
         "5HT2A_Docking": resources.files('molscore.configs.5HT2A.Docking_Selectivity_rDock')
@@ -822,6 +823,9 @@ class MolScoreBenchmark:
                 self.results.append(MS)
             yield MS
 
+    def __len__(self):
+        return len(self.configs)
+
     def summarize(self, endpoints=None, thresholds=None, chemistry_filters_basic=True, n_jobs=1, target_smiles=None):
         """
         For each result, compute metrics and summary of all results
@@ -834,8 +838,9 @@ class MolScoreBenchmark:
             metrics.update({"model_name": self.model_name, "model_parameters": self.model_parameters, "task": MS.configs["task"]})
             results.append(metrics)
         # Save results
-        with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
-            json.dump(results, f, indent=2)
+        pd.DataFrame(results).to_csv(os.path.join(self.output_dir, "results.csv"), index=False)
+        #with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
+        #    json.dump(results, f, indent=2)
         # Print results
         print(f"Preview of Results:\n{pd.DataFrame(results)}")
         return results
@@ -846,7 +851,8 @@ class MolScoreBenchmark:
         """
         if not os.path.exists(os.path.join(self.output_dir, "results.json")):
             results = self.summarize()
-            with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
-                json.dump(results, f, indent=2)
+            pd.DataFrame(results).to_csv(os.path.join(self.output_dir, "results.csv"), index=False)
+            #with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
+            #    json.dump(results, f, indent=2)
         
         

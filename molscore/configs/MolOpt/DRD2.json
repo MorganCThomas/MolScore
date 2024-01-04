@@ -1,0 +1,32 @@
+{
+  "task": "DRD2",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "LegacyQSAR",
+      "run": true,
+      "parameters": {
+        "prefix": "DRD2",
+        "env_engine": "mamba",
+        "model": "molopt_DRD2"
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "DRD2_pred_proba",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": false
+  }
+}

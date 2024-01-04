@@ -1,5 +1,5 @@
 {
-  "task": "deco_hop",
+  "task": "Deco_hop",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -50,7 +50,7 @@
       "parameters": {
         "prefix": "S5",
         "ref_smiles": [
-          "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C-(C)(C)C"
+          "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
         ],
         "fp": "PHCO",
         "bits": 1024,

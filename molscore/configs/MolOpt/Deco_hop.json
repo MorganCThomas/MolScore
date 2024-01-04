@@ -1,5 +1,5 @@
 {
-  "task": "scaffold_hop",
+  "task": "Deco_hop",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -9,27 +9,39 @@
   },
   "scoring_functions": [
     {
-      "name": "SubstructureFilters",
+      "name": "SubstructureMatch",
       "run": true,
       "parameters": {
         "prefix": "S2",
+        "smarts": [
+          "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]-c12"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    },
+    {
+      "name": "SubstructureFilters",
+      "run": true,
+      "parameters": {
+        "prefix": "S3",
         "az_filters": false,
         "custom_filters": [
-          "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]-c12"
+          "[#7]-c1ccc2ncsc2c1"
         ],
         "n_jobs": 1
       }
     },
     {
-      "name": "SubstructureMatch",
+      "name": "SubstructureFilters",
       "run": true,
       "parameters": {
-        "prefix": "S6",
-        "smarts": [
-          "[#6]-[#6]-[#6]-[#8]-[#6]\u223c[#6]\u223c[#6]\u223c[#6]\u223c[#6]-[#7]-c1ccc2ncsc2c1"
+        "prefix": "S4",
+        "az_filters": false,
+        "custom_filters": [
+          "CS([#6])(=O)=O"
         ],
-        "n_jobs": 1,
-        "method": "any"
+        "n_jobs": 1
       }
     },
     {
@@ -38,7 +50,7 @@
       "parameters": {
         "prefix": "S5",
         "ref_smiles": [
-          "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C-(C)(C)C"
+          "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
         ],
         "fp": "PHCO",
         "bits": 1024,
@@ -52,13 +64,19 @@
     "method": "amean",
     "metrics": [
       {
-        "name": "S2_substruct_filt",
+        "name": "S2_substruct_match",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}
       },
       {
-        "name": "S6_substruct_match",
+        "name": "S3_substruct_filt",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "S4_substruct_filt",
         "weight": 1.0,
         "modifier": "raw",
         "parameters": {}

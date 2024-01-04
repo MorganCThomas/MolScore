@@ -1,0 +1,61 @@
+{
+  "task": "Median_molecules_1",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": false
+  },
+  "scoring_functions": [
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "camphor",
+        "ref_smiles": [
+          "CC1(C)[C@H]2CC[C@]1(C)C(=O)C2"
+        ],
+        "radius": 2,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "menthol",
+        "ref_smiles": [
+          "CC1CCC(C(C1)O)C(C)C"
+        ],
+        "radius": 2,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "method": "gmean",
+    "metrics": [
+      {
+        "name": "camphor_Sim",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "menthol_Sim",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}

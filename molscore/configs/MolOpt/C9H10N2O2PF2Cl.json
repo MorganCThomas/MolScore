@@ -1,0 +1,31 @@
+{
+  "task": "C9H10N2O2PF2Cl",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": false
+  },
+  "scoring_functions": [
+    {
+      "name": "Isomer",
+      "run": true,
+      "parameters": {
+        "prefix": "C9H10N2O2PF2Cl",
+        "molecular_formula": "C9H10N2O2P1F2Cl1"
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "C9H10N2O2PF2Cl_isomer_score",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}
