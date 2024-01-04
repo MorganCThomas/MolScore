@@ -16,7 +16,7 @@
         "prep_timeout": 30.0,
         "dock_protocol": "dock",
         "dock_timeout": 300.0,
-        "n_runs": 10,
+        "n_runs": 5,
         "dock_n_opt_constraints": 1
       }
     },
@@ -39,7 +39,7 @@
         "prep_timeout": 30.0,
         "dock_protocol": "dock",
         "dock_timeout": 300.0,
-        "n_runs": 10,
+        "n_runs": 5,
         "dock_n_opt_constraints": 1
       }
     }
@@ -47,7 +47,7 @@
   "scoring": {
     "metrics": [
       {
-        "name": "5HT2A-3x32_SCORE",
+        "name": "5HT2A-3x32_SCORE.INTER",
         "weight": 1.0,
         "modifier": "norm",
         "parameters": {

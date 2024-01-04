@@ -16,7 +16,7 @@
         "prep_timeout": 30.0,
         "dock_protocol": "dock",
         "dock_timeout": 300.0,
-        "n_runs": 10,
+        "n_runs": 5,
         "dock_n_opt_constraints": 1
       }
     },
