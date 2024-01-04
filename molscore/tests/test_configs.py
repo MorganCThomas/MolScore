@@ -10,7 +10,7 @@ from molscore.manager import MolScore
 
 
 def main(configs: list):
-    mg = MockGenerator()
+    mg = MockGenerator(augment_invalids=True, augment_duplicates=True)
     for config in configs:
         print(f"\nTesting: {config}")
         # Ensure output directory re-directed to test_out
@@ -25,10 +25,10 @@ def main(configs: list):
             ms = MolScore(model_name='test', task_config=tconfig.name)
             # Score 5 smiles 5 times
             for i in tqdm(range(5)):
-                output = ms(mg.sample(5))
+                output = ms(mg.sample(10))
             ms.write_scores()
             ms.kill_monitor()
-            print(f"Output:\n{ms.main_df.head()}\n")
+            print(f"Output:\n{ms.main_df.head(10)}\n")
     return
 
 

@@ -20,7 +20,7 @@ import pandas as pd
 from rdkit.Chem import AllChem as Chem
 
 logger = logging.getLogger('molscore')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 class MolScore:
@@ -116,7 +116,9 @@ class MolScore:
                     logger.warning(f'Not found associated scoring function for {fconfig["name"]}')
             else:
                 pass
-        assert len(self.scoring_functions) > 0, "No scoring functions assigned"
+        if len(self.scoring_functions) == 0: ## 
+            logger.warning("No scoring functions assigned") ##
+        #assert len(self.scoring_functions) > 0, "No scoring functions assigned" ##
 
         # Load modifiers/tranformations
         self.modifier_functions = utils.all_score_modifiers
@@ -215,6 +217,7 @@ class MolScore:
         self.batch_df['absolute_time'] = time.time() - self.init_time
         self.batch_df['smiles'] = parsed_smiles
         self.batch_df['valid'] = valid
+        self.batch_df['valid_score'] = [1 if v=='true' else 0 for v in valid] ##
 
         # Check for duplicates
         duplicated = self.batch_df.smiles.duplicated().tolist()
@@ -255,15 +258,15 @@ class MolScore:
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
+        self.results_df = self.batch_df.loc[:, ['smiles']].copy() ##
         for function in self.scoring_functions:
             results = function(smiles=smiles, directory=self.save_dir, file_names=file_names, additional_formats=additional_formats)
             results_df = pd.DataFrame(results)
 
-            if self.results_df is None:
-                # If this is the first scoring function run in the list, copy
-                self.results_df = results_df
-            else:
-                self.results_df = self.results_df.merge(results_df, on='smiles', how='outer', sort=False)
+            self.results_df = self.results_df.merge(results_df, on='smiles', how='outer', sort=False)
+
+        # Drop any duplicates in results
+        self.results_df = self.results_df.drop_duplicates(subset='smiles')
         return self
 
     def first_update(self):
@@ -282,9 +285,6 @@ class MolScore:
 
         :return:
         """
-        # Drop any duplicates in results
-        self.results_df = self.results_df.drop_duplicates(subset='smiles')
-
         # Grab data for pre-existing smiles
         if len(self.exists_df) > 1:
             self.exists_df = self.exists_df.drop_duplicates(subset='smiles')
@@ -474,7 +474,7 @@ class MolScore:
 
     def _write_attributes(self):
         dir = os.path.join(self.save_dir, 'molscore_attributes')
-        os.makedirs(dir)
+        os.makedirs(dir, exist_ok=True)
         prims = {}
         # If list, dict or csv write to appropriate format
         for k, v in self.__dict__.items():
