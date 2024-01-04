@@ -4,6 +4,7 @@ import subprocess
 import atexit
 import socket
 import os
+import ast
 import time
 import signal
 from importlib import resources
@@ -22,14 +23,20 @@ class LegacyQSAR:
     return_metrics = ['pred_proba']
     # Directory of env-name, and resource path to relevant dir, model name & server name
     model_dictionary = {
-        'libinvent_DRD2': ('lib-invent', resources.files('molscore.data.models.libinvent'), 'drd2.pkl', 'libinvent_DRD2_server.py'),
+        'libinvent_DRD2': ('lib-invent', resources.files('molscore.data.models.libinvent'), 'drd2.pkl', 'legacy_qsar_server.py', 'ECFP6', 2048),
+        'molopt_DRD2': ('ms_molopt', resources.files('molscore.data.models.molopt'), 'drd2.pkl', 'legacy_qsar_server.py', 'FCFP6c', 2048),
+        'molopt_DRD2_current': ('ms_molopt_current', resources.files('molscore.data.models.molopt'), 'drd2_current.pkl', 'legacy_qsar_server.py', 'FCFP6c', 2048),
+        'molopt_GSK3B': ('ms_molopt', resources.files('molscore.data.models.molopt'), 'gsk3b.pkl', 'legacy_qsar_server.py', 'ECFP6', 2048),
+        'molopt_GSK3B_current': ('ms_molopt_current', resources.files('molscore.data.models.molopt'), 'gsk3b_current.pkl', 'legacy_qsar_server.py', 'ECFP6', 2048),
+        'molopt_JNK3': ('ms_molopt', resources.files('molscore.data.models.molopt'), 'jnk3.pkl', 'legacy_qsar_server.py', 'ECFP6', 2048),
+        'molopt_JNK3_current': ('ms_molopt_current', resources.files('molscore.data.models.molopt'), 'jnk3_current.pkl', 'legacy_qsar_server.py', 'ECFP6', 2048)
     }
 
     def __init__(self, prefix: str, env_engine: str, model: str, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param env_engine: Environment engine [conda, mamba]
-        :param model: Which legacy model to implement [libinvent_DRD2]
+        :param model: Which legacy model to implement [libinvent_DRD2, molopt_DRD2, molopt_DRD2_current, molopt_GSK3B, molopt_GSK3B_current, molopt_JNK3, molopt_JNK3_current]
         :param kwargs:
         """
         self.prefix = prefix.replace(" ", "_")
@@ -37,8 +44,8 @@ class LegacyQSAR:
         self.server_process = None
         
         # Get model resources
-        self.env_name, res, model_name, server_name = self.model_dictionary[model]
-        self.env_path = res.joinpath('environment.yml')
+        self.env_name, res, model_name, server_name, self.fp, self.nBits = self.model_dictionary[model]
+        self.env_path = res.joinpath(f'{self.env_name}.yml')
         self.model_path = res.joinpath(model_name)
         self.server_path = resources.files(f'molscore.scoring_functions.servers').joinpath(server_name)
         assert self.env_path.exists(), f"Environment file not found at {self.env_path}"
@@ -80,7 +87,7 @@ class LegacyQSAR:
         port = 8000
         while self._check_port(port):
             port += 1
-        cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} --prefix {self.prefix} --model_path {self.model_path}"
+        cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} --prefix {self.prefix} --model_path {self.model_path} --fp {self.fp} --nBits {self.nBits}"
         self.server_url = f"http://localhost:{port}"
         logger.info(f"Launching server: {cmd}")
         try:
@@ -109,7 +116,7 @@ class LegacyQSAR:
             logger.error(f"Error {response.status_code}: {response.text}")
         return results
 
-    def __call__(self, smiles, directory, file_names, **kwargs):
+    def __call__(self, smiles, **kwargs):
         results = self.send_smiles_to_server(smiles)
         # Convert strings back to interpreted type
         results = [{k: ast.literal_eval(v) if k!='smiles' else v for k, v in r.items()} for r in results]

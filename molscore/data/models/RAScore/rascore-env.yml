@@ -1,0 +1,15 @@
+name: rascore-env
+channels:
+  - rdkit
+  - conda-forge
+  - anaconda
+  - defaults
+dependencies:
+  - python=3.7
+  - scikit-learn=0.22.1
+  - rdkit::rdkit=2020.03
+  - flask=2.2.5
+  - xgboost=1.0.2
+  - pip
+  - pip:
+    - git+https://github.com/reymond-group/RAscore.git@master
