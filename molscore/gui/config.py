@@ -485,21 +485,20 @@ with col2:
 if ss.n_sp > 0:
     sp_tabs = st.tabs([f"SF{i+1}" for i in range(ss.n_sp)])
     # Get user input parameters if scoring functions have been defined
-    if len(config['scoring_functions']) > 0:
-        smetric_options = []
-        for sf in config['scoring_functions']:
-            sf_name = sf['name']
-            sf_prefix = sf['parameters']['prefix']
-            sf_obj = [sf for sf in scoring_functions.all_scoring_functions if sf.__name__ == sf_name][0]
-            try:
-                sf_metrics = sf_obj.return_metrics
-                _ = [smetric_options.append(f"{sf_prefix.strip().replace(' ', '_')}_{m}")
-                    for m in sf_metrics]
-            except AttributeError:
-                st.write(f'WARNING: No return metrics found for {sf_name}')
-                continue
-        # Get parameter inputs
-        config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
+    smetric_options = ['valid_score']
+    for sf in config['scoring_functions']:
+        sf_name = sf['name']
+        sf_prefix = sf['parameters']['prefix']
+        sf_obj = [sf for sf in scoring_functions.all_scoring_functions if sf.__name__ == sf_name][0]
+        try:
+            sf_metrics = sf_obj.return_metrics
+            _ = [smetric_options.append(f"{sf_prefix.strip().replace(' ', '_')}_{m}")
+                for m in sf_metrics]
+        except AttributeError:
+            st.write(f'WARNING: No return metrics found for {sf_name}')
+            continue
+    # Get parameter inputs
+    config['scoring']['metrics'] = [getspconfig(options=smetric_options, key_i=i, tab=t) for i, t in zip(range(ss.n_sp), sp_tabs)]
 else:
     config['scoring']['metrics'] = []
 
