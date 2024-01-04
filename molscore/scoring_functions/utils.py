@@ -4,6 +4,7 @@ import subprocess
 import multiprocessing
 import threading
 import os
+import time
 import gzip
 import signal
 import numpy as np
@@ -201,6 +202,35 @@ class DaskUtils:
         return client
 
     @staticmethod
+    def _slurm_client(cores, memory='1GB', queue=None, local_directory=None):
+        try: 
+            from dask_jobqueue import SLURMCluster
+        except ImportError:
+            raise ImportError("pip install dask-jobqueue is required if you want to use slurm clusters")
+
+        # Optional environment parameters
+        if 'MOLSCORE_SLURM_QUEUE' in os.environ.keys():
+            queue = os.environ['MOLSCORE_SLURM_QUEUE']
+        if 'MOLSCORE_SLURM_MEMORY' in os.environ.keys():
+            memory = os.environ['MOLSCORE_SLURM_MEMORY']
+
+        # Setup cluster
+        cluster = SLURMCluster(queue=queue, n_workers=cores, cores=1, memory=memory, local_directory=local_directory)
+        client = Client(cluster)
+        print(f"Dask worker dashboard: {client.dashboard_link}")
+        # ---- Export to env for further scoring functions to also connect to -----
+        os.environ['MOLSCORE_CLUSTER'] = client.scheduler.address
+        # --------------------------------------------------------------------------
+        return client
+
+    @staticmethod
+    def _environment_slurm():
+        if ('MOLSCORE_SLURM_CORES' in os.environ.keys()) or ('MOLSCORE_SLURM_CPUS' in os.environ.keys()):
+            return os.environ['MOLSCORE_SLURM_CPUS']
+        else:
+            return False
+
+    @staticmethod
     def _environment_address():
         if 'MOLSCORE_CLUSTER' in os.environ.keys():
             return os.environ['MOLSCORE_CLUSTER']
@@ -218,11 +248,18 @@ class DaskUtils:
     def _setup_from_environment(cls, local_directory=None):
         env_cluster = cls._environment_address()
         env_njobs = cls._environment_njobs()
+        env_slurm = cls._environment_slurm()
         if env_cluster:
             print(f"Identified an environment cluster address ({env_cluster}), this overrides any config parameters.")
             client = cls._distributed_client(env_cluster)
             nworkers = len(client.scheduler_info()['workers'])
             print(f"Connected to scheduler {env_cluster} with {nworkers} workers") #, to change this behaviour remove this variable via <unset MOLSCORE_CLUSTER>")
+        elif env_slurm:
+            print(f"Identified an environment specifying {env_slurm} SLURM cores, this overrides any config parameters.")
+            client = cls._slurm_client(cores=int(env_slurm), local_directory=local_directory)
+            time.sleep(5) # Ugly wait to spin up cluster
+            nworkers = len(client.scheduler_info()['workers'])
+            print(f"SLURM cluster created with {nworkers} workers")
         elif env_njobs:
             print(f"Identified an environment specifying {env_njobs} workers, this overrides any config parameters.")
             client = cls._local_client(n_workers=int(env_njobs), local_directory=local_directory)

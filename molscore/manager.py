@@ -839,8 +839,6 @@ class MolScoreBenchmark:
             results.append(metrics)
         # Save results
         pd.DataFrame(results).to_csv(os.path.join(self.output_dir, "results.csv"), index=False)
-        #with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
-        #    json.dump(results, f, indent=2)
         # Print results
         print(f"Preview of Results:\n{pd.DataFrame(results)}")
         return results
@@ -852,7 +850,5 @@ class MolScoreBenchmark:
         if not os.path.exists(os.path.join(self.output_dir, "results.json")):
             results = self.summarize()
             pd.DataFrame(results).to_csv(os.path.join(self.output_dir, "results.csv"), index=False)
-            #with open(os.path.join(self.output_dir, "results.json"), "wt") as f:
-            #    json.dump(results, f, indent=2)
         
         
