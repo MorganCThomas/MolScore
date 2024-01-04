@@ -69,5 +69,5 @@ def get_args():
 if __name__ == '__main__':
     args = get_args()
     model = RAScore_XGB(**args.__dict__)
-    app.debug = True
+    app.debug = False
     app.run(port=args.port)

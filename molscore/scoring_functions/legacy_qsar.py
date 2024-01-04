@@ -4,6 +4,7 @@ import subprocess
 import atexit
 import socket
 import os
+import time
 import signal
 from importlib import resources
 
@@ -84,6 +85,7 @@ class LegacyQSAR:
         logger.info(f"Launching server: {cmd}")
         try:
             self.server_subprocess = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
+            time.sleep(5) # Ugle wait for server to launch
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to launch server, please check {self.server_path} is correct")
             raise e
