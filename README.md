@@ -112,10 +112,12 @@ Most scoring functions implemented can be parallelised over multiple CPUs simply
 
 To setup a dask cluster first start a scheduler by running (the scheduler address will be printed to the terminal)
 ```
+mamba activate <env>
 dask scheduler
 ```
 Now to start workers accross multiple nodes, simply SSH to a connected node and run
 ```
+mamba activate <env>
 dask worker <scheduler_address> --nworkers <n_jobs> --nthreads 1
 ```
 Repeat this for each node you wish to add to the cluster (ensure the conda environment and any other dependencies are loaded as you would normally). Then supply modify the config so that `cluster: <scheduler_address>`.
