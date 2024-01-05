@@ -23,10 +23,10 @@ from molscore.scoring_functions.reaction_filter import DecoratedReactionFilter, 
 from molscore.scoring_functions.silly_bits import SillyBits
 
 all_scoring_functions = [
-    MolecularSimilarity, 
-    TanimotoSimilarity, # Back compatability
     MolecularDescriptors,
     LinkerDescriptors,
+    MolecularSimilarity, 
+    TanimotoSimilarity, # Back compatability
     SillyBits,
     RDKitDescriptors, # Back compatability
     ApplicabilityDomain,

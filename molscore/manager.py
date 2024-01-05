@@ -338,14 +338,17 @@ class MolScore:
         """
 
         mpo_columns = {"names": [], "weights": []}
-        # TODO add filter columns with names
+        filter_columns = {"names": []}
         # Iterate through specified metrics and apply modifier
-        transformed_columns = []
+        transformed_columns = {}
         for metric in self.configs['scoring']['metrics']:
             mod_name = f"{metric['modifier']}_{metric['name']}"
-            # TODO if filter add to filter_columns else mpo_columns
-            mpo_columns["names"].append(mod_name)
-            mpo_columns["weights"].append(metric['weight'])
+            # NEW filter_columns else mpo_columns
+            if metric.get('filter', False):
+                filter_columns["names"].append(mod_name)
+            else:
+                mpo_columns["names"].append(mod_name)
+                mpo_columns["weights"].append(metric['weight'])
 
             for mod in self.modifier_functions:
                 if metric['modifier'] == mod.__name__:
@@ -361,13 +364,10 @@ class MolScore:
                 raise AssertionError
 
 
-            transformed_columns.append(
-                df.loc[:, metric['name']].apply(
+            transformed_columns[mod_name] = df.loc[:, metric['name']].apply(
                 lambda x: modifier(x, **metric['parameters'])
                 ).rename(mod_name)
-                )
-        df = pd.concat([df] + transformed_columns, axis=1)
-
+        df = pd.concat([df] + list(transformed_columns.values()), axis=1)
         # Double check we have no NaN or 0 values (necessary for geometric mean) for mpo columns
         df.loc[:, mpo_columns['names']].fillna(1e-6, inplace=True)
         df[mpo_columns['names']] = df[mpo_columns['names']].apply(
@@ -384,13 +384,16 @@ class MolScore:
             raw=True
         )
 
-        # TODO for each metric in filter_columns, merge filters into one column 'filter', multiply final score
+        # NEW Add filter metrics
+        df['filter'] = df.loc[:, filter_columns["names"]].apply(
+            lambda x: np.prod(x),
+            axis=1,
+            raw=True
+        )
+        df[self.configs['scoring']['method']] = df[self.configs['scoring']['method']] * df['filter']
         
-        # Penalize invalid molecules explicitly with a score of 0.0
-        df[self.configs['scoring']['method']] = df.apply(
-            lambda x: x[self.configs['scoring']['method']] if x['valid'] == 'true' else 0.0,
-            axis=1
-            )
+        # Penalize invalid molecules explicitly with a score of 0.0 NOTE now explicit by defining valid_score as a filter in the config
+        #df[self.configs['scoring']['method']] = df[self.configs['scoring']['method']] * df['valid_score']
 
         return df
 

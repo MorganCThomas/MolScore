@@ -312,6 +312,14 @@ def getspconfig(options, key_i, tab):
             )
         if sp_config['name'] is None:
             return
+        # Get filter
+        sp_config['filter'] = st.checkbox(
+            label='Filter',
+            value=False,
+            key=f'{key_i}: sp_filter',
+            help='Select whether this parameter is a filter (to multiply the final aggregated score)'
+            )
+        # Get weight
         with st.expander(label='Weight (only applicable if using wsum or wprod)'):
             sp_config['weight'] = st.number_input(
                 label='weight', value=1.0, key=f'{key_i}: sp_weight', help='These weights are normalized by the sum of all weights (i.e., any positive value can be used).'
