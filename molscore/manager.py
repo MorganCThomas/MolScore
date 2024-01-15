@@ -336,7 +336,6 @@ class MolScore:
         """
         Compute the final score i.e. combination of which metrics according to which method.
         """
-
         mpo_columns = {"names": [], "weights": []}
         filter_columns = {"names": []}
         # Iterate through specified metrics and apply modifier
@@ -374,15 +373,19 @@ class MolScore:
             lambda x: [1e-6 if y < 1e-6 else y for y in x]
         )
 
-        # Compute final score (df not used by mpo_method except for Pareto pair [not implemented])
-        df[self.configs['scoring']['method']] = df.loc[:, mpo_columns['names']].apply(
-            lambda x: self.mpo_method(
-                x=x,
-                w=np.asarray(mpo_columns['weights']),
-                X=df.loc[:, mpo_columns['names']].to_numpy()),
-            axis=1,
-            raw=True
-        )
+        # Compute final score
+        if mpo_columns['names']:
+            df[self.configs['scoring']['method']] = df.loc[:, mpo_columns['names']].apply(
+                lambda x: self.mpo_method(
+                    x=x,
+                    w=np.asarray(mpo_columns['weights']),
+                    X=df.loc[:, mpo_columns['names']].to_numpy()),
+                axis=1,
+                raw=True
+            )
+        else:
+            df[self.configs['scoring']['method']] = 1.0
+            logger.warning("No score columns provided for aggregation, returning a full reward of 1.0")
 
         # NEW Add filter metrics
         df['filter'] = df.loc[:, filter_columns["names"]].apply(
