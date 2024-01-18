@@ -131,6 +131,24 @@ END_SECTION
 """
         return config
 
+    @staticmethod
+    def add_tether_constraint(config, translation="TETHERED", rotation="TETHERED", dihedral="FREE"):
+        assert all(param in ["FIXED", "TETHERED", "FREE"] for param in [translation, rotation, dihedral]), "translation, rotation and dihedral must be one of FIXED, TETHERED or FREE"
+        config += \
+f"""
+#################################
+## LIGAND RESTRAINTS
+#################################
+SECTION LIGAND
+   TRANS_MODE {translation}
+   ROT_MODE {rotation}
+   DIHEDRAL_MODE {dihedral}
+   MAX_TRANS 1.0
+   MAX_ROT 30.0
+END_SECTION
+"""
+        return config
+
     def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None,
                  cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
