@@ -117,7 +117,7 @@ class LegacyQSAR:
             f"\n\t{self.server_cmd}" \
             f"\n\tAre you sure it loaded within 5 seconds?\n\n"
             )
-            raise
+            raise e
         if response.status_code == 200:
             results = response.json()
             logger.debug(f"Result from server: {results}")
