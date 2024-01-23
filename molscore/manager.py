@@ -827,16 +827,9 @@ class MolScoreBenchmark:
 
     def __iter__(self):
         for config_path in self.configs:
-            # Modify save dir
-            with tempfile.NamedTemporaryFile() as tfile:
-                with open(config_path, "rt") as f:
-                    configs = json.load(f)
-                configs["output_dir"] = self.output_dir
-                with open(tfile.name, "wt") as f:
-                    json.dump(configs, f)
-                # Instantiate MolScore
-                MS = MolScore(model_name=self.model_name, task_config=tfile.name, budget=self.budget)
-                self.results.append(MS)
+            # Instantiate MolScore
+            MS = MolScore(model_name=self.model_name, task_config=config_path, output_dir=self.output_dir, budget=self.budget)
+            self.results.append(MS)
             yield MS
 
     def __len__(self):
