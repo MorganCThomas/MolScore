@@ -28,10 +28,11 @@ class MolScore:
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
 
-    def __init__(self, model_name: str, task_config: os.PathLike, budget: int = None):
+    def __init__(self, model_name: str, task_config: os.PathLike, output_dir: str = None, budget: int = None):
         """
         :param model_name: Name of generative model, used for file naming and documentation
         :param task_config: Path to task config file
+        :param output_dir: Overwrites the output directory specified in the task config file
         :param budget: Budget number of molecules to run MolScore task for until molscore.finished is True
         """
         # Load in configuration file (json)
@@ -59,7 +60,10 @@ class MolScore:
         self.run_name = "_".join([time.strftime("%Y_%m_%d", time.localtime()),
                                   self.model_name,
                                   self.configs['task'].replace(" ", "_")])
-        self.save_dir = os.path.join(os.path.abspath(self.configs['output_dir']), self.run_name)
+        if output_dir is not None:
+            self.save_dir = os.path.join(os.path.abspath(output_dir), self.run_name)
+        else:
+            self.save_dir = os.path.join(os.path.abspath(self.configs['output_dir']), self.run_name)
         # Check to see if we're loading from previous results
         if self.configs['load_from_previous']:
             assert os.path.exists(self.configs['previous_dir']), "Previous directory does not exist"
