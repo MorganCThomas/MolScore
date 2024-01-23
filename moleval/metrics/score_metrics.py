@@ -18,7 +18,7 @@ class ScoreMetrics:
         self.scores = self._preprocess_scores(scores.copy(deep=True), valid=valid, unique=unique, budget=budget)
         self.target_smiles = target_smiles if target_smiles else []
         self._preprocess_target()
-        self.chemistry_filter = ChemistryFilter()
+        self.chemistry_filter = ChemistryFilter(n_jobs=self.n_jobs)
         self._bcf_scores = None
         self._tcf_scores = None
         self._btcf_scores = None
