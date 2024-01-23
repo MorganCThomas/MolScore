@@ -853,7 +853,7 @@ class MolScoreBenchmark:
         """
         If results aren't saved, save just incase
         """
-        if not os.path.exists(os.path.join(self.output_dir, "results.json")):
+        if not os.path.exists(os.path.join(self.output_dir, "results.csv")):
             results = self.summarize()
             pd.DataFrame(results).to_csv(os.path.join(self.output_dir, "results.csv"), index=False)
         
