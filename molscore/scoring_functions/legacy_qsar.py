@@ -88,6 +88,7 @@ class LegacyQSAR:
         while self._check_port(port):
             port += 1
         cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} --prefix {self.prefix} --model_path {self.model_path} --fp {self.fp} --nBits {self.nBits}"
+        self.server_cmd = cmd
         self.server_url = f"http://localhost:{port}"
         logger.info(f"Launching server: {cmd}")
         try:
@@ -106,7 +107,17 @@ class LegacyQSAR:
     def send_smiles_to_server(self, smiles):
         payload = {'smiles': smiles}
         logger.debug(f"Sending payload to server: {payload}")
-        response = requests.post(self.server_url+"/", json=payload)
+        try:
+            response = requests.post(self.server_url+"/", json=payload)
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"{e}: " \
+            f"\n\tAre sure the server was running at {self.server_url}?" \
+            f"\n\tAre you sure the right environment engine was used (I'm using {self.engine})?" \
+            f"\n\tAre you sure the following command runs? (Also try by loading the environment first)"
+            f"\n\t{self.server_cmd}" \
+            f"\n\tAre you sure it loaded within 5 seconds?\n\n"
+            )
+            raise
         if response.status_code == 200:
             results = response.json()
             logger.debug(f"Result from server: {results}")
