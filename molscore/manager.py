@@ -801,16 +801,22 @@ class MolScoreBenchmark:
                     self.configs.append(os.path.join(self.custom_tasks, task))
 
         if self.include:
+            exclude = []
             for config in self.configs:
                 name = os.path.basename(config)
                 if (name not in self.include) or (name.strip(".json") not in self.include):
-                    self.configs.remove(config)
+                    exclude.append(config)
+            for config in exclude:
+                self.configs.remove(config)
 
         if self.exclude:
+            exclude = []
             for config in self.configs:
                 name = os.path.basename(config)
                 if (name in self.exclude) or (name.strip(".json") in self.exclude):
-                    self.configs.remove(config)
+                    exclude.append(config)
+            for config in exclude:
+                self.configs.remove(config)
 
         # Add name to ouput dir
         self.output_dir = os.path.join(self.output_dir, f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}")
