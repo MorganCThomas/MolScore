@@ -245,7 +245,7 @@ class MolScore:
         self.exists_df = self.main_df[self.main_df.smiles.isin(self.batch_df.smiles.tolist())]
 
         # Update unique and occurrence columns
-        if len(self.exists_df) > 1:
+        if len(self.exists_df) > 0:
             for smi in self.batch_df.smiles.unique():
                 tdf = self.exists_df[self.exists_df.smiles == smi]
                 if len(tdf) > 0:
@@ -262,7 +262,7 @@ class MolScore:
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
-        self.results_df = self.batch_df.loc[:, ['smiles']].copy() ##
+        self.results_df = pd.DataFrame(smiles, columns=['smiles'])
         for function in self.scoring_functions:
             results = function(smiles=smiles, directory=self.save_dir, file_names=file_names, additional_formats=additional_formats)
             results_df = pd.DataFrame(results)
@@ -290,7 +290,7 @@ class MolScore:
         :return:
         """
         # Grab data for pre-existing smiles
-        if len(self.exists_df) > 1:
+        if len(self.exists_df) > 0:
             self.exists_df = self.exists_df.drop_duplicates(subset='smiles')
             self.exists_df = self.exists_df.loc[:, self.results_df.columns]
             # Check no duplicated values in exists and results df
