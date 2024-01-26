@@ -130,5 +130,5 @@ class LegacyQSAR:
     def __call__(self, smiles, **kwargs):
         results = self.send_smiles_to_server(smiles)
         # Convert strings back to interpreted type
-        results = [{k: ast.literal_eval(v) if k!='smiles' else v for k, v in r.items()} for r in results]
+        results = [{k: float(v) if k!='smiles' else v for k, v in r.items()} for r in results]
         return results

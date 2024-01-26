@@ -51,7 +51,10 @@ def compute():
     logger.debug(f'Valid molecules subset:\n\t{len(valid)}')
     # Compute predicted probability
     logger.debug(f'Computing predictions:\n\t{np.asarray(fps)}')
-    y_probs = model.clf.predict_proba(np.asarray(fps))[:, 1]
+    if len(fps):
+        y_probs = model.clf.predict_proba(np.asarray(fps))[:, 1]
+    else:
+        y_probs = []
     logger.debug(f'Predictions collected:\n\t{y_probs}')
     for i, prob in zip(valid, y_probs):
         results[i].update({f'{model.prefix}_pred_proba': str(prob)})
