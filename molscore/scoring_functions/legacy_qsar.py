@@ -93,7 +93,8 @@ class LegacyQSAR:
         logger.info(f"Launching server: {cmd}")
         try:
             self.server_subprocess = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
-            time.sleep(5) # Ugle wait for server to launch
+            logger.info(f"Leaving a grace period of 10s for server to launch")
+            time.sleep(10) # Ugly wait for server to launch
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to launch server, please check {self.server_path} is correct")
             raise e
