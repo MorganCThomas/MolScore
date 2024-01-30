@@ -1,5 +1,6 @@
 import os
 import time
+import warnings
 import subprocess
 from dask.distributed import TimeoutError
 
@@ -16,6 +17,21 @@ from molscore.scoring_functions.utils import timedFunc, timedFunc2, timedSubproc
 # Tautomers: LigPrep / Epik / Moka / GypsumDL (MolVS)
 # Stereoisomers: LigPrep / RDKit / Corina / GypsumDL (manual/rdkit)
 # 3D Embedding: LigPrep / GypsumDL(RDKit) / Corina / RDKit / OBabel? / OpenEye?
+
+# Wrap GypsumDL functions to catch errors
+def _prepare_smiles(contrn, params):
+    try:
+        return prepare_smiles(contrn, params)
+    except RuntimeError:
+        warnings.warn(f"Error preparing: {contrn.orig_smi}")
+        return None
+
+def _prepare_3d(contrn, params):
+    try:
+        return prepare_3d(contrn, params)
+    except RuntimeError:
+        warnings.warn(f"Error embedding: {contrn.orig_smi}")
+        return None
 
 
 class LigandPreparation:
@@ -386,7 +402,6 @@ class GypsumDL(LigandPreparation):
                 self.gypsum_params["job_manager"], self.gypsum_params["num_processors"], True
             )
         # Can use GypsumDLDaskParallelizer(client=self.dask_client) wrapper (see below)
-
     
     def prepare(self, smiles: list, directory: os.PathLike, file_names: list, logger=None, **kwargs):
         """
@@ -417,7 +432,7 @@ class GypsumDL(LigandPreparation):
             smiles_futures = []
             embed_futures = []
             for c in contnrs:
-                tprepare_smiles = timedFunc2(prepare_smiles, self.timeout)
+                tprepare_smiles = timedFunc2(_prepare_smiles, self.timeout)
                 sf = self.dask_client.submit(tprepare_smiles, [c], self.gypsum_params)
                 smiles_futures.append(sf)
             new_contnrs = []
@@ -426,7 +441,7 @@ class GypsumDL(LigandPreparation):
                 if nc:
                     nc = nc[0]
                     new_contnrs.append(nc)
-                    tprepare_3d = timedFunc2(prepare_3d, self.timeout)
+                    tprepare_3d = timedFunc2(_prepare_3d, self.timeout)
                     ef = self.dask_client.submit(tprepare_3d, [nc], self.gypsum_params)
                     embed_futures.append(ef)
                 else:
