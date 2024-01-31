@@ -19,14 +19,14 @@ from molscore.scoring_functions.utils import timedFunc, timedFunc2, timedSubproc
 # 3D Embedding: LigPrep / GypsumDL(RDKit) / Corina / RDKit / OBabel? / OpenEye?
 
 # Wrap GypsumDL functions to catch errors
-def _prepare_smiles(contrn, params):
+def catch_prepare_smiles(contrn, params):
     try:
         return prepare_smiles(contrn, params)
     except RuntimeError:
         warnings.warn(f"Error preparing: {contrn.orig_smi}")
         return None
 
-def _prepare_3d(contrn, params):
+def catch_prepare_3d(contrn, params):
     try:
         return prepare_3d(contrn, params)
     except RuntimeError:
@@ -432,7 +432,7 @@ class GypsumDL(LigandPreparation):
             smiles_futures = []
             embed_futures = []
             for c in contnrs:
-                tprepare_smiles = timedFunc2(_prepare_smiles, self.timeout)
+                tprepare_smiles = timedFunc2(catch_prepare_smiles, self.timeout)
                 sf = self.dask_client.submit(tprepare_smiles, [c], self.gypsum_params)
                 smiles_futures.append(sf)
             new_contnrs = []
@@ -441,7 +441,7 @@ class GypsumDL(LigandPreparation):
                 if nc:
                     nc = nc[0]
                     new_contnrs.append(nc)
-                    tprepare_3d = timedFunc2(_prepare_3d, self.timeout)
+                    tprepare_3d = timedFunc2(catch_prepare_3d, self.timeout)
                     ef = self.dask_client.submit(tprepare_3d, [nc], self.gypsum_params)
                     embed_futures.append(ef)
                 else:

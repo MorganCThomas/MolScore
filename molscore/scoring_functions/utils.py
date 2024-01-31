@@ -272,7 +272,7 @@ class DaskUtils:
     @classmethod
     def _setup_from_arguments(cls, cluster_address_or_n_workers=None, local_directory=None):
         if isinstance(cluster_address_or_n_workers, str):
-            client = cls._distributed_client(fcluster_address_or_n_workers)
+            client = cls._distributed_client(cluster_address_or_n_workers)
         elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
             client = cls._local_client(cluster_address_or_n_workers)
         else:
