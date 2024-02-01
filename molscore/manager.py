@@ -808,7 +808,9 @@ class MolScoreBenchmark:
             exclude = []
             for config in self.configs:
                 name = os.path.basename(config)
-                if (name not in self.include) or (name.strip(".json") not in self.include):
+                if (name in self.include) or (name.strip(".json") in self.include):
+                    continue
+                else:
                     exclude.append(config)
             for config in exclude:
                 self.configs.remove(config)
@@ -821,6 +823,10 @@ class MolScoreBenchmark:
                     exclude.append(config)
             for config in exclude:
                 self.configs.remove(config)
+
+        # Check some configs are specified
+        if not self.configs:
+            raise ValueError("No configs found to run, this could be due to include/exclude resulting in zero configs to run")
 
         # Add name to ouput dir
         self.output_dir = os.path.join(self.output_dir, f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}")
