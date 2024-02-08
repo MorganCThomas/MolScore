@@ -23,14 +23,14 @@ def catch_prepare_smiles(contrn, params):
     try:
         return prepare_smiles(contrn, params)
     except RuntimeError:
-        warnings.warn(f"Error preparing: {contrn.orig_smi}")
+        warnings.warn(f"Error preparing smiles")
         return None
 
 def catch_prepare_3d(contrn, params):
     try:
         return prepare_3d(contrn, params)
     except RuntimeError:
-        warnings.warn(f"Error embedding: {contrn.orig_smi}")
+        warnings.warn(f"Error embedding smiles")
         return None
 
 
