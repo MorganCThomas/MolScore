@@ -710,5 +710,77 @@ class TestrDockParallelPH4(BaseTests.TestScoringFunction):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
+class TestrDockParallelScaff1(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+        # Check installation
+        if rDock.check_installation() is None:
+            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
+        # Clean output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = rDock
+        cls.inst = rDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            ligand_preparation='GypsumDL',
+            dock_substructure_constraints="Fc1cc2oncc2cc1",
+            dock_substructure_max_trans=0.0,
+            dock_substructure_max_rot=0.0,
+            n_runs=5,
+            cluster=4
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = [test_files['DRD2_ref_smiles']] + ["Fc1cc2onc(CC)c2cc1", "Fc1cc2onc(CCC(=O))c2cc1", "Fc1cc2onc(C(=O)N)c2cc1", "Fc1cc2onc(CCCCC)c2cc1"]
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.close()
+        cls.inst.client.cluster.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
+class TestrDockParallelScaff2(BaseTests.TestScoringFunction):
+    # Only set up once per class, otherwise too long
+    @classmethod
+    def setUpClass(cls):
+        # Check installation
+        if rDock.check_installation() is None:
+            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
+        # Clean output directory
+        os.makedirs(cls.output_directory, exist_ok=True)
+        # Instantiate
+        cls.obj = rDock
+        cls.inst = rDock(
+            prefix='test',
+            receptor=test_files['DRD2_receptor'],
+            ref_ligand=test_files['DRD2_ref_ligand'],
+            ligand_preparation='GypsumDL',
+            dock_substructure_constraints="Fc1cc2oncc2cc1.Cc1nc2CCCCn2c(=O)c1",
+            dock_substructure_max_trans=0.0,
+            dock_substructure_max_rot=0.0,
+            n_runs=5,
+            cluster=4
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = [test_files['DRD2_ref_smiles']] + ["Cc1nc2CCCCn2c(=O)c1CCCCCc1noc2cc(F)ccc21", "Cc1nc2CCCCn2c(=O)c1CCCCc1noc2cc(F)ccc21", "Cc1nc2CCCCn2c(=O)c1CCCCCCc1noc2cc(F)ccc21", "Cc1nc2CCCCn2c(=O)c1CCOCCc1noc2cc(F)ccc21"]
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst.client.close()
+        cls.inst.client.cluster.close()
+        os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
+
+
 if __name__ == '__main__':
     unittest.main()
