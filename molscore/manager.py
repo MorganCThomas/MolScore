@@ -546,16 +546,19 @@ class MolScore:
         if step is not None:
             self.step = step
         logger.info(f'   Scoring: {len(smiles)} SMILES')
-        file_names = [f'{self.step}_{i}' for i, smi in enumerate(smiles)]
-        self.run_scoring_functions(smiles=smiles, file_names=file_names)
+        run_smiles = list(set(smiles))
+        file_names = [f'{self.step}_{i}' for i, smi in enumerate(run_smiles)]
+        self.run_scoring_functions(smiles=run_smiles, file_names=file_names)
         logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
         self.update_maxmin(self.results_df)
         self.results_df = self.compute_score(self.results_df)
         if self.diversity_filter is not None:
             self.results_df = self.run_diversity_filter(self.results_df)
-            scores = self.results_df.loc[:, f"filtered_{self.configs['scoring']['method']}"].tolist()
+            score_col = f"filtered_{self.configs['scoring']['method']}"
         else:
-            scores = self.results_df.loc[:, self.configs['scoring']['method']].tolist()
+            score_col = self.configs['scoring']['method']
+            
+        scores = [float(self.results_df.loc[self.results_df.smiles == smi, score_col]) for smi in smiles]
         if not flt:
             scores = np.array(scores, dtype=np.float32)
         logger.info(f'    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s')
