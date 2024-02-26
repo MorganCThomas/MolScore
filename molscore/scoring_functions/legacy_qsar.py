@@ -11,7 +11,7 @@ from importlib import resources
 
 logger = logging.getLogger('legacy_qsar')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
@@ -93,8 +93,8 @@ class LegacyQSAR:
         logger.info(f"Launching server: {cmd}")
         try:
             self.server_subprocess = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
-            logger.info(f"Leaving a grace period of 10s for server to launch")
-            time.sleep(10) # Ugly wait for server to launch
+            logger.info(f"Leaving a grace period of 20s for server to launch")
+            time.sleep(20) # Ugly wait for server to launch
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to launch server, please check {self.server_path} is correct")
             raise e
@@ -116,7 +116,7 @@ class LegacyQSAR:
             f"\n\tAre you sure the right environment engine was used (I'm using {self.engine})?" \
             f"\n\tAre you sure the following command runs? (Also try by loading the environment first)"
             f"\n\t{self.server_cmd}" \
-            f"\n\tAre you sure it loaded within 5 seconds?\n\n"
+            f"\n\tAre you sure it loaded within 20 seconds?\n\n"
             )
             raise e
         if response.status_code == 200:
