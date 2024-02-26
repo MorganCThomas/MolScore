@@ -7,7 +7,7 @@ from molbloom import buy
 
 from moleval.utils import Fingerprints, maxmin_picker
 from moleval.metrics.metrics import se_diversity, FingerprintAnaloguesMetric
-from moleval.metrics.metrics_utils import compute_scaffold, mapper, neutralize_atoms
+from moleval.metrics.metrics_utils import compute_scaffold, mapper, neutralize_atoms, get_mol, canonic_smiles
 from moleval.metrics.chemistry_filters import ChemistryFilter
 
 class ScoreMetrics:
@@ -22,6 +22,7 @@ class ScoreMetrics:
         self._bcf_scores = None
         self._tcf_scores = None
         self._btcf_scores = None
+        self._rascorer = None
 
     @property
     def bcf_scores(self):
@@ -40,6 +41,13 @@ class ScoreMetrics:
         if self._btcf_scores is None:
             self._btcf_scores = self.scores.iloc[self.chemistry_filter.filter_molecules(self.scores.smiles.tolist(), basic=True, target=True)]
         return self._btcf_scores
+
+    @property
+    def RAscorer(self):
+        if self._rascorer is None:
+            from molscore.scoring_functions import RAScore_XGB
+            self._rascorer = RAScore_XGB()
+        return self._rascorer
 
     def filter(self, basic=True, target=False):
         if basic and not target:
@@ -238,16 +246,15 @@ class ScoreMetrics:
                     prefix+"Analogue Rate": gen_ans,
                     prefix+"Analogue Ratio": ref_ans,
                 })
-                # TODO Sillyness?
             # ----- Property related
             if len(gen_smiles) >= 1000:
                 metrics[prefix+"Diversity (SEDiv@1k)"] = se_diversity(gen_smiles, k=1000, n_jobs=self.n_jobs)
         # ----- Further property related
         # MCF filters
         metrics['B-CF'] = len(self.bcf_scores) / self.budget
-        # TODO Predicted synthesizability (RAScore > 0.5?)
+        # Predicted synthesizability (RAScore > 0.5?)
         if run_synthesizability:
-            raise NotImplementedError
+            metrics['Predicted Synthesizability'] = np.mean([r['RAScore_pred_proba'] > 0.5 for r in self.RAscorer(self.scores.smiles.to_list())])
         # Purchasability (MolBloom)
         if run_purchasability:
             metrics['Predicted Purchasability'] = np.mean(mapper(self.n_jobs)(buy, self.scores.smiles.tolist()))
@@ -318,7 +325,7 @@ class ScoreMetrics:
         if selection:
             if selection == 'diverse':
                 mols = maxmin_picker(dataset=tdf[mol_key].tolist(), n=n)
-                mols = [Chem.MolToSmiles(m) for m in mols]
+                mols = [canonic_smiles(m) for m in mols]
             elif selection == 'random':
                 mols = tdf[mol_key].sample(n).tolist()
             elif selection == 'similar':

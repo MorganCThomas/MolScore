@@ -94,12 +94,13 @@ class RAScore_XGB:
         port = 8000
         while self._check_port(port):
             port += 1
-        cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} --prefix {self.prefix} --model_path {self.model_path}"
+        self.server_cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} --prefix {self.prefix} --model_path {self.model_path}"
         self.server_url = f"http://localhost:{port}"
-        logger.info(f"Launching server: {cmd}")
+        logger.info(f"Launching server: {self.server_cmd}")
         try:
-            self.server_subprocess = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
-            time.sleep(5) # Ugly way to wait for server to launch
+            logger.info(f"Leaving a grace period of 20s for server to launch")
+            self.server_subprocess = subprocess.Popen(self.server_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
+            time.sleep(20) # Ugly way to wait for server to launch
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to launch server, please check {self.server_path} is correct")
             raise e
@@ -113,7 +114,17 @@ class RAScore_XGB:
     def send_smiles_to_server(self, smiles):
         payload = {'smiles': smiles}
         logger.debug(f"Sending payload to server: {payload}")
-        response = requests.post(self.server_url+"/", json=payload)
+        try:
+            response = requests.post(self.server_url+"/", json=payload)
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"{e}: " \
+            f"\n\tAre sure the server was running at {self.server_url}?" \
+            f"\n\tAre you sure the right environment engine was used (I'm using {self.engine})?" \
+            f"\n\tAre you sure the following command runs? (Also try by loading the environment first)"
+            f"\n\t{self.server_cmd}" \
+            f"\n\tAre you sure it loaded within 20 seconds?\n\n"
+            )
+            raise e
         if response.status_code == 200:
             results = response.json()
             logger.debug(f"Result from server: {results}")
