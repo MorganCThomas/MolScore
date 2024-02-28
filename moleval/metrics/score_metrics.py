@@ -326,6 +326,9 @@ class ScoreMetrics:
             if selection == 'diverse':
                 mols = maxmin_picker(dataset=tdf[mol_key].tolist(), n=n)
                 mols = [canonic_smiles(m) for m in mols]
+            elif selection == 'range':
+                idxs = np.linspace(0, len(tdf)-1, n).astype(int)
+                mols = tdf[mol_key].iloc[idxs].tolist()
             elif selection == 'random':
                 mols = tdf[mol_key].sample(n).tolist()
             elif selection == 'similar':
@@ -369,8 +372,7 @@ class ScoreMetrics:
         tdf = self.scores
         # Chemisry Filters
         if bad_only:
-            bad_idxs = [i for i in range(len(tdf)) if i not in self.chemistry_filter.filter_molecules(tdf.smiles.tolist(), basic=True, target=False)]
-            tdf = tdf.iloc[bad_idxs]
+            tdf = tdf.loc[~tdf.index.isin(self.filter(basic=True, target=False))]
         else:
             tdf = self.filter(basic=chemistry_filters_basic, target=chemistry_filters_target)
         
@@ -404,6 +406,7 @@ class ScoreMetrics:
         tdf = self.scores
         # Chemisry Filters
         if bad_only:
+            import pdb; pdb.set_trace()
             bad_idxs = [i for i in range(len(tdf)) if i not in self.chemistry_filter.filter_molecules(tdf.smiles.tolist(), basic=True, target=False)]
             tdf = tdf.iloc[bad_idxs]
         else:
