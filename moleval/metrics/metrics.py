@@ -232,7 +232,7 @@ class GetMetrics(object):
         metrics['Filters'] = fraction_passes_filters(mols, self.pool, normalize=self.normalize)
 
         # Calculate purchasability
-        metrics['Purchasable_ZINC20'] = np.sum(mapper(self.pool)(buy, gen)) if self.normalize else np.mean(mapper(self.pool)(buy, gen))
+        metrics['Purchasable_ZINC20'] = np.mean(mapper(self.pool)(buy, gen)) if self.normalize else np.sum(mapper(self.pool)(buy, gen))
 
         # ---- Extrinsic properties ----
 
