@@ -372,7 +372,7 @@ class ScoreMetrics:
         tdf = self.scores
         # Chemisry Filters
         if bad_only:
-            tdf = tdf.loc[~tdf.index.isin(self.filter(basic=True, target=False))]
+            tdf = tdf.loc[~tdf.index.isin(self.filter(basic=True, target=False).index)]
         else:
             tdf = self.filter(basic=chemistry_filters_basic, target=chemistry_filters_target)
         
