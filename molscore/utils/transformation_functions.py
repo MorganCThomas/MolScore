@@ -139,6 +139,42 @@ def gauss(x: float, objective: str, mu: float, sigma: float, **kwargs):
     return y
 
 
+def sigmoid(x: float, objective: str, upper: float, lower: float, scale: float, **kwargs):
+    """
+    Transform values using a sigmoid function
+    :param x: Input value
+    :param objective: Maximize, minimize or range [maximize, minimize, range]
+    :param objective: Maximize, minimize or range [maximize, minimize, range]
+    :param upper: Upper bound for transforming values ('range' and 'maximize' only)
+    :param lower: Lower bound for transforming values ('range' and 'minimize' only)
+    :param scale: Gradient of sigmoid function
+    :param kwargs:
+    :return:
+    """
+    def _sigmoid(x):
+        return 1 / (1 + np.exp(-x))
+
+    if objective == 'maximize':
+        shift = upper - (5/scale)
+        y = _sigmoid(scale * (x - shift))
+    elif objective == 'minimize':
+        shift = -lower - (5/scale)
+        y = _sigmoid(scale * (-x - shift))
+    elif objective == 'range':
+        if lower <= x <= upper:
+            y = 1.0
+        else:
+            if x > upper:
+                shift = -upper - (5/scale)
+                y = _sigmoid(scale * (-x - shift))
+            else: # x < lower
+                shift = lower - (5/scale)
+                y = _sigmoid(scale * (x - shift)) 
+    else:
+        raise
+    return y
+
+
 def plot_mod(mod, func_kwargs: dict):
     """
     Plot transformation functions
@@ -155,6 +191,7 @@ def plot_mod(mod, func_kwargs: dict):
     plt.xlabel('E.g input')
     plt.ylabel('E.g output')
     plt.title(mod.__name__)
+    plt.grid()
     #plt.legend()
     return fig
 

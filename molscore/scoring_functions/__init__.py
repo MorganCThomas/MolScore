@@ -1,3 +1,4 @@
+#################### List of all scoring functions ####################
 from molscore.scoring_functions.glide import GlideDock
 from molscore.scoring_functions.plants import PLANTSDock
 from molscore.scoring_functions.gold import GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock
@@ -10,18 +11,23 @@ from molscore.scoring_functions.applicability_domain import ApplicabilityDomain
 from molscore.scoring_functions.external_server import POSTServer
 from molscore.scoring_functions.align3d import Align3D
 from molscore.scoring_functions.pidgin import PIDGIN
-from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors
+from molscore.scoring_functions.legacy_qsar import LegacyQSAR
+from molscore.scoring_functions.descriptors import MolecularDescriptors, RDKitDescriptors, LinkerDescriptors
 from molscore.scoring_functions.isomer import Isomer
 from molscore.scoring_functions.substructure_filters import SubstructureFilters
 from molscore.scoring_functions.substructure_match import SubstructureMatch
 from molscore.scoring_functions.sklearn_model import SKLearnModel, EnsembleSKLearnModel, SKLearnClassifier, SKLearnRegressor
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.scoring_functions.aizynthfinder import AiZynthFinder
+from molscore.scoring_functions.reaction_filter import DecoratedReactionFilter, SelectiveDecoratedReactionFilter
+from molscore.scoring_functions.silly_bits import SillyBits
 
 all_scoring_functions = [
+    MolecularDescriptors,
+    LinkerDescriptors,
     MolecularSimilarity, 
     TanimotoSimilarity, # Back compatability
-    MolecularDescriptors,
+    SillyBits,
     RDKitDescriptors, # Back compatability
     ApplicabilityDomain,
     Isomer,
@@ -29,10 +35,13 @@ all_scoring_functions = [
     SubstructureMatch,
     SKLearnModel,
     EnsembleSKLearnModel,
+    LegacyQSAR,
     POSTServer,
     PIDGIN,
     RAScore_XGB,
     AiZynthFinder,
+    DecoratedReactionFilter,
+    SelectiveDecoratedReactionFilter,
     Align3D,
     GlideDock,
     SminaDock,
@@ -52,7 +61,7 @@ try:
     from molscore.scoring_functions.oedock import OEDock
     all_scoring_functions += [ROCS, GlideDockFromROCS, OEDock]
 except ImportError:
-    pass # print("To use openeye scoring functions please install openeye and acquire a license")
+    print("To use openeye scoring functions please install openeye and acquire a license")
 
 try:
     from molscore.scoring_functions.chemprop import ChemPropModel

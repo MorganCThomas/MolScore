@@ -4,6 +4,8 @@ import subprocess
 import multiprocessing
 import threading
 import os
+import time
+import gzip
 import signal
 import numpy as np
 import rdkit.rdBase as rkrb
@@ -174,26 +176,107 @@ class DaskUtils:
     # TODO add dask-ssh cluster
 
     @classmethod
-    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, processes=True, logger=None):
-        """Processes=False must be used if launching child subprocesses"""
+    def setup_dask(cls, cluster_address_or_n_workers=None, local_directory=None, logger=None):
         client = None
+        client = cls._setup_from_environment(local_directory=local_directory)
+        if client is None:
+            client = cls._setup_from_arguments(cluster_address_or_n_workers, local_directory=local_directory)
+        if (logger is not None) and (client is None) and (cluster_address_or_n_workers is not None):
+            logger.warning(f"Unrecognized dask input: {cluster_address_or_n_workers}")
+        return client
 
-        # Check if it's a string
-        if isinstance(cluster_address_or_n_workers, str):
-            client = Client(cluster_address_or_n_workers)
-            print(f"Dask worker dashboard: {client.dashboard_link}")
-        # Or a number
-        elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
-            #if int(cluster_address_or_n_workers) > 1:
-            # processes=False may be needed to run nested subprocesses, only if local, otherwise --no-nanny via CLI
-            cluster = LocalCluster(n_workers=int(cluster_address_or_n_workers), processes=processes, threads_per_worker=1, local_directory=local_directory)
-            client = Client(cluster)
-            print(f"Dask worker dashboard: {client.dashboard_link}")
-        # Or is unrecognized
+    @staticmethod
+    def _local_client(n_workers: float, local_directory=None):
+        cluster = LocalCluster(n_workers=int(n_workers), processes=True, threads_per_worker=1, local_directory=local_directory)
+        client = Client(cluster)
+        print(f"Dask worker dashboard: {client.dashboard_link}")
+        # ---- Export to env for further scoring functions to also connect to -----
+        os.environ['MOLSCORE_CLUSTER'] = client.scheduler.address
+        # --------------------------------------------------------------------------
+        return client
+
+    @staticmethod
+    def _distributed_client(address: str):
+        client = Client(address)
+        print(f"Dask worker dashboard: {client.dashboard_link}")
+        return client
+
+    @staticmethod
+    def _slurm_client(cores, memory='1GB', queue=None, local_directory=None):
+        try: 
+            from dask_jobqueue import SLURMCluster
+        except ImportError:
+            raise ImportError("pip install dask-jobqueue is required if you want to use slurm clusters")
+
+        # Optional environment parameters
+        if 'MOLSCORE_SLURM_QUEUE' in os.environ.keys():
+            queue = os.environ['MOLSCORE_SLURM_QUEUE']
+        if 'MOLSCORE_SLURM_MEMORY' in os.environ.keys():
+            memory = os.environ['MOLSCORE_SLURM_MEMORY']
+
+        # Setup cluster
+        cluster = SLURMCluster(queue=queue, n_workers=cores, cores=1, memory=memory, local_directory=local_directory)
+        client = Client(cluster)
+        print(f"Dask worker dashboard: {client.dashboard_link}")
+        # ---- Export to env for further scoring functions to also connect to -----
+        os.environ['MOLSCORE_CLUSTER'] = client.scheduler.address
+        # --------------------------------------------------------------------------
+        return client
+
+    @staticmethod
+    def _environment_slurm():
+        if ('MOLSCORE_SLURM_CORES' in os.environ.keys()) or ('MOLSCORE_SLURM_CPUS' in os.environ.keys()):
+            return os.environ['MOLSCORE_SLURM_CPUS']
         else:
-            if (logger is not None) and (cluster_address_or_n_workers is not None):
-                logger.warning(f"Unrecognized dask input {cluster_address_or_n_workers}")
+            return False
 
+    @staticmethod
+    def _environment_address():
+        if 'MOLSCORE_CLUSTER' in os.environ.keys():
+            return os.environ['MOLSCORE_CLUSTER']
+        else:
+            return False
+
+    @staticmethod
+    def _environment_njobs():
+        if 'MOLSCORE_NJOBS' in os.environ.keys():
+            return int(os.environ['MOLSCORE_NJOBS'])
+        else:
+            return False
+
+    @classmethod
+    def _setup_from_environment(cls, local_directory=None):
+        env_cluster = cls._environment_address()
+        env_njobs = cls._environment_njobs()
+        env_slurm = cls._environment_slurm()
+        if env_cluster:
+            print(f"Identified an environment cluster address ({env_cluster}), this overrides any config parameters.")
+            client = cls._distributed_client(env_cluster)
+            nworkers = len(client.scheduler_info()['workers'])
+            print(f"Connected to scheduler {env_cluster} with {nworkers} workers") #, to change this behaviour remove this variable via <unset MOLSCORE_CLUSTER>")
+        elif env_slurm:
+            print(f"Identified an environment specifying {env_slurm} SLURM cores, this overrides any config parameters.")
+            client = cls._slurm_client(cores=int(env_slurm), local_directory=local_directory)
+            time.sleep(5) # Ugly wait to spin up cluster
+            nworkers = len(client.scheduler_info()['workers'])
+            print(f"SLURM cluster created with {nworkers} workers")
+        elif env_njobs:
+            print(f"Identified an environment specifying {env_njobs} workers, this overrides any config parameters.")
+            client = cls._local_client(n_workers=int(env_njobs), local_directory=local_directory)
+            nworkers = len(client.scheduler_info()['workers'])
+            print(f"Local cluster created with {nworkers} workers") #, to change this behaviour remove this variable via <unset MOLSCORE_NJOBS>")
+        else:
+            client = None
+        return client
+
+    @classmethod
+    def _setup_from_arguments(cls, cluster_address_or_n_workers=None, local_directory=None):
+        if isinstance(cluster_address_or_n_workers, str):
+            client = cls._distributed_client(cluster_address_or_n_workers)
+        elif isinstance(cluster_address_or_n_workers, float) or isinstance(cluster_address_or_n_workers, int):
+            client = cls._local_client(cluster_address_or_n_workers)
+        else:
+            client = None
         return client
 
 # ----- Zenodo related ------
@@ -312,6 +395,31 @@ def read_mol(mol_path: os.PathLike, i=0):
         raise TypeError(f"Cannot read molecule, unknown input file type: {mol_path}")
     
     return mol
+
+
+def read_smiles(file_path):
+    """Read a smiles file separated by \n"""
+    if any(['gz' in ext for ext in os.path.basename(file_path).split('.')[1:]]):
+        with gzip.open(file_path) as f:
+            smiles = f.read().splitlines()
+            smiles = [smi.decode('utf-8') for smi in smiles]
+    else:
+        with open(file_path, 'rt') as f:
+            smiles = f.read().splitlines()
+    return smiles
+
+
+def write_smiles(smiles, file_path):
+    """Save smiles to a file path seperated by \n"""
+    if (not os.path.exists(os.path.dirname(file_path))) and (os.path.dirname(file_path) != ''):
+        os.makedirs(os.path.dirname(file_path))
+    if any(['gz' in ext for ext in os.path.basename(file_path).split('.')[1:]]):
+        with gzip.open(file_path, 'wb') as f:
+            _ = [f.write((smi+'\n').encode('utf-8')) for smi in smiles]
+    else:
+        with open(file_path, 'wt') as f:
+            _ = [f.write(smi+'\n') for smi in smiles]
+    return
 
 
 class Fingerprints:

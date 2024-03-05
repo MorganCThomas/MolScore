@@ -1,0 +1,61 @@
+{
+  "task": "Median_molecules_2",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": false
+  },
+  "scoring_functions": [
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "tadalafil",
+        "ref_smiles": [
+          "CN1CC(=O)N2[C@H](Cc3c([nH]c4ccccc34)[C@H]2c2ccc3c(c2)OCO3)C1=O"
+        ],
+        "radius": 3,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "sildenafil",
+        "ref_smiles": [
+          "CCCc1nn(C)c2c(=O)[nH]c(-c3cc(S(=O)(=O)N4CCN(C)CC4)ccc3OCC)nc12"
+        ],
+        "radius": 3,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "method": "gmean",
+    "metrics": [
+      {
+        "name": "tadalafil_Sim",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "sildenafil_Sim",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}

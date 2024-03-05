@@ -1,7 +1,10 @@
-"""
-Adapted from https://github.com/reymond-group/RAscore published https://doi.org/10.1039/d0sc05401a
-"""
 import os
+import ast
+import time
+import requests
+import signal
+import atexit
+import socket
 import tempfile
 import logging
 import subprocess
@@ -9,7 +12,6 @@ import pandas as pd
 import numpy as np
 import pickle as pkl
 from importlib import resources
-
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -30,153 +32,110 @@ class RAScore_XGB:
     """
     return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str = 'RAScore', model: str = 'ChEMBL', method: str = 'XGB', **kwargs):
+    def __init__(self, prefix: str = 'RAScore', env_engine: str = 'mamba', model: str = 'ChEMBL', **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance
+        :param env_engine: Environment engine [conda, mamba]
         :param model: Either ChEMBL, GDB, GDBMedChem [ChEMBL, GDB, GDBMedChem]
-        :param method: Either XGB or DNN [XGB, DNN]
         :param kwargs:
         """
-        self.prefix = prefix
+        self.prefix = prefix.replace(" ", "_")
+        self.engine = env_engine
+        self.server_subprocess = None
+
         self.subprocess = timedSubprocess()
-        self.env = "rascore-env"
-        self.method = method
-        if self.method == 'XGB':
-            self.ext = 'pkl'
-            self.fp = 'ecfp'
-        else:
-            self.ext = 'h5'
-            self.fp = 'fcfp'
+        self.env_name = "rascore-env"
+        self.env_path = resources.files(f'molscore.data.models.RAScore').joinpath(f'environment.yml')
+        self.model_name = model
+        self.server_path = resources.files(f'molscore.scoring_functions.servers').joinpath('rascore_server.py')
         
         # Check/create RAscore Environment
         if not self._check_env():
-            logger.warning(f"Failed to identify {self.env}, attempting to create it automatically (this may take several minutes)")
+            logger.warning(f"Failed to identify {self.env_name}, attempting to create it automatically (this may take several minutes)")
             self._create_env()
-            logger.info(f"{self.env} successfully created")
+            logger.info(f"{self.env_name} successfully created")
         else:
-            logger.info(f"Found existing {self.env}")
+            logger.info(f"Found existing {self.env_name}")
 
-        if model == 'ChEMBL':
-            with resources.path(f'molscore.data.models.RAScore.{self.method}_chembl_{self.fp}_counts', f'model.{self.ext}') as p:
-                self.model_path = str(p)
-        elif model == 'GDB':
-            with resources.path(f'molscore.data.models.RAScore.{self.method}_gdbchembl_{self.fp}_counts', f'model.{self.ext}') as p:
-                self.model_path = str(p)
-        elif model == 'GDBMedChem':
-            with resources.path(f'molscore.data.models.RAScore.{self.method}_gdbmedechem_{self.fp}_counts', f'model.{self.ext}') as p:
-                self.model_path = str(p)      
+        if self.model_name == 'ChEMBL':
+            self.model_path = resources.files(f'molscore.data.models.RAScore').joinpath('XGB_chembl_ecfp_counts/model.pkl')
+        elif self.model_name == 'GDB':
+            self.model_path = resources.files(f'molscore.data.models.RAScore').joinpath('XGB_gdbchembl_ecfp_counts/model.pkl')
+        elif self.model_name == 'GDBMedChem':
+            self.model_path = resources.files(f'molscore.data.models.RAScore').joinpath('XGB_gdbmedechem_ecfp_counts/model.pkl')     
         else:
             raise "Please select from ChEMBL, GDB or GDBMedChem"
 
+        # Launch server
+        self._launch_server()
+        atexit.register(self._kill_server)
 
     def _check_env(self):
-        cmd = "conda info --envs"
+        cmd = f"{self.engine} info --envs"
         out = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
         envs = [line.split(" ")[0] for line in out.stdout.decode().splitlines()[2:]]
-        return self.env in envs
+        return self.env_name in envs
 
     
     def _create_env(self):
-        cmd = f"conda create -n {self.env} python=3.7 -y ; " \
-              f"conda install -n {self.env} -c rdkit rdkit -y ; " \
-              f"conda run -n {self.env} pip install git+https://github.com/reymond-group/RAscore.git@master"
+        cmd = f"{self.engine} env create -f {self.env_path}"
         try:
-            subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, check=True)
+            subprocess.run(cmd, shell=True, check=True)
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to create {self.env} automatically please install as per instructions https://github.com/reymond-group/RAscore")
+            logger.error(f"Failed to create {self.env_name} automatically please install as per instructions on respective GitHub with correct name")
             raise e
 
-
     @staticmethod
-    def calculate_fp(smiles):
-        """
-        Converts SMILES into a counted ECFP6 vector with features.
-        :param smiles: SMILES representation of the moelcule of interest
-        :type smiles: str
-        :return: ECFP6 counted vector with features
-        :rtype: np.array
-        """
-        raise DeprecationWarning
-        mol = Chem.MolFromSmiles(smiles)
-        if mol:
-            fp = AllChem.GetMorganFingerprint(mol, 3, useCounts=True, useFeatures=False)
-            size = 2048
-            arr = np.zeros((size,), np.int32)
-            for idx, v in fp.GetNonzeroElements().items():
-                nidx = idx % size
-                arr[nidx] += int(v)
-            return arr
+    def _check_port(port: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    def _launch_server(self):
+        port = 8000
+        while self._check_port(port):
+            port += 1
+        self.server_cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} --prefix {self.prefix} --model_path {self.model_path}"
+        self.server_url = f"http://localhost:{port}"
+        logger.info(f"Launching server: {self.server_cmd}")
+        try:
+            logger.info(f"Leaving a grace period of 20s for server to launch")
+            self.server_subprocess = subprocess.Popen(self.server_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
+            time.sleep(20) # Ugly way to wait for server to launch
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to launch server, please check {self.server_path} is correct")
+            raise e
+    
+    def _kill_server(self):
+        if self.server_subprocess is not None:
+            os.killpg(os.getpgid(self.server_subprocess.pid), signal.SIGTERM)
+            self.server_subprocess = None
+            logger.info("Server killed")
+
+    def send_smiles_to_server(self, smiles):
+        payload = {'smiles': smiles}
+        logger.debug(f"Sending payload to server: {payload}")
+        try:
+            response = requests.post(self.server_url+"/", json=payload)
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"{e}: " \
+            f"\n\tAre sure the server was running at {self.server_url}?" \
+            f"\n\tAre you sure the right environment engine was used (I'm using {self.engine})?" \
+            f"\n\tAre you sure the following command runs? (Also try by loading the environment first)"
+            f"\n\t{self.server_cmd}" \
+            f"\n\tAre you sure it loaded within 20 seconds?\n\n"
+            )
+            raise e
+        if response.status_code == 200:
+            results = response.json()
+            logger.debug(f"Result from server: {results}")
         else:
-            return None
-
-    def _score_old(self, smiles: list, **kwargs):
-        """
-        Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
-        should return 0.0
-
-        :param smiles: List of SMILES strings
-        :param kwargs: Ignored
-        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
-        """
-        raise DeprecationWarning
-        results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
-        valid = []
-        fps = []
-        with Pool(self.n_jobs) as pool:
-            [(valid.append(i), fps.append(fp))
-             for i, fp in enumerate(pool.imap(self.calculate_fp, smiles))
-             if fp is not None]
-        probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
-        for i, prob in zip(valid, probs):
-            results[i].update({f'{self.prefix}_pred_proba': prob})
-
+            results = [{'smiles': smi} for smi in smiles]
+            _ = [r.update({m: 0.0 for m in self.return_metrics}) for r in results]
+            logger.error(f"Error {response.status_code}: {response.text}")
         return results
 
-    def score(self, smiles: list, directory: str, **kwargs):
-        """
-        Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
-        should return 0.0
-
-        :param smiles: List of SMILES strings
-        :param kwargs: Ignored
-        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
-        """
-        directory = os.path.abspath(directory)
-        # Populate results with 0.0 placeholder
-        results = [{'smiles': smi} for smi in smiles]
-        for result in results:
-            result.update({f"{self.prefix}_{metric}": 0.0 for metric in self.return_metrics})
-        # Ensure they're valid otherwise AiZynthFinder will throw an error
-        valid = [i for i, smi in enumerate(smiles) if get_mol(smi)]
-        if len(valid) == 0:
-            return results
-        # Write smiles to a tempfile
-        smiles_file = tempfile.NamedTemporaryFile(mode='w+t', dir=directory, suffix='.smi')
-        smiles_file.write('SMILES\n')
-        for i in valid:
-            smiles_file.write(smiles[i]+'\n')
-        smiles_file.flush()
-        # Specify output file
-        output_file = os.path.join(directory, 'rascore_out.csv')
-        # Submit job to aizynthcli (specify filter policy if not None)
-        cmd = f"conda run -n {self.env} " \
-              f"RAscore -f {smiles_file.name} -o {output_file} -m {self.model_path}"
-        self.subprocess.run(cmd=cmd,cwd=directory)
-        # Read in ouput
-        output_data = pd.read_csv(output_file)
-        # Process output
-        for i, score in zip(valid, output_data.RAscore):
-            results[i].update({f"{self.prefix}_pred_proba": score})
+    def __call__(self, smiles: list, **kwargs):
+        results = self.send_smiles_to_server(smiles)
+        # Convert strings back to interpreted type
+        results = [{k: ast.literal_eval(v) if k!='smiles' else v for k, v in r.items()} for r in results]
         return results
-
-
-    def __call__(self, smiles: list, directory, **kwargs):
-        """
-        Calculate RAScore given a list of SMILES, if a smiles is abberant or invalid,
-        should return 0.0
-
-        :param smiles: List of SMILES strings
-        :param kwargs: Ignored
-        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
-        """
-        return self.score(smiles=smiles, directory=directory)

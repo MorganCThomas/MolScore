@@ -132,7 +132,7 @@ def main():
     # ----- Exit -----
     exit = st.sidebar.button('Exit')
     if exit:
-        if SS.pymol is not None:
+        if SS.pymol:
             SS.pymol.close()
         os._exit(0)
 

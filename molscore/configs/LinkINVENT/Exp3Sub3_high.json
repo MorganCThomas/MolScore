@@ -1,0 +1,49 @@
+{
+  "task": "Exp3Sub3_high",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "LinkerDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "linker_desc",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "linker_desc_RatioRotatableBonds",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 1.0,
+          "lower": 0.7
+        }
+      }
+    ],
+    "method": "wprod"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "IdenticalMurckoScaffold",
+    "parameters": {
+      "nbmax": 25,
+      "minscore": 0.0,
+      "outputmode": "binary"
+    }
+  }
+}

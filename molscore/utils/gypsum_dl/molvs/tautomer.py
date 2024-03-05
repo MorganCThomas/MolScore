@@ -301,8 +301,8 @@ class TautomerEnumerator(object):
                                 kekulized[smiles] = kekulized_product
                             else:
                                 log.debug('Previous tautomer produced again: %s' % smiles)
-                        except ValueError:
-                            log.debug('ValueError Applying rule: %s', transform.name)
+                        except (ValueError, RuntimeError) as e:
+                            log.debug(f'{e} Applying rule: %s', transform.name)
                 done.add(tsmiles)
             if len(tautomers) == len(done):
                 break

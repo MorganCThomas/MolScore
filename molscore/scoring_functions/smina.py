@@ -263,7 +263,7 @@ class SminaDock:
         self.docking_results = []
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'SminaDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_SminaDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 

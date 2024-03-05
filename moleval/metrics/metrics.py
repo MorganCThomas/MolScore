@@ -4,11 +4,14 @@ https://github.com/molecularsets/moses
 """
 
 import warnings
-from multiprocessing import Pool
+import multiprocessing
+from collections import Counter
 import numpy as np
 import rdkit
 from scipy.spatial.distance import cosine as cos_distance
 from scipy.stats import wasserstein_distance
+from scipy import linalg
+from rdkit.Chem import DataStructs
 
 from molbloom import buy
 
@@ -48,7 +51,9 @@ class GetMetrics(object):
             None, will not run comparitive statistics
         train (None or list): train SMILES. Only compute novelty as this is usually a very large dataset, to run comparative statistics, submit a sample as test
         target (None or list): target SMILES. If none, will not run comparative statistics
-        fcd (bool): Whether to compute FCD if pre-statistics aren't supplied
+        run_fcd (bool): Whether to compute FCD if pre-statistics aren't supplied
+        normalize (bool): Whether to normalize metrics by number of molecules (this may not behave or apply to all metrics like IntDiv, or SNN, RS_<ref> etc.)
+        cumulative (bool): Keep a memory of previously generated SMILES and only compute new unique gens, sum or average with previous metrics depending on normalize.
     Available metrics:
         ----- Intrinsic metrics ----
         * # - Number of molecules
@@ -78,10 +83,18 @@ class GetMetrics(object):
     """
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
                  test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
-                 target=None, ptarget=None, run_fcd=True):
+                 target=None, ptarget=None, run_fcd=True, normalize=True, cumulative=False):
         """
         Prepare to calculate metrics by declaring reference datasets and running pre-statistics
         """
+        self.prev_gen = set()
+        self.prev_scaff = set()
+        self.prev_fg = set()
+        self.prev_rs = set()
+        self.prev_metrics = {}
+        self.prev_n = {'n': 0, 'n_scaff': 0, 'n_fg': 0, 'n_rs': 0}
+        self.normalize = normalize
+        self.cumulative = cumulative
         self.n_jobs = n_jobs
         self.device = device
         self.batch_size = batch_size
@@ -113,7 +126,7 @@ class GetMetrics(object):
         disable_rdkit_log()
         if self.pool is None:
             if self.n_jobs != 1:
-                self.pool = Pool(n_jobs)
+                self.pool = multiprocessing.get_context("fork").Pool(n_jobs)
                 self.close_pool = True
             else:
                 self.pool = 1
@@ -138,7 +151,7 @@ class GetMetrics(object):
             self.target_sw = SillyWalks(reference_mols=self.target, n_jobs=self.n_jobs)
             if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, verbose=False):
+    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
         """
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles
@@ -152,62 +165,76 @@ class GetMetrics(object):
         metrics = {}
         metrics['#'] = len(gen)
 
+        if verbose: print("Calculating Validity & Uniqueness")
+        gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, prev_gen=self.prev_gen, n_jobs=self.n_jobs)
+
         # ----- Intrinsic properties -----
 
-        # Calculate validity
-        if verbose: print("Calculating Validity")
-        if calc_valid:
-            metrics['Validity'] = fraction_valid(gen, self.pool)
+        # Report validity
+        if calc_valid and self.normalize: metrics['Validity'] = fraction_valid
+        metrics['# valid'] = n_valid
 
-        gen = remove_invalid(gen, canonize=True, n_jobs=self.n_jobs)
-        metrics['# valid'] = len(gen)
+        # ReportuUniqueness
+        if calc_unique and self.normalize: metrics['Uniqueness'] = fraction_unique
+        metrics['# valid & unique'] = len(gen)
 
-        # Calculate Uniqueness
-        if verbose: print("Calculating Uniqueness")
-        if calc_unique:
-            metrics['Uniqueness'] = fraction_unique(gen=gen, k=None, n_jobs=self.pool)
-            if unique_k is not None:
-                metrics[f'Unique@{unique_k/1000:.0f}k'] = fraction_unique(gen=gen, k=unique_k, n_jobs=self.pool)
-
-        # Now subset only unique molecules
-        if verbose: print("Computing pre-statistics")
-        gen = list(set(gen))
-        mols = mapper(self.pool)(get_mol, gen)
-        # Precalculate some things
+        # Compute pre-statistics
+        if verbose: print("Computing pre-statistics (fps, ring systems etc.)")
         mol_fps = fingerprints(mols, self.pool, already_unique=True, fp_type='morgan')
         scaffs = compute_scaffolds(mols, n_jobs=self.n_jobs)
         scaff_gen = list(scaffs.keys())
+        if self.cumulative: scaff_gen = list(set(scaff_gen) - set(self.prev_scaff))
         fgs = compute_functional_groups(mols, n_jobs=self.n_jobs)
+        if self.cumulative: fgs = Counter({k: v for k, v in fgs.items() if k not in self.prev_fg})
         rss = compute_ring_systems(mols, n_jobs=self.n_jobs)
+        if self.cumulative: rss = Counter({k: v for k, v in rss.items() if k not in self.prev_rs})
         scaff_mols = mapper(self.pool)(get_mol, scaff_gen)
-        metrics['# valid & unique'] = len(gen)
+        
+        # Calculate novelty
+        if verbose: print("Calculating Novelty")
+        if self.train:
+            if self.normalize: metrics['Novelty'] = novelty(gen, self.train, self.pool)
+            metrics['# novel'] = novelty(gen, self.train, self.pool, normalize=False)
 
         # Calculate diversity related metrics
-        if verbose: print("Calculating Novelty")
-        if self.train is not None:
-            metrics['Novelty'] = novelty(gen, self.train, self.pool)
         if verbose: print("Calculating Diversity")
-        metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device)
-        metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, device=self.device, p=2)
-        if (se_k is not None) and (len(mols) < se_k):
+        metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, p=1, device=self.device)
+        metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, p=2, device=self.device)
+        
+        if se_k and (len(mols) < se_k):
             warnings.warn(f'Less than {se_k} molecules so SEDiv is non-standard.')
-            metrics['SEDiv'] = se_diversity(gen=mols, n_jobs=self.pool)
-        if (se_k is not None) and (len(gen) >= se_k):
-            metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mols, k=se_k, n_jobs=self.pool, normalize=True)
-        metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, device=self.device,
-                                                 fp_type='morgan')
-        metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
+            metrics['SEDiv'] = se_diversity(gen=mol_fps, n_jobs=self.pool, normalize=self.normalize)
+        if se_k and (len(gen) >= se_k):
+            metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mol_fps, k=se_k, n_jobs=self.pool, normalize=self.normalize)
+        
+        if sp_k and (len(mols) < sp_k):
+            warnings.warn(f'Less than {sp_k} molecules so SPDiv is non-standard.')
+            metrics['SPDiv'] = sp_diversity(gen=mols, n_jobs=self.pool, normalize=self.normalize)
+        if sp_k and (len(mols) >= sp_k):
+            metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, k=1000, n_jobs=self.pool, normalize=self.normalize)
+        
+        metrics['# scaffolds']  = len(scaff_gen)
+        
+        metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, p=1, device=self.device, fp_type='morgan')
+        
+        if len(scaff_gen): metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
+        else: metrics['ScaffUniqueness'] = 0.
+        
         # Calculate number of FG and RS relative to sample size
-        metrics['FG'] = len(list(fgs.keys()))/sum(fgs.values())
-        metrics['RS'] = len(list(rss.keys()))/sum(rss.values())
-        # Calculate % pass filters
+        if sum(fgs.values()): metrics['FG'] = len(list(fgs.keys()))/sum(fgs.values()) if self.normalize else len(list(fgs.keys()))
+        else: metrics['FG'] = 0.
+
+        if sum(rss.values()): metrics['RS'] = len(list(rss.keys()))/sum(rss.values()) if self.normalize else len(list(rss.keys()))
+        else: metrics['RS'] = 0.
+        
+        # Calculate filters
         if verbose: print("Calculating Filters")
-        metrics['Filters'] = fraction_passes_filters(mols, self.pool)
+        metrics['Filters'] = fraction_passes_filters(mols, self.pool, normalize=self.normalize)
 
         # Calculate purchasability
-        metrics['Purchasable_ZINC20'] = np.mean(mapper(self.pool)(buy, gen))
+        metrics['Purchasable_ZINC20'] = np.mean(mapper(self.pool)(buy, gen)) if self.normalize else np.sum(mapper(self.pool)(buy, gen))
 
-        # ---- Extrinsic properties ---- 
+        # ---- Extrinsic properties ----
 
         # Calculate FCD
         if self.run_fcd:
@@ -225,21 +252,22 @@ class GetMetrics(object):
         # Test metrics
         if self.test_int is not None:
             if verbose: print("Calculating Test metrics")
-            metrics['Novelty_test'] = novelty(gen, self.test, self.pool)
+            metrics['Novelty_test'] = novelty(gen, self.test, self.pool, normalize=self.normalize)
             metrics['AnSim_test'], metrics['AnCov_test'] = \
-                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'])
+                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'], normalize=self.normalize)
             metrics['FG_test'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.test_int['FG'])
             metrics['RS_test'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.test_int['RS'])
             metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
             metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
             metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
-            metrics['OutlierBits_test'] = self.test_sw.score_mols(mols)
-            for name, func in [('logP', logP),
-                               ('NP', NP),
-                               ('SA', SA),
-                               ('QED', QED),
-                               ('Weight', weight)]:
-                metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
+            metrics['OutlierBits_test'] = self.test_sw.score_mols(mols, normalize=self.normalize)
+            if properties:
+                for name, func in [('logP', logP),
+                                ('NP', NP),
+                                ('SA', SA),
+                                ('QED', QED),
+                                ('Weight', weight)]:
+                    metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
 
         # Test scaff metrics
         if self.test_scaffolds_int is not None:
@@ -247,27 +275,71 @@ class GetMetrics(object):
             metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
             metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
             metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
-            metrics['OutlierBits_testSF'] = self.test_scaffolds_sw.score_mols(mols)
+            metrics['OutlierBits_testSF'] = self.test_scaffolds_sw.score_mols(mols, normalize=self.normalize)
 
         # Target metrics
         if self.target_int is not None:
             if verbose: print("Calculating Target metrics")
-            metrics['Novelty_target'] = novelty(gen, self.target, self.pool)
+            metrics['Novelty_target'] = novelty(gen, self.target, self.pool, normalize=self.normalize)
             metrics['AnSim_target'], metrics['AnCov_target'] = \
-                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'])
+                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'], normalize=self.normalize)
             metrics['FG_target'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.target_int['FG'])
             metrics['RS_target'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.target_int['RS'])
             metrics['SNN_target'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['SNN'])
             metrics['Frag_target'] = FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag'])
             metrics['Scaf_target'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf'])
-            metrics['OutlierBits_target'] = self.target_sw.score_mols(mols)
-            for name, func in [('logP', logP),
-                               ('NP', NP),
-                               ('SA', SA),
-                               ('QED', QED),
-                               ('Weight', weight)]:
-                metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
+            metrics['OutlierBits_target'] = self.target_sw.score_mols(mols, normalize=self.normalize)
+            if properties:
+                for name, func in [('logP', logP),
+                                ('NP', NP),
+                                ('SA', SA),
+                                ('QED', QED),
+                                ('Weight', weight)]:
+                    metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
 
+        if self.cumulative:
+            metrics = self.cumulative_correction(metrics, len(gen), len(scaff_gen), len(list(fgs.keys())), len(list(rss.keys())))
+            self.prev_gen.update(gen)
+            self.prev_scaff.update(scaff_gen)
+            self.prev_fg.update(fgs.keys())
+            self.prev_rs.update(rss.keys())
+        return metrics
+
+    def cumulative_correction(self, metrics, n, n_scaffs, n_fgs, n_rss):
+        """
+        Corrects metrics into a rolling average, such that the final value represents the metric for all molecules generated
+        """
+        # Skip for first run
+        if self.prev_metrics:
+            if self.normalize:
+                # For most metrics compute weighted sum
+                for key in metrics.keys():
+                    # Keys that require addition
+                    if key in ['#', '# valid', '# valid & unique', '# scaffolds']:
+                        metrics[key] += self.prev_metrics[key]
+                    # Keys that require averaging by number of FGs
+                    elif key in ['FG']:
+                        metrics[key] = (metrics[key] * n_fgs + self.prev_metrics[key] * self.prev_n['n_fg']) / (n_fgs + self.prev_n['n_fg'])   
+                    # Keys that require averaging by number of RSs
+                    elif key in ['RS']:
+                        metrics[key] = (metrics[key] * n_rss + self.prev_metrics[key] * self.prev_n['n_rs']) / (n_rss + self.prev_n['n_rs'])         
+                    # Keys that require averaging by number of scaffolds
+                    elif key in ['ScaffDiv']:
+                        metrics[key] = (metrics[key] * n_scaffs + self.prev_metrics[key] * self.prev_n['n_scaff']) / (n_scaffs + self.prev_n['n_scaff'])
+                    # Keys that require averaging by number of molecules
+                    else:
+                        metrics[key] = (metrics[key] * n + self.prev_metrics[key] * self.prev_n['n']) / (n + self.prev_n['n'])
+            else:
+                # For all metrics sum
+                for key in metrics.keys():
+                    metrics[key] += self.prev_metrics[key]
+
+        # Update for next run
+        self.prev_metrics = metrics
+        self.prev_n['n'] += n
+        self.prev_n['n_scaff'] += n_scaffs
+        self.prev_n['n_fg'] += n_fgs
+        self.prev_n['n_rs'] += n_rss
         return metrics
 
     def property_distributions(self, gen):
@@ -309,7 +381,7 @@ def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
     close_pool = False
     if pool is None:
         if n_jobs != 1:
-            pool = Pool(n_jobs)
+            pool = multiprocessing.get_context("fork").Pool(n_jobs)
             close_pool = True
         else:
             pool = 1
@@ -336,7 +408,7 @@ def compute_intermediate_statistics(smiles, n_jobs=1, device='cpu',
     return statistics
 
 
-def fraction_passes_filters(gen, n_jobs=1):
+def fraction_passes_filters(gen, n_jobs=1, normalize=True):
     """
     Computes the fraction of molecules that pass filters:
     * MCF
@@ -345,13 +417,17 @@ def fraction_passes_filters(gen, n_jobs=1):
     * No charges
     """
     passes = mapper(n_jobs)(mol_passes_filters, gen)
-    return np.mean(passes)
+    if normalize:
+        return np.mean(passes)
+    else:
+        return np.sum(passes)
 
 
 def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
     """
     Computes internal diversity as:
     1/|A|^2 sum_{x, y in AxA} (1-tanimoto(x, y))
+    p: power for averaging: (mean x^p)^(1/p)
     """
     assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray)
 
@@ -360,15 +436,63 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
     else:
         gen_fps = gen
 
-    return 1 - (average_agg_tanimoto(gen_fps, gen_fps,
-                                     agg='mean', device=device, p=p)).mean()
+    agg = average_agg_tanimoto(gen_fps, gen_fps, agg='mean', device=device, p=p)
+
+    if p != 1:
+        return 1 - np.mean((agg) ** (1 / p))
+    else:
+        return 1 - np.mean(agg)
 
 
 def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
                  dist_threshold=0.65, normalize=True):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
-     Tanimoto distance.
+     Tanimoto distance on the first k molecules.
+
+    :param k:
+    :param gen:
+    :param n_jobs:
+    :param device:
+    :param fp_type:
+    :param gen_fps:
+    :param dist_threshold:
+    :param normalize:
+    :return:
+    """
+    assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray) or isinstance(gen[0], str)
+
+    if k is not None:
+        if len(gen) < k:
+            warnings.warn(
+                f"Can't compute SEDiv@{k/1000:.0f} "
+                f"gen contains only {len(gen)} molecules"
+            )
+        np.random.seed(123)
+        idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+        if isinstance(gen[0], (rdkit.Chem.rdchem.Mol, str)): 
+            gen = [gen[i] for i in idxs]
+        else: 
+            gen = gen[idxs]
+
+    if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
+        gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
+    elif isinstance(gen[0], str):
+        gen_mols = mapper(n_jobs)(get_mol, gen)
+        gen_fps = fingerprints(gen_mols, fp_type=fp_type, n_jobs=n_jobs)
+    else:
+        gen_fps = gen
+
+    bvs = numpy_fps_to_bitvectors(gen_fps, n_jobs=n_jobs)
+    no_diverse = sphere_exclusion(fps=bvs, dist_thresh=dist_threshold)
+    if normalize:
+        return no_diverse / len(gen)
+    else:
+        return no_diverse
+
+def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
+    """
+    Computes Solow Polasky diversity on the first k molecules.
 
     :param k:
     :param gen:
@@ -388,20 +512,81 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
                 f"Can't compute SEDiv@{k/1000:.0f} "
                 f"gen contains only {len(gen)} molecules"
             )
-        gen = gen[:k]
+        np.random.seed(123)
+        idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+        if isinstance(gen[0], rdkit.Chem.rdchem.Mol): 
+            gen = [gen[i] for i in idxs]
+        else: 
+            gen = gen[idxs]
 
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
-        gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
+        gen_fps = fingerprints(gen, fp_type='morgan', n_jobs=n_jobs, morgan__r=3, morgan__n=2048)
     else:
         gen_fps = gen
 
     bvs = numpy_fps_to_bitvectors(gen_fps, n_jobs=n_jobs)
-    no_diverse = sphere_exclusion(fps=bvs, dist_thresh=dist_threshold)
+    # Compute distances
+    dist = 1 - np.array([DataStructs.BulkTanimotoSimilarity(f, bvs) for f in bvs])
+    # Finds unique rows in arr and return their indices
+    arr_ = np.ascontiguousarray(dist).view(np.dtype((np.void, dist.dtype.itemsize * dist.shape[1])))
+    _, idxs = np.unique(arr_, return_index=True)
+    idxs = np.sort(idxs)
+    dist = dist[idxs, :][:, idxs]
+    f_ = np.linalg.inv(np.e ** (-10 * dist))
     if normalize:
-        return no_diverse / len(gen)
+        return np.sum(f_) / len(gen)
     else:
-        return no_diverse
+        return np.sum(f_)
+    
+def preprocess_gen(gen, prev_gen=[], canonize=True, n_jobs=1):
+    """
+    Convert to valid, unique and return mols in one function (save compute redundancy)
+    :return: (gen, mols, n_valid, fraction_valid, fraction_unique)
+    """
+    # Convert to mols
+    mols = mapper(n_jobs)(get_mol, gen)
+    fraction_invalid = 1 - mols.count(None) / len(mols)
+    n_valid = len(mols) - mols.count(None)
+    # Remove invalid
+    if canonize:
+        gen = [x for x in mapper(n_jobs)(canonic_smiles, mols) if x is not None]
+    else:
+        gen = [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
+    mols = [mol for mol in mols if mol is not None]
+    # Count unique (Note this is fraction of valid SMILES), keeping order
+    pc = Counter(prev_gen)
+    c = Counter()
+    unique_gen = []
+    unique_mols = []
+    for smi, mol in zip(gen, mols):
+        # Add to counter
+        pc.update([smi])
+        c.update([smi])
+        if pc[smi] == 1:
+            unique_gen.append(smi)
+            unique_mols.append(mol)
+    fraction_unique = len(list(c.keys())) / len(gen)
+    return unique_gen, unique_mols, n_valid, fraction_invalid, fraction_unique
 
+def fraction_valid(gen, n_jobs=1):
+    """
+    Computes a number of valid molecules
+    Parameters:
+        gen: list of SMILES
+        n_jobs: number of threads for calculation
+    """
+    gen = mapper(n_jobs)(get_mol, gen)
+    return 1 - gen.count(None) / len(gen)
+
+def remove_invalid(gen, canonize=True, n_jobs=1):
+    """
+    Removes invalid molecules from the dataset
+    """
+    if not canonize:
+        mols = mapper(n_jobs)(get_mol, gen)
+        return [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
+    return [x for x in mapper(n_jobs)(canonic_smiles, gen) if
+            x is not None]
 
 def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     """
@@ -425,36 +610,17 @@ def fraction_unique(gen, k=None, n_jobs=1, check_validity=True):
     return len(canonic) / len(gen)
 
 
-def fraction_valid(gen, n_jobs=1):
-    """
-    Computes a number of valid molecules
-    Parameters:
-        gen: list of SMILES
-        n_jobs: number of threads for calculation
-    """
-    gen = mapper(n_jobs)(get_mol, gen)
-    return 1 - gen.count(None) / len(gen)
-
-
-def novelty(gen, train, n_jobs=1):
+def novelty(gen, train, n_jobs=1, normalize=True):
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
         gen_smiles = mapper(n_jobs)(canonic_smiles, gen)
     else:
         gen_smiles = gen
     gen_smiles_set = set(gen_smiles) - {None}
     train_set = set(train)
-    return len(gen_smiles_set - train_set) / len(gen_smiles_set)
-
-
-def remove_invalid(gen, canonize=True, n_jobs=1):
-    """
-    Removes invalid molecules from the dataset
-    """
-    if not canonize:
-        mols = mapper(n_jobs)(get_mol, gen)
-        return [gen_ for gen_, mol in zip(gen, mols) if mol is not None]
-    return [x for x in mapper(n_jobs)(canonic_smiles, gen) if
-            x is not None]
+    if normalize:
+        return len(gen_smiles_set - train_set) / len(gen_smiles_set)
+    else:
+        return len(gen_smiles_set - train_set)
 
 
 class Metric:
@@ -465,14 +631,14 @@ class Metric:
         for k, v in kwargs.values():
             setattr(self, k, v)
 
-    def __call__(self, ref=None, gen=None, pref=None, pgen=None):
+    def __call__(self, ref=None, gen=None, pref=None, pgen=None, **kwargs):
         assert (ref is None) != (pref is None), "specify ref xor pref"
         assert (gen is None) != (pgen is None), "specify gen xor pgen"
         if pref is None:
             pref = self.precalc(ref)
         if pgen is None:
             pgen = self.precalc(gen)
-        return self.metric(pref, pgen)
+        return self.metric(pref, pgen, **kwargs)
 
     def precalc(self, moleclues):
         raise NotImplementedError
@@ -494,9 +660,13 @@ class SNNMetric(Metric):
         return {'fps': fingerprints(mols, n_jobs=self.n_jobs,
                                     fp_type=self.fp_type)}
 
-    def metric(self, pref, pgen):
-        return average_agg_tanimoto(pref['fps'], pgen['fps'],
-                                    device=self.device)
+    def metric(self, pref, pgen, normalize=True):
+        snns = average_agg_tanimoto(pref['fps'], pgen['fps'], device=self.device)
+        if normalize:
+            return np.mean(snns)
+        else:
+            return snns
+    
 
 
 class FingerprintAnaloguesMetric(Metric):
@@ -512,9 +682,12 @@ class FingerprintAnaloguesMetric(Metric):
         return {'fps': fingerprints(mols, n_jobs=self.n_jobs,
                                     fp_type=self.fp_type)}
 
-    def metric(self, pref, pgen):
-        return analogues_tanimoto(pref['fps'], pgen['fps'],
-                                  device=self.device)  # Tuple returned (Frac analogues, analogue coverage)
+    def metric(self, pref, pgen, normalize=True):
+        gen_ans, ref_ans = analogues_tanimoto(pref['fps'], pgen['fps'], device=self.device)  # Tuple of bool arrays returned (Analogues, Coverage)
+        if normalize:
+            return gen_ans.mean(), ref_ans.mean()
+        else:
+            return gen_ans.sum(), ref_ans.sum()
 
 
 def cos_similarity(ref_counts, gen_counts):

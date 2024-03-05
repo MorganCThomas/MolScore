@@ -1,0 +1,76 @@
+{
+  "task": "lorlati_like_scaffold",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Lorlati_like_macro",
+        "ref_smiles": [
+          "CC1Oc2c(C)nccc2-c2cc(NC(=O)Cc3nn(C)cc13)ccc2C#N"
+        ],
+        "fp": "PHCO",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "Lorlati_like_scaffold",
+        "smarts": [
+          "COc1cnccc1-c1cccc(NC(=O)Cc2ccn(C)n2)c1"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "Lorlati_like_macro_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier":"lin_thresh",
+        "parameters":{
+            "objective":"maximize",
+            "upper":0.7,
+            "lower":0,
+            "buffer":0.7
+        }
+      },
+      {
+        "name": "Lorlati_like_scaffold_substruct_match",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "gmean"
+  },
+  "diversity_filter": {
+    "run": false,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  }
+}

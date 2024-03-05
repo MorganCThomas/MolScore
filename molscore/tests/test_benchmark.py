@@ -1,0 +1,25 @@
+import os
+import json
+import argparse
+import unittest
+import subprocess
+from tqdm import tqdm
+
+from molscore import MolScoreBenchmark
+from molscore.tests.mock_generator import MockGenerator
+
+def main(benchmark):
+    output_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_out')
+    MSB = MolScoreBenchmark(model_name='test', output_dir=output_directory, budget=10, benchmark=benchmark)
+    mg = MockGenerator(augment_invalids=True, augment_duplicates=True)
+    for task in tqdm(MSB, desc='Benchmark Objectives'):
+        while not task.finished:
+            smiles = mg.sample(10)
+            task.score(smiles)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('benchmark', type=str, default='GuacaMol', choices=['GuacaMol', 'MolOpt', '5HT2A_PhysChem', '5HT2A_Selectivity', '5HT2A_Docking'])
+    args = parser.parse_args()
+
+    main(args.benchmark)

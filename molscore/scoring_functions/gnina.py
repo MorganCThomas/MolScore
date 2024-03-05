@@ -298,7 +298,7 @@ class GninaDock:
         self.docking_results = []
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'GninaDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_GninaDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 

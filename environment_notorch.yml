@@ -1,0 +1,24 @@
+name: molscore
+channels:
+  - anaconda
+  - conda-forge
+  - openeye
+  - bioconda
+dependencies:
+  - python>=3.8,<3.10
+  - rdkit>=2019.03.2
+  - ipython
+  - prolif 
+  - openeye-toolkits
+  - smina=2017.11.9
+  - openbabel
+  - dask
+  - scikit-learn=1.1.3
+  - pip
+  - pip:
+    - zenodo-client
+    - levenshtein
+    - streamlit-plotly-events
+    - streamlit>=1.11.0
+    - molbloom
+    - func_timeout

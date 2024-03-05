@@ -242,13 +242,13 @@ def save_sdf(mol_paths, mol_names, out_file):
         if path:
             if path.endswith('gz'):
                 with gzip.open(path) as rf:
-                    suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False)
+                    suppl = Chem.ForwardSDMolSupplier(rf, removeHs=False, sanitize=False)
                     mol = suppl.__next__()
                     if mol:
                         mol.SetProp('_Name', name)
                         writer.write(mol)
             elif ('.sdf' in path) or ('.sd' in path):
-                suppl = Chem.ForwardSDMolSupplier(path, removeHs=False)
+                suppl = Chem.ForwardSDMolSupplier(path, removeHs=False, sanitize=False)
                 mol = suppl.__next__()
                 if mol:
                     mol.SetProp('_Name', name)

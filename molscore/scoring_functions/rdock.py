@@ -8,8 +8,9 @@ from functools import partial
 from typing import Union
 from itertools import takewhile
 from tempfile import TemporaryDirectory
+from importlib import resources
 
-from rdkit import Chem
+from rdkit.Chem import AllChem as Chem
 
 from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
 from molscore.scoring_functions.descriptors import MolecularDescriptors
@@ -34,6 +35,21 @@ class rDock:
         'NetCharge', 'PositiveCharge', 'NegativeCharge',
         'best_variant'
         ]
+    presets = {
+        "5HT2A": {
+            "receptor": resources.files('molscore.data.structures.6A93').joinpath("6A93p_rec.pdb"),
+            "ref_ligand": resources.files('molscore.data.structures.6A93').joinpath('6A93p_risperidone.sdf'),
+        },
+        "5HT2A-3x32": {
+            "receptor": resources.files('molscore.data.structures.6A93').joinpath('6A93p_rec.pdb'),
+            "ref_ligand": resources.files('molscore.data.structures.6A93').joinpath('6A93p_risperidone.sdf'),
+            "dock_constraints": resources.files('molscore.data.structures.6A93').joinpath('6A93p_3x32Cat.restr'),
+        },
+        "DRD2": {
+            "receptor": resources.files('molscore.data.structures.6CM4').joinpath('6CM4p_rec.pdb'),
+            "ref_ligand": resources.files('molscore.data.structures.6CM4').joinpath('6CM4p_risperidone.sdf'),
+        }
+    }
 
     @staticmethod
     def check_installation():
@@ -115,15 +131,35 @@ END_SECTION
 """
         return config
 
-    def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
+    @staticmethod
+    def add_tether_constraint(config, translation="TETHERED", rotation="TETHERED", dihedral="FREE", max_trans=1.0, max_rot=30.0):
+        assert all(param in ["FIXED", "TETHERED", "FREE"] for param in [translation, rotation, dihedral]), "translation, rotation and dihedral must be one of FIXED, TETHERED or FREE"
+        config += \
+f"""
+#################################
+## LIGAND RESTRAINTS
+#################################
+SECTION LIGAND
+   TRANS_MODE {translation}
+   ROT_MODE {rotation}
+   DIHEDRAL_MODE {dihedral}
+   MAX_TRANS {max_trans:.1f}
+   MAX_ROT {max_rot:.1f}
+END_SECTION
+"""
+        return config
+
+    def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None,
                  cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
                  dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
+                 dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 1.0, dock_substructure_max_rot: int = 30.0,
                  dock_constraints: Union[str, os.PathLike] = None,
                  dock_opt_constraints: Union[str, os.PathLike] = None, dock_n_opt_constraints: int = 1,
                  **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2]
         :param receptor: Path to receptor file (.pdb)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
@@ -132,12 +168,26 @@ END_SECTION
         :param dock_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param n_runs: Number of docking trials (poses to return)
-        :param dock_constrains: Path to rDock pharmacophoric constriants file that are mandatory
+        :param dock_substructure_constraints: SMARTS pattern to constrain ligands to reference ligand
+        :param dock_substructure_max_trans: Maximum allowed translation of tethered substructure
+        :param dock_substructure_max_rot: Maximum allowed rotation of tethered substructure
+        :param dock_constraints: Path to rDock pharmacophoric constriants file that are mandatory
         :param dock_opt_constraints: Path to rDock pharmacophoric constriants file that are optional
         :param dock_n_opt_constraints: Number of optional constraints required
         """
         # Check rDock installation
         assert self.check_installation() is not None, "Could not find rDock path, please ensure proper installation"
+
+        # Check if preset is provided
+        assert preset or (receptor and ref_ligand), "Either preset or receptor and ref_ligand must be provided"
+        if preset:
+            assert preset in self.presets.keys(), f"preset must be one of {self.presets.keys()}"
+            receptor = str(self.presets[preset]['receptor'])
+            ref_ligand = str(self.presets[preset]['ref_ligand'])
+            if 'dock_constraints' in self.presets[preset].keys():
+                dock_constraints = str(self.presets[preset]['dock_constraints'])
+            if 'dock_opt_constraints' in self.presets[preset].keys():
+                dock_opt_constraints = str(self.presets[preset]['dock_opt_constraints'])
 
         # Control subprocess in/out
         self.subprocess = timedSubprocess(timeout=None, shell=True)
@@ -167,6 +217,7 @@ END_SECTION
         self.n_runs = n_runs
         self.rdock_env = 'rbdock'
         self.rcav_env = 'rbcavity'
+        self.substructure_smarts = dock_substructure_constraints
         self.dock_constraints = os.path.abspath(dock_constraints) if dock_constraints else dock_constraints
         self.dock_opt_constraints = os.path.abspath(dock_opt_constraints) if dock_opt_constraints else dock_opt_constraints
         self.dock_n_opt_constraints = dock_n_opt_constraints
@@ -204,6 +255,12 @@ END_SECTION
             rec_prm = self.add_pharmacophore_constraint(rec_prm, self.dock_constraints, self.dock_opt_constraints, self.dock_n_opt_constraints)
             if self.dock_constraints: self.rdock_files.append(self.dock_constraints)
             if self.dock_opt_constraints: self.rdock_files.append(self.dock_opt_constraints)
+        # Add substructure constraints
+        if self.substructure_smarts:
+            rec_prm = self.add_tether_constraint(rec_prm, max_trans=dock_substructure_max_trans, max_rot=dock_substructure_max_rot)
+            with Chem.SDMolSupplier(self.ref, removeHs=False) as suppl:
+                self.ref_mol = suppl[0]
+            assert self.ref_mol.GetSubstructMatch(Chem.MolFromSmarts(self.substructure_smarts)), f"Substructure {self.substructure_smarts} not found in reference ligand"
         # Copy files to RBT home
         self.subprocess.run(f'cp {" ".join(self.rdock_files)} {self.temp_dir.name}')
         # Write config
@@ -226,6 +283,49 @@ END_SECTION
     def _move_rdock_files(self, cwd):
         os.environ['RBT_HOME'] = cwd
         self.subprocess.run(f'cp {" ".join(self.rdock_files)} {cwd}')
+
+    @staticmethod
+    def _align_mol(query: os.PathLike, ref_mol: Chem.rdchem.Mol, smarts: str, logger: logging.Logger):
+        # Load query file
+        with Chem.SDMolSupplier(query, removeHs=False) as suppl:
+            query_mol = suppl[0]
+        # Load SMARTS
+        patt = Chem.MolFromSmarts(smarts)
+        # Get QUERY match
+        query_match = query_mol.GetSubstructMatch(patt)
+        # Get REF match
+        ref_match = ref_mol.GetSubstructMatch(patt)
+        # Align query to ref by substructure match
+        if query_match:
+            # Do a conf search
+            Chem.EmbedMultipleConfs(query_mol, numConfs=50, ETversion=2)
+            rmsds = []
+            for i in range(query_mol.GetNumConformers()):
+                rmsds.append(Chem.AlignMol(query_mol, ref_mol, prbCid=i, atomMap=list(zip(query_match, ref_match))))
+            query_mol = Chem.Mol(query_mol, confId=sorted(enumerate(rmsds), key=lambda x: x[1])[0][0])
+            # Set tethered atoms
+            query_match = list(query_match)
+            # NOTE rDock can't accept 0 index, but doesn't seem 1-indexed ...
+            if 0 in query_match:
+                query_match.remove(0)
+            query_mol.SetProp("TETHERED ATOMS", ",".join([str(a) for a in query_match]))
+            # Save aligned mol
+            with Chem.SDWriter(query) as writer:
+                writer.write(query_mol)
+        else:
+            # TODO unspecified constrained docking by MCS
+            logger.warning(f"No substructure match found for {query}, skipping alignment.")
+        
+    def align_mols(self, varients, varient_files):
+        logger.debug('Aligning molecules for tethered docking')
+        if self.cluster:
+            p = partial(self._align_mol, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
+            futures = self.client.map(p, varient_files)
+            results = self.client.gather(futures)
+        else:
+            for vfile in varient_files:
+                self._align_mol(vfile, self.ref_mol, self.substructure_smarts)
+        return varients, varient_files     
     
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .sd via obabel (RDKit doesn't write charge in a rDock friendly way)"""
@@ -400,7 +500,7 @@ END_SECTION
         self.docking_results = []
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), 'rDock', step)
+        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_rDock', step)
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
@@ -413,6 +513,8 @@ END_SECTION
 
         # Prepare ligands
         self.variants, variant_paths = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=self.file_names, logger=logger)
+        if self.substructure_smarts:
+            self.variants, variant_paths = self.align_mols(self.variants, variant_paths)
         self.variants, variant_paths = self.reformat_ligands(self.variants, variant_paths)
 
         # Dock ligands
