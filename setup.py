@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='MolScore',
-    version='1.0',
+    version='1.1',
     packages=['molscore'] + ['molscore.'+p for p in find_packages(where="molscore")] + ['moleval'] + ['moleval.'+p for p in find_packages(where="moleval")],
     license='MIT',
     author='Morgan Thomas',
