@@ -1,0 +1,76 @@
+{
+  "task": "GCCA1_like_scaffold",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Lenacapavir_like",
+        "ref_smiles": [
+          "CC(C)C#Cc1ccc(-c2ccc(Cl)c3c(NS(C)(=O)=O)nn(CC(F)(F)F)c23)c(C(Cc2cc(F)cc(F)c2)NC(=O)Cn2nc(C(F)(F)F)c3c2C(F)(F)C2CC32)n1"
+        ],
+        "fp": "PHCO",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "Lenacapavir_like",
+        "smarts": [
+          "CCc1cnc(-c2ccccc2)c(C(Cc2ccccc2)NC(=O)Cn2nc(CF)c3c2C(C)(F)C2CC32)n1"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "Lenacapavir_like_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier":"lin_thresh",
+        "parameters":{
+            "objective":"maximize",
+            "upper":0.7,
+            "lower":0,
+            "buffer":0.7
+        }
+      },
+      {
+        "name": "Lenacapavir_like_substruct_match",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "gmean"
+  },
+  "diversity_filter": {
+    "run": false,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  }
+}

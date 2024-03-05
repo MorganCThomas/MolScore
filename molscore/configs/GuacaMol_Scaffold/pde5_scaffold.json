@@ -1,0 +1,76 @@
+{
+  "task": "pde5_scaffold",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Sildenafil",
+        "ref_smiles": [
+          "CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C"
+        ],
+        "fp": "AP",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "Sildenafil",
+        "smarts": [
+          "Cc1ncn2[nH]c(-c3ccc(F)c(S(=O)(=O)N4CCNCC4)c3)nc(=O)c12"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "Sildenafil_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier":"lin_thresh",
+        "parameters":{
+            "objective":"maximize",
+            "upper":0.75,
+            "lower":0,
+            "buffer":0.75
+        }
+      },
+      {
+        "name": "Sildenafil_substruct_match",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "gmean"
+  },
+  "diversity_filter": {
+    "run": false,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  }
+}

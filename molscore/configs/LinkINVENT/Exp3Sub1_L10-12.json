@@ -1,0 +1,109 @@
+{
+  "task": "Exp3Sub1_L10-12",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "LinkerDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "linker_desc",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "desc_TPSA",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 250.0,
+          "lower": 100.0
+        }
+      },
+      {
+        "name": "desc_CLogP",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 6.0,
+          "lower": 3.5
+        }
+      },
+      {
+        "name": "desc_NumHAcceptors",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "minimize",
+          "upper": 0.0,
+          "lower": 16.0
+        }
+      },
+      {
+        "name": "desc_NumHDonors",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 6.0,
+          "lower": 2.0
+        }
+      },
+      {
+        "name": "desc_NumRotatableBonds",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "minimize",
+          "upper": 0.0,
+          "lower": 24.0
+        }
+      },
+      {
+        "name": "linker_desc_LengthRatio",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "maximize",
+          "upper": 1.0,
+          "lower": 0.0
+        }
+      },
+      {
+        "name": "linker_desc_EffectiveLength",
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 12.0,
+          "lower": 10.0
+        }
+      }
+    ],
+    "method": "wprod"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "IdenticalMurckoScaffold",
+    "parameters": {
+      "nbmax": 25,
+      "minscore": 0.0,
+      "outputmode": "binary"
+    }
+  }
+}

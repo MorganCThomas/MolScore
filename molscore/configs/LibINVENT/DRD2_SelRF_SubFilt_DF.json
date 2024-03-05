@@ -1,0 +1,105 @@
+{
+  "task": "DRD2_SelRF_SubFilt_DF",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": true,
+  "scoring_functions": [
+    {
+      "name": "LegacyQSAR",
+      "run": true,
+      "parameters": {
+        "prefix": "DRD2",
+        "env_engine": "mamba",
+        "model": "libinvent_DRD2"
+      }
+    },
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "LibINVENT",
+        "smarts": [
+          "[*;r8]",
+          "[*;r16]",
+          "[#7;!n][S;!$(S(=O)=O)]",
+          "[*;r9]",
+          "[*;r17]",
+          "[#7;!n][C;!$(C(=[ON])[NO])][#16;!s]",
+          "[*;r10]",
+          "[#8][#8]",
+          "[#7;!n][C;!$(C(=[ON])[NO])][#7;!n]",
+          "[*;r11]",
+          "[#6;+]",
+          "[#7;!n][C;!$(C(=[ON])[NO])]",
+          "[#8;!o]",
+          "[*;r12]",
+          "[#16][#16]",
+          "[#8;!o][C;!$(C(=[ON])[NO])][#16;!s]",
+          "[*;r13]",
+          "C(=[OS])[OS]",
+          "[#8;!o][C;!$(C(=[ON])[NO])][#8;!o]",
+          "[*;r14]",
+          "[#7;!n][#7;!n]",
+          "[#16;!s][C;!$(C(=[ON])[NO])][#16;!s]",
+          "[*;r15]",
+          "C#C"
+        ],
+        "method": "any", 
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SelectiveDecoratedReactionFilter",
+      "run": true,
+      "parameters": {
+        "prefix": "ReactionFilter",
+        "scaffold": "[N:0]1CCN(CC1)CCCC[N:1]",
+        "allowed_reactions": {
+          "0": ["[c;$(c1:[c,n]:[c,n]:[c,n]:[c,n]:[c,n]:1):1]-!@[N;$(NC)&!$(N=*)&!$([N-])&!$(N#*)&!$([ND1])&!$(N[O])&!$(N[C,S]=[S,O,N]),H2&$(Nc1:[c,n]:[c,n]:[c,n]:[c,n]:[c,n]:1):2]>>[*][c;$(c1:[c,n]:[c,n]:[c,n]:[c,n]:[c,n]:1):1].[*][N:2]"],
+          "1": ["[#6;!$(C(C=*)(C=*));!$([#6]~[O,N,S]);$([#6]~[#6]):1][C:2](=[O:3])[N;D2;$(N(C=[O,S]));!$(N~[O,P,S,N]):4][#6;!$(C=*);!$([#6](~[O,N,S])N);$([#6]~[#6]):5]>>[#6:1][C:2](=[O:3])[*].[*][N:4][#6:5]"]
+        },
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "DRD2_pred_proba",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "LibINVENT_substruct_match",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "ReactionFilter_score",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "prod"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  }
+}

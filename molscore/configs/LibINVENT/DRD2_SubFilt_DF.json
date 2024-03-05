@@ -1,0 +1,86 @@
+{
+  "task": "DRD2_SubFilt_DF",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": true,
+  "scoring_functions": [
+    {
+      "name": "LegacyQSAR",
+      "run": true,
+      "parameters": {
+        "prefix": "DRD2",
+        "env_engine": "mamba",
+        "model": "libinvent_DRD2"
+      }
+    },
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "LibINVENT",
+        "smarts": [
+          "[*;r8]",
+          "[*;r16]",
+          "[#7;!n][S;!$(S(=O)=O)]",
+          "[*;r9]",
+          "[*;r17]",
+          "[#7;!n][C;!$(C(=[ON])[NO])][#16;!s]",
+          "[*;r10]",
+          "[#8][#8]",
+          "[#7;!n][C;!$(C(=[ON])[NO])][#7;!n]",
+          "[*;r11]",
+          "[#6;+]",
+          "[#7;!n][C;!$(C(=[ON])[NO])]",
+          "[#8;!o]",
+          "[*;r12]",
+          "[#16][#16]",
+          "[#8;!o][C;!$(C(=[ON])[NO])][#16;!s]",
+          "[*;r13]",
+          "C(=[OS])[OS]",
+          "[#8;!o][C;!$(C(=[ON])[NO])][#8;!o]",
+          "[*;r14]",
+          "[#7;!n][#7;!n]",
+          "[#16;!s][C;!$(C(=[ON])[NO])][#16;!s]",
+          "[*;r15]",
+          "C#C"
+        ],
+        "method": "any",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "DRD2_pred_proba",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "LibINVENT_substruct_match",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "prod"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  }
+}

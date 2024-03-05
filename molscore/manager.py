@@ -745,10 +745,13 @@ class MolScoreBenchmark:
     
     presets = {
         "GuacaMol": resources.files('molscore.configs.GuacaMol'),
+        "GuacaMol_Scaffold": resources.files('molscore.configs.GuacaMol_Scaffold'),
         "MolOpt": resources.files('molscore.configs.MolOpt'),
         "5HT2A_PhysChem": resources.files('molscore.configs.5HT2A.PhysChem'),
         "5HT2A_Selectivity": resources.files('molscore.configs.5HT2A.PIDGIN_Selectivity'),
-        "5HT2A_Docking": resources.files('molscore.configs.5HT2A.Docking_Selectivity_rDock')
+        "5HT2A_Docking": resources.files('molscore.configs.5HT2A.Docking_Selectivity_rDock'),
+        "LibINVENT_Exp1": resources.files('molscore.configs.LibINVENT'),
+        "LinkINVENT_Exp3": resources.files('molscore.configs.LinkINVENT')
     }
 
     def __init__(
