@@ -8,13 +8,10 @@ setup(
     package_data={
         'molscore': [
             'data/sample.smi',
-            'data/models/RAScore/*/*',
-            'data/models/aizynth/*',
-            'data/models/libinvent/*',
-            'data/models/molopt/*'
-            'configs/*/*',
-            'configs/*/*/*',
-            'utils/gypsum_dl/*/*/*/*'],
+            'data/models/**/*',
+            'data/structures/**/*',
+            'configs/**/*',
+            'utils/gypsum_dl/**/*'],
         'moleval': [
             'test/data/sample.smi',
             'metrics/mcf.csv',
