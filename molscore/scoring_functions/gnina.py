@@ -1,11 +1,3 @@
-"""
-Makes use of and adapted from Gypsum-DL
-    https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3
-    https://durrantlab.pitt.edu/gypsum-dl/
-As well as pyscreener,
-    https://github.com/coleygroup/pyscreener
-"""
-
 import os
 import atexit
 import logging
@@ -18,11 +10,11 @@ from tempfile import TemporaryDirectory
 
 from rdkit import Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
-logger = logging.getLogger('smina')
+logger = logging.getLogger('gnina')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
@@ -36,6 +28,11 @@ class GninaDock:
     """
     return_metrics = ['docking_score', 'CNN_pose', 'CNN_affinity', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
+    @staticmethod
+    def check_installation():
+        if not ('gnina' in os.environ.keys()):
+            raise RuntimeError("Can't find gnina in PATH, please export the gnina executable as \'gnina\', an executable file can be downloaded here https://github.com/gnina/gnina/releases/")
+    
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cpus: int = 1, cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
@@ -51,8 +48,9 @@ class GninaDock:
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         :param gpu_device: Which GPU device to use for CNN scoring, -1 uses all available GPUs on machine
         """
-        # Check Gnina installation
-        assert 'gnina' in os.environ.keys(), "Can't find gnina in PATH, please export the gnina executable as \'gnina\'"
+        # Check requirements
+        self.check_installation()
+        check_openbabel()
 
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):

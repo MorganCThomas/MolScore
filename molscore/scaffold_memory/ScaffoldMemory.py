@@ -13,8 +13,8 @@ rdBase.DisableLog('rdApp.error')
 
 class ScaffoldMemory(object):
     def __init__(self):
-        self._scaffolds = {}
-        self._morganfp = {}
+        self._scaffolds = {} ## Dictionary of scaffold: {smiles: score}
+        self._morganfp = {} ## Dictionary of scaffold: morganfp
 
     def add(self, smiles, scores=None):
         if scores:

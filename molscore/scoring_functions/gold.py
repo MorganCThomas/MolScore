@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from rdkit.Chem import AllChem as Chem
 
 from molscore.scoring_functions.descriptors import MolecularDescriptors
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('gold')
@@ -33,6 +33,12 @@ class GOLDDock:
     # This class is ChemPLP by default
     return_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'time'] + generic_metrics
     docking_metric = 'Score'
+
+    @staticmethod
+    def check_installation():
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise RuntimeError("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_executable>)")
 
     # Can additionally add WATER DATA and WRITE OPTIONS
     default_config = {
@@ -128,7 +134,11 @@ class GOLDDock:
         :param dock_timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param kwargs:
         """
+        # Check requirements
+        check_openbabel()
+        self.check_installation()
         assert (gold_template is not None) or ((receptor is not None) and (ref_ligand is not None)), "Must specify gold template config, or both receptor and ref_ligand" 
+        
         # Convert any necessary file formats
         self.subprocess = timedSubprocess(shell=True)
         if ref_ligand.endswith('.pdb') or ref_ligand.endswith('.sdf'):

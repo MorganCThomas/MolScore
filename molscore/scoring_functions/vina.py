@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 
 from rdkit import Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, read_mol
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, read_mol, check_openbabel
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
@@ -29,6 +29,11 @@ class VinaDock:
     """
     return_metrics = ['docking_score', 'inter_score', 'intra_score', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
+    @staticmethod
+    def check_installation():
+        if not ('vina' in os.environ.keys()):
+            raise RuntimeError("Can't find vina in PATH, please export the vina executable as \'vina\'")
+    
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cpus: int = 1, cluster: Union[str, int] = None, 
                  file_preparation: str = 'obabel',
@@ -46,8 +51,10 @@ class VinaDock:
         :param dock_scoring: Docking scoring function to use [vina, vinardo]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         """
-        # Check vina installation
-        assert 'vina' in os.environ.keys(), "Can't find vina in PATH, please export the vina executable as \'vina\'"
+        # Check requirements
+        check_openbabel()
+        self.check_installation()
+        
         # Set file prep environment
         self.prep_env = file_preparation
         if self.prep_env == 'mgltools':

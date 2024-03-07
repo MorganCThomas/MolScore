@@ -12,7 +12,7 @@ from importlib import resources
 
 from rdkit.Chem import AllChem as Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
@@ -53,7 +53,8 @@ class rDock:
 
     @staticmethod
     def check_installation():
-        return shutil.which('rbdock')
+        if shutil.which('rbdock') is None:
+            raise RuntimeError("Could not find rDock path, please ensure proper installation.")
 
     @staticmethod
     def cavity_config(receptor_file, ligand_file):
@@ -176,7 +177,8 @@ END_SECTION
         :param dock_n_opt_constraints: Number of optional constraints required
         """
         # Check rDock installation
-        assert self.check_installation() is not None, "Could not find rDock path, please ensure proper installation"
+        self.check_installation()
+        check_openbabel()
 
         # Check if preset is provided
         assert preset or (receptor and ref_ligand), "Either preset or receptor and ref_ligand must be provided"

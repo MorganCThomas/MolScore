@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def raw(x: float, **kwargs):
@@ -182,6 +181,7 @@ def plot_mod(mod, func_kwargs: dict):
     :param func_kwargs: Keyword arguments for the modifier object
     :return:
     """
+    import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(3, 3))
     scale_max = max(v for k, v in func_kwargs.items() if k != 'objective')
     scale_max = 10 ** np.ceil(np.log10(scale_max))  # Round up to nearest log10
@@ -197,6 +197,7 @@ def plot_mod(mod, func_kwargs: dict):
 
 
 def plot_mod_objectives(mod, non_objective_kwargs: dict):
+    import matplotlib.pyplot as plt
     objectives = ['maximize', 'minimize']
     if mod.__name__ != 'norm':
         objectives.append('range')

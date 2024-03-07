@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from rdkit.Chem import AllChem as Chem
 
 from molscore.scoring_functions.descriptors import MolecularDescriptors
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('plants')
@@ -31,6 +31,12 @@ class PLANTSDock:
         'SCORE_NORM_CRT_WEIGHT', 'SCORE_RB_PEN_NORM_CRT_HEVATOMS', 'SCORE_NORM_CONTACT', 'EVAL', 'TIME', 
         'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant'
         ]
+    
+    @staticmethod
+    def check_installation():
+        # Check installation
+        if not ('PLANTS' in list(os.environ.keys())):
+            raise RuntimeError("PLANTS installation not found, please install and add to os environment (e.g., export PLANTS=<path_to_plants_executable>)")
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike], cluster: Union[str, int] = None,
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0, dock_timeout: float = 120.0,
@@ -44,7 +50,11 @@ class PLANTSDock:
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param dock_timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param kwargs:
-        """        
+        """
+        # Check requirements
+        check_openbabel()
+        self.check_installation()
+        
         # Convert necessary file formats
         self.subprocess = timedSubprocess(shell=True)
         if receptor.endswith('.pdb'):

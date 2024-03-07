@@ -4,6 +4,7 @@ import subprocess
 import multiprocessing
 import threading
 import os
+import shutil
 import time
 import gzip
 import signal
@@ -21,6 +22,11 @@ from pathlib import Path
 import pystow
 os.environ['PYSTOW_NAME'] = '.pidgin_data'
 from zenodo_client import Zenodo as ZenodoBase
+
+# ----- Requirements related -----
+def check_openbabel():
+    if shutil.which('obabel') is None:
+        raise RuntimeError("OpenBabel is required for this function, please install it using conda or mamba e.g., mamba install openbabel -c conda-forge")
 
 # ----- Multiprocessing related -----
 def Pool(*args):

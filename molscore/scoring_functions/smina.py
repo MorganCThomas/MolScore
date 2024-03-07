@@ -10,6 +10,7 @@ import os
 import atexit
 import logging
 import glob
+import shutil
 import subprocess
 from typing import Union
 from itertools import takewhile
@@ -17,7 +18,7 @@ from tempfile import TemporaryDirectory
 
 from rdkit import Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
@@ -35,6 +36,11 @@ class SminaDock:
     """
     return_metrics = ['docking_score', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
+    @staticmethod
+    def check_installation():
+        if shutil.which('smina') is None:
+            raise RuntimeError("Smina not found. Please install with mamba install smina==2017.11.9.")
+    
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cpus: int = 1, cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
@@ -49,6 +55,10 @@ class SminaDock:
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         """
+        # Check smina installation
+        check_openbabel()
+        self.check_installation()
+
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):
             pdbqt_receptor = receptor.replace('.pdb', '.pdbqt')
