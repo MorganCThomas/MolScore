@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "MolScore"
 version = "1.1.1"
 authors = [
-  { name="Morgan Thomas", email="morganthomas273@gmail.com" },
+  { name="Morgan Thomas", email="morganthomas263@gmail.com" },
 ]
 description = "A scoring, benchmarking and evaluation framework for goal directed generative models"
 readme = "README.md"
