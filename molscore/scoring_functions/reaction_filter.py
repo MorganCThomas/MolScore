@@ -182,6 +182,8 @@ class SelectiveDecoratedReactionFilter(DecoratedReactionFilter):
         """
         attachment_points = {}
         match_idxs = molecule.GetSubstructMatch(self.scaffold)
+        if not match_idxs:
+            return attachment_points
         molidx_to_vector = {match_idxs[sidx]: vidx for sidx, vidx in self.scaffidx_to_vector.items()}
         for idx in match_idxs:
             atom = molecule.GetAtomWithIdx(idx)
