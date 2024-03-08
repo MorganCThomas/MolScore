@@ -855,6 +855,9 @@ class MolScoreBenchmark:
         results = []
         # Compute results
         for MS in self.results:
+            if MS.main_df is None:
+                print(f"Skipping summary of {MS.configs['task']} as no results found")
+                continue
             metrics = MS.compute_metrics(endpoints=endpoints, thresholds=thresholds, chemistry_filters_basic=chemistry_filters_basic, budget=self.budget, n_jobs=n_jobs, target_smiles=target_smiles)
             metrics.update({"model_name": self.model_name, "model_parameters": self.model_parameters, "task": MS.configs["task"]})
             results.append(metrics)
