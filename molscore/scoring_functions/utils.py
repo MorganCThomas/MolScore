@@ -1,5 +1,6 @@
 from typing import Union, Sequence, Callable
 from functools import partial
+import platform
 import subprocess
 import multiprocessing
 import threading
@@ -30,7 +31,10 @@ def check_openbabel():
 
 # ----- Multiprocessing related -----
 def Pool(*args):
-    context = multiprocessing.get_context("fork")
+    if platform.system() == "Linux":
+        context = multiprocessing.get_context("fork")
+    else:
+        context = multiprocessing.get_context("spawn")
     return context.Pool(*args)
 
 
