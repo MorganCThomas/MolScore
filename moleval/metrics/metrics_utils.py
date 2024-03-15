@@ -1,4 +1,5 @@
 import os
+import platform
 from typing import Union, Tuple
 import multiprocessing
 from collections import Counter, defaultdict
@@ -20,11 +21,14 @@ from rdkit.Chem import Descriptors
 from moleval.metrics.SA_Score import sascorer
 from moleval.metrics.NP_Score import npscorer
 from moleval.metrics.ifg import identify_functional_groups
+from moleval.metrics.quality_filters import rd_filters
 
 _base_dir = os.path.split(__file__)[0]
 _mcf = pd.read_csv(os.path.join(_base_dir, 'mcf.csv'))
 _pains = pd.read_csv(os.path.join(_base_dir, 'wehi_pains.csv'),
                      names=['smarts', 'names'])
+_alerts_path = os.path.join(_base_dir, 'quality_filters', 'alert_collection.csv')
+_guacamol_rules_path = os.path.join(_base_dir, 'quality_filters', 'guacamol_rules.json')
 _filters = [Chem.MolFromSmarts(x) for x in
             pd.concat([_mcf, _pains], axis=0, sort=True)['smarts'].values]
 
@@ -42,7 +46,10 @@ def mapper(n_jobs):
 
         return _mapper
     if isinstance(n_jobs, int):
-        context = multiprocessing.get_context("fork")
+        if platform.system() == 'Linux':
+            context = multiprocessing.get_context("fork")
+        else:
+            context = multiprocess.get_context("spawn")
         pool = context.Pool(n_jobs)
 
         def _mapper(*args, **kwargs):
@@ -491,6 +498,40 @@ def mol_passes_filters(mol,
     return True
 
 
+class QualityFilter:
+    def __init__(self, rules: str = _guacamol_rules_path, n_jobs=1):
+        # Load files
+        self.rf = rd_filters.RDFilters(_alerts_path)
+        rule_dict = rd_filters.read_rules(rules)
+        rule_list = [x.replace("Rule_", "") for x in rule_dict.keys() if x.startswith("Rule") and rule_dict[x]]
+        rule_str = " and ".join(rule_list)
+        self.rf.build_rule_list(rule_list)
+        self._n_jobs = n_jobs
+
+    def score(self, mol):
+        output = self.rf.evaluate(mol)
+        if output[0] == "OK":
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def _score(mol, rf):
+        output = rf.evaluate(mol)
+        if output[0] == "OK":
+            return True
+        else:
+            return False
+
+    def score_mols(self, mols, normalize=True, n_jobs=1):
+        mols = [m for m in mapper(self._n_jobs)(get_mol, mols) if m is not None]
+        scores = [s for s in mapper(self._n_jobs)(partial(self._score, rf=self.rf), mols)]
+        if normalize:
+            return np.mean(scores)
+        else:
+            return np.sum(scores)
+
+
 def neutralize_atoms(mol, isomericSmiles=False):
     mol = get_mol(mol)
     if mol:
@@ -515,6 +556,7 @@ def neutralize_atoms(mol, isomericSmiles=False):
     else:
         return None
 
+
 def MCF_PAINS_filters(mol):
     """
     Mol passes MCF and Pains filters
@@ -530,6 +572,7 @@ def MCF_PAINS_filters(mol):
         return False
     else:
         return True
+
 
 class SillyWalks:
     """From https://github.com/PatWalters/silly_walks"""
@@ -589,4 +632,3 @@ class SillyWalks:
             return np.mean(scores)
         else:
             return np.sum(scores)
-

@@ -7,15 +7,16 @@ from molbloom import buy
 
 from moleval.utils import Fingerprints, maxmin_picker
 from moleval.metrics.metrics import se_diversity, FingerprintAnaloguesMetric
-from moleval.metrics.metrics_utils import compute_scaffold, mapper, neutralize_atoms, get_mol, canonic_smiles
+from moleval.metrics.metrics_utils import compute_scaffold, mapper, neutralize_atoms, get_mol, canonic_smiles, QualityFilter
 from moleval.metrics.chemistry_filters import ChemistryFilter
 
 class ScoreMetrics:
-    def __init__(self, scores: pd.DataFrame = None, target_smiles: list = None, budget: int = None, valid=True, unique=True , n_jobs=1):
+    def __init__(self, scores: pd.DataFrame = None, target_smiles: list = None, budget: int = None, valid=True, unique=True , n_jobs=1, benchmark=None):
         self.n_jobs = n_jobs
         self.total = len(scores)
         self.budget = budget if budget else self.total
         self.scores = self._preprocess_scores(scores.copy(deep=True), valid=valid, unique=unique, budget=budget)
+        self.benchmark = benchmark
         self.target_smiles = target_smiles if target_smiles else []
         self._preprocess_target()
         self.chemistry_filter = ChemistryFilter(n_jobs=self.n_jobs)
@@ -187,6 +188,74 @@ class ScoreMetrics:
         # Compute intersection
         return len(target.intersection(smiles))
 
+    def guacamol_score(self, endpoint):
+        task = self.scores.task.unique()[0]
+        if any([task.lower().startswith(name) for name in [
+            "aripiprazole",
+            "albuterol",
+            "mestranol",
+            "median",
+            "osimertinib",
+            "fexofenadine",
+            "ranolazine",
+            "perindopril",
+            "amlodipine",
+            "sitagliptin",
+            "zaleplon",
+            "valsartan",
+            "deco",
+            "scaffold",
+            "factor_xa_like_scaffold",
+            "gcca1_like_scaffold",
+            "lorlati_like_scaffold",
+            "pde5_scaffold"]]):
+            top1, top10, top100 = self.top_avg(top_n=[1, 10, 100], endpoint=endpoint, basic_filter=False, target_filter=False)
+            score = np.mean([top1, top10, top100])
+        if any([task.lower().startswith(name) for name in [
+            "celecoxxib",
+            "troglitazone",
+            "thiothixene"]]):
+            score, = self.top_avg(top_n=[1], endpoint=endpoint, basic_filter=False, target_filter=False)
+        elif task == "C11H24":
+            score, = self.top_avg(top_n=[159], endpoint=endpoint, basic_filter=False, target_filter=False)
+        elif task == "C9H10N2O2PF2Cl":
+            score, = self.top_avg(top_n=[250], endpoint=endpoint, basic_filter=False, target_filter=False)
+        else:
+            print(f"Unknown GuacaMol task {task}, returning uniform specification")
+            top1, top10, top100 = self.top_avg(top_n=[1, 10, 100], endpoint=endpoint, basic_filter=False, target_filter=False)
+            score = np.mean([top1, top10, top100])
+        return score
+
+    def add_benchmark_metrics(self, endpoint):
+        benchmark_metrics = {}
+        # Right now all Molopt metrics are already computed
+        if self.benchmark == "GuacaMol":
+            # Score
+            benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
+            # Quality
+            qf = QualityFilter(n_jobs=self.n_jobs)
+            top100_mols = self.scores.sort_values(by=endpoint, ascending=False)['smiles'].iloc[:100]
+            if len(top100_mols) < 100:
+                print(f"Less than 100 molecules to score for GuacaMol Quality, returning 0")
+                benchmark_metrics["GuacaMol_Quality"] = 0
+            else:
+                benchmark_metrics["GuacaMol_Quality"] = qf.score_mols(top100_mols)
+        elif self.benchmark == "GuacaMol_Scaffold":
+            # Score
+            benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
+            # Quality
+            qf = QualityFilter(n_jobs=self.n_jobs)
+            top100_mols = self.scores.sort_values(by=endpoint, ascending=False)['smiles'].iloc[:100]
+            if len(top100_mols) < 100:
+                print(f"Less than 100 molecules to score for GuacaMol Quality, returning 0")
+                benchmark_metrics["GuacaMol_Quality"] = 0
+            else:
+                benchmark_metrics["GuacaMol_Quality"] = qf.score_mols(top100_mols)
+        elif self.benchmark == "LibINVENT_Exp3":
+            # TODO
+            pass
+        return benchmark_metrics
+
     def get_metrics(self, endpoints=[], thresholds=[], chemistry_filters_basic=False, chemistry_filter_target=False, run_synthesizability=False, run_purchasability=False):
         # NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
         metrics =  {}
@@ -258,6 +327,9 @@ class ScoreMetrics:
         # Purchasability (MolBloom)
         if run_purchasability:
             metrics['Predicted Purchasability'] = np.mean(mapper(self.n_jobs)(buy, self.scores.smiles.tolist()))
+        # ----- Add any benchmark related metrics
+        if self.benchmark:
+            metrics.update(self.add_benchmark_metrics(endpoint=endpoint))
         return metrics
 
     def plot_endpoint(self, endpoint, x='index', label=None, chemistry_filters_basic=False, chemistry_filter_target=False,

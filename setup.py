@@ -15,7 +15,9 @@ setup(
         'moleval': [
             'test/data/sample.smi',
             'metrics/mcf.csv',
-            'metrics/wehi_pains.csv']},
+            'metrics/wehi_pains.csv',
+            'metrics/quality_filters/alert_collection.csv',
+            'metrics/guacamol_rules.json']},
     install_requires=[
         "numpy",
         "pandas",
