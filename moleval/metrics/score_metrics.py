@@ -228,7 +228,9 @@ class ScoreMetrics:
 
     def add_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
-        # Right now all Molopt metrics are already computed
+        if self.benchmark == "MolOpt":
+            # Right now all Molopt metrics are already computed
+            pass
         if self.benchmark == "GuacaMol":
             # Score
             benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
@@ -251,9 +253,11 @@ class ScoreMetrics:
                 benchmark_metrics["GuacaMol_Quality"] = 0
             else:
                 benchmark_metrics["GuacaMol_Quality"] = qf.score_mols(top100_mols)
-        elif self.benchmark == "LibINVENT_Exp3":
-            # TODO
-            pass
+        #elif self.benchmark == "LibINVENT_Exp3":
+        #    # TODO
+        #    pass
+        else:
+            print(f"Benchmark specific metrics for {self.benchmark} have not been defined yet. Nothing further to add.")
         return benchmark_metrics
 
     def get_metrics(self, endpoints=[], thresholds=[], chemistry_filters_basic=False, chemistry_filter_target=False, run_synthesizability=False, run_purchasability=False):
