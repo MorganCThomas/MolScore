@@ -610,7 +610,7 @@ class MyMol:
         self.conformers.sort(key=operator.attrgetter("energy"))
 
         # Remove ones that are very structurally similar.
-        self.eliminate_structurally_similar_conformers(rmsd_cutoff)
+        #self.eliminate_structurally_similar_conformers(rmsd_cutoff)
 
     def eliminate_structurally_similar_conformers(self, rmsd_cutoff=0.1):
         """Eliminates conformers that are very geometrically similar.

@@ -114,7 +114,7 @@ END_SECTION
     
     @staticmethod
     def add_pharmacophore_constraint(config, constraints=None, optional_constraints=None, n_optional=1):
-        if constraints and optional_constraints:
+        if optional_constraints:
              config += \
 f"""
 #################################
@@ -124,19 +124,6 @@ SECTION PHARMA
     SCORING_FUNCTION RbtPharmaSF
     WEIGHT 1.0
     CONSTRAINTS_FILE {os.path.basename(constraints)}
-    OPTIONAL_FILE {os.path.basename(optional_constraints)}
-    NOPT {n_optional}
-END_SECTION
-"""
-        elif optional_constraints and not constraints:
-            config += \
-f"""
-#################################
-## PHARMACOPHORIC RESTRAINTS
-#################################
-SECTION PHARMA
-    SCORING_FUNCTION RbtPharmaSF
-    WEIGHT 1.0
     OPTIONAL_FILE {os.path.basename(optional_constraints)}
     NOPT {n_optional}
 END_SECTION
@@ -176,7 +163,7 @@ END_SECTION
     def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None, ref_xyz: list[float] = None,
                  cavity_kwargs: dict = {"RADIUS": 10.0, "SMALL_SPHERE": 1.5, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5},
                  cluster: Union[str, int] = None, 
-                 ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
+                 ligand_preparation: str = 'GypsumDL', ligand_preparation_kwargs: dict = {}, prep_timeout: float = 30.0,
                  dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
                  dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 0.5, dock_substructure_max_rot: int = 10.0,
                  dock_constraints: Union[str, os.PathLike] = None,
@@ -191,6 +178,7 @@ END_SECTION
         :param cavity_kwargs: Dictionary of parameters for cavity generation, any changes will update defaults so only need to supply the changing parameter, see rDock manual for details
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param ligand_preparation_kwargs: Additional keyword arguments for ligand preparation
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param dock_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
@@ -271,9 +259,9 @@ END_SECTION
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
         if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger, **ligand_preparation_kwargs)
         else:
-            self.ligand_protocol = self.ligand_protocol(logger=logger)
+            self.ligand_protocol = self.ligand_protocol(logger=logger, **ligand_preparation_kwargs)
 
         # Select docking protocol
         if dock_protocol in ['dock', 'dock_solv', 'dock_grid', 'dock_solv_grid', 'minimise', 'minimise_solv', 'score', 'score_solv']:
@@ -287,6 +275,11 @@ END_SECTION
         rec_prm = self.cavity_config(self.receptor, self.ref, self.xyz, self.cavity_kwargs)
         # Add PH4 constriants
         if self.dock_constraints or self.dock_opt_constraints:
+            # If only optional provided we have to create an empty mandatory file
+            if self.dock_opt_constraints and not self.dock_constraints:
+                self.dock_constraints = os.path.join(self.temp_dir.name, 'empty.restr')
+                with open(self.dock_constraints, 'wt') as f: 
+                    pass
             rec_prm = self.add_pharmacophore_constraint(rec_prm, self.dock_constraints, self.dock_opt_constraints, self.dock_n_opt_constraints)
             if self.dock_constraints: self.rdock_files.append(self.dock_constraints)
             if self.dock_opt_constraints: self.rdock_files.append(self.dock_opt_constraints)
@@ -392,7 +385,7 @@ END_SECTION
                 in_lig = os.path.join(self.directory, f'{name}-{variant}_prepared.sd')
                 out_lig = os.path.join(self.directory, f'{name}-{variant}_docked')
                 out_log = os.path.join(self.directory, f'{name}-{variant}_rbdock.log')
-                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} --allH'
+                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} -allH'
                 rdock_commands.append(command)
 
         # Initialize subprocess
@@ -431,8 +424,9 @@ END_SECTION
                 if os.path.exists(out_file):
                     # Try to load it in, and grab the score
                     try:
-                        rdock_out = Chem.ForwardSDMolSupplier(out_file, sanitize=False) 
-                        for mol in rdock_out:  
+                        rdock_out = Chem.SDMolSupplier(out_file, sanitize=False) 
+                        for mol_idx in range(len(rdock_out)):
+                            mol = rdock_out[mol_idx]
                             mol = manually_charge_mol(mol) # RDKit doesn't like rDock charged files
                             dscore = mol.GetPropsAsDict()['SCORE']
                             
