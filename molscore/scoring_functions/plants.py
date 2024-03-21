@@ -82,13 +82,11 @@ class PLANTSDock:
         self.docking_results = None
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name, 
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Set default PLANTS params & find binding site center
@@ -112,7 +110,7 @@ class PLANTSDock:
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
+        if self.client is not None:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
@@ -156,7 +154,7 @@ class PLANTSDock:
         logger.debug('PLANTS called')
         p = timedSubprocess(timeout=self.dock_timeout).run
 
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, plants_commands)
             results = self.client.gather(futures)
         else:
@@ -247,7 +245,7 @@ class PLANTSDock:
         :param parallel: Whether to run using Dask
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_files = [os.path.join(k, 'docked_ligands.sdf') for k in keep] + [os.path.join(k, 'ranking.csv') for k in keep]
@@ -311,7 +309,7 @@ class PLANTSDock:
         logger.addHandler(fh)
 
         # Refresh Dask every few hundred iterations
-        if self.cluster is not None:
+        if self.client is not None:
             if int(step) % 250 == 0:
                 self.client.restart()
 

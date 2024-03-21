@@ -110,18 +110,16 @@ class VinaDock:
         self.temp_dir = TemporaryDirectory()
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name,
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
+        if self.client is not None:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
@@ -149,7 +147,7 @@ class VinaDock:
                 cmds1.append(f"obabel {vfile} -O {tvfile}")
                 cmds2.append(f"{self.prep_env} {self.prep_lig} -l {tvfile} -o {new_vfile}")
 
-        if self.cluster:
+        if self.client:
             if cmds1:
                 futures = self.client.map(p, cmds1)
                 self.client.gather(futures)
@@ -168,11 +166,11 @@ class VinaDock:
         for docked_file in glob.glob(os.path.join(self.directory, f'*_docked.pdbqt')):
             new_docked_file = docked_file.replace('.pdbqt', '.sdf')
             cmd = f"obabel {docked_file} -O {new_docked_file}"
-            if self.cluster:
+            if self.client:
                 futures.append(self.client.submit(p, cmd))
             else:
                 p(cmd)
-        if self.cluster: self.client.gather(futures)
+        if self.client: self.client.gather(futures)
 
     def dock_ligands(self, variant_paths):
         vina_commands = []
@@ -189,7 +187,7 @@ class VinaDock:
         logger.debug('Vina called')
         p = timedSubprocess(timeout=self.dock_timeout).run
 
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, vina_commands)
             results = self.client.gather(futures)
         else:
@@ -308,7 +306,7 @@ class VinaDock:
         :param parallel: Whether to run using Dask (requires scheduler address during initialisation).
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_poses = [f'{k}_docked.sdf' for k in keep]

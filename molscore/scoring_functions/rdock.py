@@ -247,18 +247,16 @@ END_SECTION
         if self.ref: self.rdock_files.append(self.ref)
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name,
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
+        if self.client is not None:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger, **ligand_preparation_kwargs)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger, **ligand_preparation_kwargs)
@@ -348,14 +346,14 @@ END_SECTION
         
     def align_mols(self, varients, varient_files):
         logger.debug('Aligning molecules for tethered docking')
-        if self.cluster:
+        if self.client:
             p = partial(self._align_mol, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
             p = timedFunc2(p, timeout=self.prep_timeout)
             futures = self.client.map(p, varient_files)
             results = self.client.gather(futures)
         else:
             for vfile in varient_files:
-                p = timedFunc2(self.align_mol, timeout=self.prep_timeout)
+                p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
                 p(vfile, self.ref_mol, self.substructure_smarts, logger=logger)
         return varients, varient_files     
     
@@ -366,14 +364,14 @@ END_SECTION
         for vfile in varient_files:
             new_vfile = vfile.replace(".sdf", ".sd")
             new_varient_files.append(new_vfile)
-            if self.cluster:
+            if self.client:
                 p = timedSubprocess()
                 futures.append(self.client.submit(p.run, f"obabel {vfile} -O {new_vfile}"))
             else:
                 self.subprocess.run(f"obabel {vfile} -O {new_vfile}")
         
         # Wait for parallel jobs
-        if self.cluster: self.client.gather(futures)
+        if self.client: self.client.gather(futures)
         
         return varients, new_varient_files
 
@@ -396,7 +394,7 @@ END_SECTION
         p = partial(p.run, cwd=self.directory)
 
         # Submit docking subprocesses
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, rdock_commands)
             results = self.client.gather(futures)
         else:
@@ -496,7 +494,7 @@ END_SECTION
         :param parallel: Whether to run using Dask (requires scheduler address during initialisation).
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_poses = [f'{k}_docked.sd' for k in keep]
