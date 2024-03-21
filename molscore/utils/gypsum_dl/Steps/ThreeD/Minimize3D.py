@@ -105,15 +105,19 @@ def minimize_3d(
         results.append(mol)
         contnr_list_not_empty.add(mol.contnr_idx)
 
+    # MCT 21/03/24: contnr index might not relate to the index in the contnrs list
+    # Use a map instead
+    contnr_map = {contnr.contnr_idx: contnr for contnr in contnrs}
+
     # Go through each of the containers that are not empty and remove current
     # ones. Because you'll be replacing them with optimized versions.
     for i in contnr_list_not_empty:
-        contnrs[i].mols = []
+        contnr_map[i].mols = []
 
     # Go through each of the minimized mols, and populate containers they
     # belong to.
     for mol in results:
-        contnrs[mol.contnr_idx].add_mol(mol)
+        contnr_map[mol.contnr_idx].add_mol(mol)
 
     # Alert the user to any errors.
     for contnr in contnrs:

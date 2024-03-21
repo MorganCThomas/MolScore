@@ -347,8 +347,8 @@ END_SECTION
     def align_mols(self, varients, varient_files):
         logger.debug('Aligning molecules for tethered docking')
         if self.client:
-            p = partial(self._align_mol, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
-            p = timedFunc2(p, timeout=self.prep_timeout)
+            p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
+            p = partial(p, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
             futures = self.client.map(p, varient_files)
             results = self.client.gather(futures)
         else:

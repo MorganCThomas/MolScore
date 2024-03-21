@@ -478,9 +478,9 @@ class GypsumDL(LigandPreparation):
         else:
             # Normal prepare and embed
             if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL')
-            catch_prepare_smiles(contnrs, self.gypsum_params)
+            contnrs = catch_prepare_smiles(contnrs, self.gypsum_params)
             if logger: logger.debug('Preparing 3D embedding with Gypsum-DL')
-            catch_prepare_3d(contnrs, self.gypsum_params)
+            contnrs = catch_prepare_3d(contnrs, self.gypsum_params)
 
         # Enforce specified tautomers
         if self.enforce_tautomer:
