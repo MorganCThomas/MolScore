@@ -12,7 +12,7 @@ from importlib import resources
 
 from rdkit.Chem import AllChem as Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel, timedFunc2
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
@@ -350,11 +350,13 @@ END_SECTION
         logger.debug('Aligning molecules for tethered docking')
         if self.cluster:
             p = partial(self._align_mol, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
+            p = timedFunc2(p, timeout=self.prep_timeout)
             futures = self.client.map(p, varient_files)
             results = self.client.gather(futures)
         else:
             for vfile in varient_files:
-                self._align_mol(vfile, self.ref_mol, self.substructure_smarts, logger=logger)
+                p = timedFunc2(self.align_mol, timeout=self.prep_timeout)
+                p(vfile, self.ref_mol, self.substructure_smarts, logger=logger)
         return varients, varient_files     
     
     def reformat_ligands(self, varients, varient_files):
