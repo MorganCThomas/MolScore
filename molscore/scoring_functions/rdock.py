@@ -32,6 +32,7 @@ class rDock:
         'SCORE', 
         'SCORE.INTER',
         'SCORE.INTRA',
+        'TETHERED.RMSD',
         'NetCharge', 'PositiveCharge', 'NegativeCharge',
         'best_variant'
         ]
@@ -165,7 +166,8 @@ END_SECTION
                  cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', ligand_preparation_kwargs: dict = {}, prep_timeout: float = 30.0,
                  dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
-                 dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 0.5, dock_substructure_max_rot: int = 10.0,
+                 dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 0.5,
+                 dock_substructure_max_rot: int = 10.0, dock_substructure_max_rmsd: float = 2.0,
                  dock_constraints: Union[str, os.PathLike] = None,
                  dock_opt_constraints: Union[str, os.PathLike] = None, dock_n_opt_constraints: int = 1,
                  **kwargs):
@@ -186,6 +188,7 @@ END_SECTION
         :param dock_substructure_constraints: SMARTS pattern to constrain ligands to reference ligand
         :param dock_substructure_max_trans: Maximum allowed translation of tethered substructure
         :param dock_substructure_max_rot: Maximum allowed rotation of tethered substructure
+        :param dock_substructure_max_rmsd: Maximum allowed RMSD of tethered substructure
         :param dock_constraints: Path to rDock pharmacophoric constriants file that are mandatory
         :param dock_opt_constraints: Path to rDock pharmacophoric constriants file that are optional
         :param dock_n_opt_constraints: Number of optional constraints required
@@ -240,6 +243,7 @@ END_SECTION
         self.rdock_env = 'rbdock'
         self.rcav_env = 'rbcavity'
         self.substructure_smarts = dock_substructure_constraints
+        self.substructure_max_rmsd = dock_substructure_max_rmsd
         self.dock_constraints = os.path.abspath(dock_constraints) if dock_constraints else dock_constraints
         self.dock_opt_constraints = os.path.abspath(dock_opt_constraints) if dock_opt_constraints else dock_opt_constraints
         self.dock_n_opt_constraints = dock_n_opt_constraints
@@ -312,7 +316,7 @@ END_SECTION
         self.subprocess.run(f'cp {" ".join(self.rdock_files)} {cwd}')
 
     @staticmethod
-    def _align_mol(query: os.PathLike, ref_mol: Chem.rdchem.Mol, smarts: str, logger: logging.Logger):
+    def _align_mol(query: os.PathLike, ref_mol: Chem.rdchem.Mol, smarts: str, max_rmsd: float, logger: logging.Logger):
         # TODO return several variants for multiple ref matches? E.g., variant-1_205 i.e.,  +0{count}
         # Load query file
         with Chem.SDMolSupplier(query, removeHs=False) as suppl:
@@ -337,9 +341,11 @@ END_SECTION
             if 0 in query_match:
                 query_match.remove(0)
             query_mol.SetProp("TETHERED ATOMS", ",".join([str(a) for a in query_match]))
-            # Save aligned mol
-            with Chem.SDWriter(query) as writer:
-                writer.write(query_mol)
+            query_mol.SetProp("TETHERED.RMSD", str(min(rmsds)))
+            # Save aligned mol if below max_rmsd
+            if (max_rmsd) and (min(rmsds) <= max_rmsd):
+                with Chem.SDWriter(query) as writer:
+                    writer.write(query_mol)
         else:
             # TODO unspecified constrained docking by MCS
             logger.warning(f"No substructure match found for {query}, skipping alignment.")
@@ -348,13 +354,13 @@ END_SECTION
         logger.debug('Aligning molecules for tethered docking')
         if self.client:
             p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
-            p = partial(p, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
+            p = partial(p, ref_mol=self.ref_mol, smarts=self.substructure_smarts, max_rmsd=self.substructure_max_rmsd, logger=logger)
             futures = self.client.map(p, varient_files)
             results = self.client.gather(futures)
         else:
             for vfile in varient_files:
                 p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
-                p(vfile, self.ref_mol, self.substructure_smarts, logger=logger)
+                p(vfile, ref_mol=self.ref_mol, smarts=self.substructure_smarts, max_rmsd=self.substructure_max_rmsd, logger=logger)
         return varients, varient_files     
     
     def reformat_ligands(self, varients, varient_files):
@@ -434,6 +440,7 @@ END_SECTION
                             if best_score[name] is None:
                                 best_score[name] = dscore
                                 best_variants[i] = f'{name}-{variant}'
+                                # TODO TETHERED.RMSD isn't read because of previous error in rDock sd formatting without ">""
                                 docking_result.update({f'{self.prefix}_' + k: v
                                                         for k, v in mol.GetPropsAsDict().items()
                                                         if k in self.return_metrics})
