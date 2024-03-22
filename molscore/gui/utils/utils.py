@@ -191,6 +191,8 @@ def send2pymol(name, path, pymol, col=None):
 def _find_sdf(query_dir, step, batch_idx):
     if query_dir is None:
          return
+    step = int(step)
+    batch_idx = int(batch_idx)
     # Search for an sdf file
     possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sd*'))
     # Try without variant
