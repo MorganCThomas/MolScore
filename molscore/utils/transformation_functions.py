@@ -21,14 +21,17 @@ def norm(x: float, objective: str, max: float, min: float, **kwargs):
     :param kwargs:
     :return:
     """
-    if objective == 'maximize':
-        y = (x - min) / (max - min)
+    try:
+        if objective == 'maximize':
+            y = (x - min) / (max - min)
 
-    elif objective == 'minimize':
-        y = (x - max) / (min - max)
+        elif objective == 'minimize':
+            y = (x - max) / (min - max)
 
-    else:
-        raise
+        else:
+            raise
+    except ZeroDivisionError:
+        y = 0.0
     return y
 
 
