@@ -8,6 +8,7 @@ setup(
     package_data={
         'molscore': [
             'data/sample.smi',
+            'data/sample.bloom',
             'data/models/**/*',
             'data/structures/**/*',
             'configs/**/*',

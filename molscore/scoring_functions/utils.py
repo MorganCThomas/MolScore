@@ -388,6 +388,17 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     return mol
 
 
+def canonize_smiles(smiles_or_mol, return_none=True):
+    mol = get_mol(smiles_or_mol)
+    if mol:
+        return Chem.MolToSmiles(mol)
+    else:
+        if return_none:
+            return None
+        else:
+            return smiles_or_mol
+
+
 def read_mol(mol_path: os.PathLike, i=0):
     if mol_path.endswith('.mol2') or mol_path.endswith('.mol'):
         mol = Chem.MolFromMolFile(mol_path, sanitize=False, strictParsing=False)

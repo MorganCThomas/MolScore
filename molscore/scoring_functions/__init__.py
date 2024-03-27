@@ -47,6 +47,12 @@ except Exception as e:
     logger.warn(f"Failed to import SubstructureMatch, currently unavailable due to the following: {e}")
 
 try:
+    from molscore.scoring_functions.bloom_filter import BloomFilter
+    all_scoring_functions.append(BloomFilter)
+except Exception as e:
+    logger.warn(f"Failed to import BloomFilter, currently unavailable due to the following: {e}")
+
+try:
     from molscore.scoring_functions.reaction_filter import DecoratedReactionFilter, SelectiveDecoratedReactionFilter
     all_scoring_functions.extend([DecoratedReactionFilter, SelectiveDecoratedReactionFilter])
 except Exception as e:
