@@ -262,7 +262,7 @@ def save_sdf(mol_paths, mol_names, out_file):
 
 
 # ----- Plotting -----
-def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median'):
+def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median', trendline_only=False):
     if y == 'valid':
         tdf = main_df.groupby(['run', 'step'])[y].agg(lambda x: (x == 'true').mean()).reset_index()
         fig = px.line(data_frame=tdf, x='step', y=y, range_y=(0, 1), color='run', template='plotly_white')
@@ -280,12 +280,15 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median'):
     else:
         if x == 'index': x = 'idx'
         if trendline:
+            n_runs = len(main_df.run.unique())
+            if n_runs > 1: trendline_color = False
+            else: trendline_color = 'black'
             if trendline == 'max':
                 fig = px.scatter(
                     data_frame=main_df, x=x, y=y, color='run',
                     hover_data=['run', 'step', 'batch_idx', y],
                     trendline='expanding', trendline_options=dict(function='max'),
-                    trendline_color_override='black',
+                    trendline_color_override=trendline_color,
                     opacity=0.4, template='plotly_white'
                 )
             else:
@@ -293,9 +296,14 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median'):
                     data_frame=main_df, x=x, y=y, color='run',
                     hover_data=['run', 'step', 'batch_idx', y],
                     trendline='rolling', trendline_options=dict(function=trendline, window=100),
-                    trendline_color_override='black',
+                    trendline_color_override=trendline_color,
                     opacity=0.4, template='plotly_white'
                 )
+            
+            if trendline_only:
+                fig.data = [t for t in fig.data if t.mode == "lines"]
+                fig.update_traces(showlegend=True) #trendlines have showlegend=False by default
+
         else:           
             fig = px.scatter(
                 data_frame=main_df, x=x, y=y, color='run',
