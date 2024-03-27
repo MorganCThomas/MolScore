@@ -7,11 +7,12 @@ def single_plot(main_df, SS, dock_path=None):
     """ The streamlit monitors main page """
 
     # ----- Show central plot -----
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     x_axis = col1.selectbox('Plot x-axis', ['step', 'index'], index=0)
     y_axis = col2.selectbox('Plot y-axis', [c for c in main_df.columns.tolist() if c not in SS.exclude_params], index=7)
     valid_only = col3.checkbox(label='Valid only')
     unique_only = col3.checkbox(label='Unique only')
+    trendline = col4.selectbox('Trendline', [None, 'median', 'mean', 'max'], index=1)
 
     tdf = main_df
     if valid_only:
@@ -19,7 +20,7 @@ def single_plot(main_df, SS, dock_path=None):
     if unique_only:
         tdf = tdf.loc[tdf.unique == True, :]
 
-    fig = utils.plotly_plot(y_axis, tdf, x=x_axis)
+    fig = utils.plotly_plot(y_axis, tdf, x=x_axis, trendline=trendline)
     selection = utils.plotly_events(fig, click_event=False, select_event=True)
     selection = [int(tdf[tdf.run == tdf.run.unique()[sel['curveNumber']//2]].index[sel['pointNumber']]) for sel in selection]
   

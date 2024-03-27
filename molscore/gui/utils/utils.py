@@ -262,7 +262,7 @@ def save_sdf(mol_paths, mol_names, out_file):
 
 
 # ----- Plotting -----
-def plotly_plot(y, main_df, size=(1000, 500), x='step'):
+def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median'):
     if y == 'valid':
         tdf = main_df.groupby(['run', 'step'])[y].agg(lambda x: (x == 'true').mean()).reset_index()
         fig = px.line(data_frame=tdf, x='step', y=y, range_y=(0, 1), color='run', template='plotly_white')
@@ -279,13 +279,31 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step'):
             )
     else:
         if x == 'index': x = 'idx'
-        fig = px.scatter(
-            data_frame=main_df, x=x, y=y, color='run',
-            hover_data=['run', 'step', 'batch_idx', y],
-            trendline='rolling', trendline_options=dict(function='median', window=100),
-            trendline_color_override='black',
-            opacity=0.4, template='plotly_white'
+        if trendline:
+            if trendline == 'max':
+                fig = px.scatter(
+                    data_frame=main_df, x=x, y=y, color='run',
+                    hover_data=['run', 'step', 'batch_idx', y],
+                    trendline='expanding', trendline_options=dict(function='max'),
+                    trendline_color_override='black',
+                    opacity=0.4, template='plotly_white'
+                )
+            else:
+                fig = px.scatter(
+                    data_frame=main_df, x=x, y=y, color='run',
+                    hover_data=['run', 'step', 'batch_idx', y],
+                    trendline='rolling', trendline_options=dict(function=trendline, window=100),
+                    trendline_color_override='black',
+                    opacity=0.4, template='plotly_white'
+                )
+        else:           
+            fig = px.scatter(
+                data_frame=main_df, x=x, y=y, color='run',
+                hover_data=['run', 'step', 'batch_idx', y],
+                opacity=0.4, template='plotly_white'
             )
+
+
     return fig
 
 try:
