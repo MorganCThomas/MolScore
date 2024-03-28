@@ -62,9 +62,9 @@ class AiZynthFinder:
 
         # Set environment engine
         if (env_engine=='mamba') and check_exe('mamba'):
-            self.env_engine = 'mamba'
+            self.engine = 'mamba'
         elif check_exe('conda'):
-            self.env_engine = 'conda'
+            self.engine = 'conda'
         else:
             raise ValueError(f"Could not find mamba or conda executables needed to create and run this environment")
 
@@ -137,15 +137,15 @@ class AiZynthFinder:
             
         
     def _check_env(self):
-        cmd = "conda info --envs"
+        cmd = "{self.engine} info --envs"
         out = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
         envs = [line.split(" ")[0] for line in out.stdout.decode().splitlines()[2:]]
         return self.env in envs
 
     
     def _create_env(self):
-        cmd = f"conda create \"python>=3.8,<3.10\" -n {self.env} -y ; " \
-              f"conda run -n {self.env} pip install aizynthfinder"
+        cmd = f"{self.engine} create \"python>=3.8,<3.10\" -n {self.env} -y ; " \
+              f"{self.engine} run -n {self.env} pip install aizynthfinder"
         try:
             out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, check=True)
         except subprocess.CalledProcessError as e:
@@ -178,7 +178,7 @@ class AiZynthFinder:
         # Specify output file
         output_file = os.path.join(directory, 'aizynth_out.json')
         # Submit job to aizynthcli (specify filter policy if not None)
-        cmd = f"conda run -n {self.env} " \
+        cmd = f"{self.engine} run -n {self.env} " \
               f"aizynthcli --smiles {smiles_file.name} --config {self.config_file.name} --output {output_file} --nproc {int(self.n_jobs)}" # --filter my_policy
         if self.filter_policy:
             cmd += f" --filter my_policy"
