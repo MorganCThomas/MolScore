@@ -799,7 +799,7 @@ class MolScoreBenchmark:
                 self.configs.append(str(config))
 
         if self.custom_benchmark:
-            assert os.isdir(self.custom_benchmark), f"Custom benchmark directory {self.custom_benchmark} not found"
+            assert os.path.isdir(self.custom_benchmark), f"Custom benchmark directory {self.custom_benchmark} not found"
             for config in os.listdir(self.custom_benchmark):
                 if config.endswith(".json"):
                     self.configs.append(os.path.join(self.custom_benchmark, config))

@@ -12,7 +12,7 @@ def single_plot(main_df, SS, dock_path=None):
     y_axis = col2.selectbox('Plot y-axis', [c for c in main_df.columns.tolist() if c not in SS.exclude_params], index=7)
     valid_only = col3.checkbox(label='Valid only')
     unique_only = col3.checkbox(label='Unique only')
-    trendline = col4.selectbox('Trendline', [None, 'median', 'mean', 'max'], index=1)
+    trendline = col4.selectbox('Trendline', [None, 'median', 'mean', 'max', 'min'], index=1)
     col5.write("") ; col5.write("") # Hacky vertical fill
     trendline_only = col5.checkbox(label='Trendline only')
 

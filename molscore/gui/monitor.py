@@ -42,6 +42,9 @@ def add_run(input_dir, SS):
             if SS.main_df is None:
                 SS.main_df = df
             else:
+                # Ensure run names are unique
+                if df.run.unique()[0] in SS.main_df.run.unique():
+                    df.run = df.run + f'-{len(SS.input_dirs)}'
                 SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
         except FileNotFoundError as e:
             raise e 

@@ -283,11 +283,11 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median', tren
             n_runs = len(main_df.run.unique())
             if n_runs > 1: trendline_color = False
             else: trendline_color = 'black'
-            if trendline == 'max':
+            if trendline in ['max', 'min']:
                 fig = px.scatter(
                     data_frame=main_df, x=x, y=y, color='run',
                     hover_data=['run', 'step', 'batch_idx', y],
-                    trendline='expanding', trendline_options=dict(function='max'),
+                    trendline='expanding', trendline_options=dict(function=trendline),
                     trendline_color_override=trendline_color,
                     opacity=0.4, template='plotly_white'
                 )
