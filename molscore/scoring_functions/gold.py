@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from rdkit.Chem import AllChem as Chem
 
 from molscore.scoring_functions.descriptors import MolecularDescriptors
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('gold')
@@ -33,6 +33,12 @@ class GOLDDock:
     # This class is ChemPLP by default
     return_metrics = ['Score', 'S(PLP)', 'S(hbond)', 'S(cho)', 'S(metal)', 'DE(clash)', 'DE(tors)', 'time'] + generic_metrics
     docking_metric = 'Score'
+
+    @staticmethod
+    def check_installation():
+        # Check installation
+        if not ('GOLD' in list(os.environ.keys())):
+            raise RuntimeError("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_executable>)")
 
     # Can additionally add WATER DATA and WRITE OPTIONS
     default_config = {
@@ -128,7 +134,11 @@ class GOLDDock:
         :param dock_timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param kwargs:
         """
+        # Check requirements
+        check_openbabel()
+        self.check_installation()
         assert (gold_template is not None) or ((receptor is not None) and (ref_ligand is not None)), "Must specify gold template config, or both receptor and ref_ligand" 
+        
         # Convert any necessary file formats
         self.subprocess = timedSubprocess(shell=True)
         if ref_ligand.endswith('.pdb') or ref_ligand.endswith('.sdf'):
@@ -152,13 +162,11 @@ class GOLDDock:
         self.docking_results = None
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name, 
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Set GOLD params
@@ -171,7 +179,7 @@ class GOLDDock:
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
+        if self.client is not None:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
@@ -259,7 +267,7 @@ class GOLDDock:
         p = timedSubprocess(timeout=self.dock_timeout).run
 
         # Submit docking subprocesses
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, gold_commands)
             results = self.client.gather(futures)
         else:
@@ -348,7 +356,7 @@ class GOLDDock:
         :param parallel: Whether to run using Dask
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_files = [os.path.join(k, f'ranked_{k}_docked_m1_1.sdf') for k in keep] + [os.path.join(k, 'bestranking.lst') for k in keep]

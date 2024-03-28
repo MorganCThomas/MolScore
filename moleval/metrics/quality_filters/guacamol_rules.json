@@ -1,0 +1,31 @@
+{
+    "HBA": [
+        -1,
+        100
+    ],
+    "HBD": [
+        -1,
+        500
+    ],
+    "LogP": [
+        -50,
+        50
+    ],
+    "MW": [
+        0,
+        5000
+    ],
+    "Rule_BMS": false,
+    "Rule_Dundee": false,
+    "Rule_Glaxo": true,
+    "Rule_Inpharmatica": false,
+    "Rule_LINT": false,
+    "Rule_MLSMR": false,
+    "Rule_PAINS": true,
+    "Rule_SureChEMBL": true,
+    "Rule_BAI": true,
+    "TPSA": [
+        -1,
+        2000
+    ]
+}

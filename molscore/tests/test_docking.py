@@ -6,7 +6,7 @@ import subprocess
 from molscore.tests import test_files
 from molscore.tests.base_tests import BaseTests
 from molscore.tests.mock_generator import MockGenerator
-from molscore.scoring_functions import GlideDock, SminaDock, GninaDock, VinaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock, OEDock, rDock
+from molscore.scoring_functions import GlideDock, SminaDock, GninaDock, VinaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock, rDock
 
 
 class TestGlideDockSerial(BaseTests.TestScoringFunction):
@@ -98,8 +98,14 @@ class TestSminaDockSerial(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+        
         cls.obj = SminaDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("Smina installation not found")
+        # Instantiate
         cls.inst = SminaDock(
             prefix='test',
             receptor=test_files['DRD2_receptor_pdbqt'],
@@ -125,8 +131,14 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+        
         cls.obj = SminaDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("Smina installation not found")
+        # Instantiate
         cls.inst = SminaDock(
             prefix='test',
             receptor=test_files['DRD2_receptor_pdbqt'],
@@ -153,13 +165,16 @@ class TestGninaDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if not ('gnina' in list(os.environ.keys())):
-            raise unittest.SkipTest("Gnina installation not found, please install and add to os environment (e.g., export gnina=<path_to_exe>)")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = GninaDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("Gnina installation not found")
+        # Instantiate
         cls.inst = GninaDock(
             prefix='test',
             receptor=test_files['DRD2_receptor_pdbqt'],
@@ -183,13 +198,16 @@ class TestGninaDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if not ('gnina' in list(os.environ.keys())):
-            raise unittest.SkipTest("Gnina installation not found, please install and add to os environment (e.g., export gnina=<path_to_exe>)")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = GninaDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("Gnina installation not found")
+        # Instantiate
         cls.inst = GninaDock(
             prefix='test',
             receptor=test_files['DRD2_receptor_pdbqt'],
@@ -216,13 +234,16 @@ class TestVinaDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if not ('vina' in list(os.environ.keys())):
-            raise unittest.SkipTest("Vina installation not found, please install and add to os environment (e.g., export vina=<path_to_exe>)")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
         # Instantiate
         cls.obj = VinaDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("Vina installation not found")
+        # Instantiate
         cls.inst = VinaDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],
@@ -248,13 +269,15 @@ class TestVinaDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if not ('vina' in list(os.environ.keys())):
-            raise unittest.SkipTest("Vina installation not found, please install and add to os environment (e.g., export vina=<path_to_exe>)")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
         cls.obj = VinaDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("Vina installation not found")
+        # Instantiate
         cls.inst = VinaDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],
@@ -283,15 +306,16 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('PLANTS' in list(os.environ.keys())):
-            raise unittest.SkipTest("PLANTS installation not found, please install and add to os environment (e.g., export PLANTS=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = PLANTSDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("PLANTS installation not found")
+        # Instantiate
         cls.inst = PLANTSDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -316,15 +340,16 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('PLANTS' in list(os.environ.keys())):
-            raise unittest.SkipTest("PLANTS installation not found, please install and add to os environment (e.g., export PLANTS=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = PLANTSDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("PLANTS installation not found")
+        # Instantiate
         cls.inst = PLANTSDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -350,15 +375,16 @@ class TestGOLDDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('GOLD' in list(os.environ.keys())):
-            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+        
         cls.obj = GOLDDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("GOLD installation not found")
+        # Instantiate
         cls.inst = GOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -381,15 +407,16 @@ class TestGOLDDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('GOLD' in list(os.environ.keys())):
-            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = GOLDDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("GOLD installation not found")
+        # Instantiate
         cls.inst = GOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -415,15 +442,16 @@ class TestChemPLPGOLDDock(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('GOLD' in list(os.environ.keys())):
-            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = ChemPLPGOLDDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("GOLD installation not found")
+        # Instantiate
         cls.inst = ChemPLPGOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -449,15 +477,16 @@ class TestASPGOLDDock(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('GOLD' in list(os.environ.keys())):
-            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = ASPGOLDDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("GOLD installation not found")
+        # Instantiate
         cls.inst = ASPGOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -483,15 +512,16 @@ class TestChemScoreGOLDDock(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('GOLD' in list(os.environ.keys())):
-            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = ChemScoreGOLDDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("GOLD installation not found")
+        # Instantiate
         cls.inst = ChemScoreGOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -517,15 +547,16 @@ class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
-        # Check installation
-        if not ('GOLD' in list(os.environ.keys())):
-            raise unittest.SkipTest("GOLD installation not found, please install and add gold_auto to os environment (e.g., export GOLD=<path_to_plants_exe>)")
-
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = GoldScoreGOLDDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("GOLD installation not found")
+        # Instantiate
         cls.inst = GoldScoreGOLDDock(
             prefix='test',
             receptor=test_files["DRD2_receptor"],
@@ -553,6 +584,8 @@ class TestOEDockSerial(BaseTests.TestScoringFunction):
     def setUpClass(cls):
 
         # Check installation
+        try: from molscore.scoring_functions.oedock import OEDock
+        except: raise unittest.SkipTest("OpenEye not found, please install via mamba install openeye-toolkits -c openeye")
         if not ('OE_LICENSE' in list(os.environ.keys())):
             raise unittest.SkipTest("OpenEye license not found, please install license and export to \'OE_LICENSE\'")
 
@@ -584,6 +617,8 @@ class TestOEDockParallel(BaseTests.TestScoringFunction):
     def setUpClass(cls):
 
         # Check installation
+        try: from molscore.scoring_functions.oedock import OEDock
+        except: raise unittest.SkipTest("OpenEye not found, please install via mamba install openeye-toolkits -c openeye")
         if not ('OE_LICENSE' in list(os.environ.keys())):
             raise unittest.SkipTest("OpenEye license not found, please install license and export to \'OE_LICENSE\'")
 
@@ -616,13 +651,16 @@ class TestrDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if rDock.check_installation() is None:
-            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+        
         cls.obj = rDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("rDock installation not found")
+        # Instantiate
         cls.inst = rDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],
@@ -647,13 +685,16 @@ class TestrDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if rDock.check_installation() is None:
-            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = rDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("rDock installation not found")
+        # Instantiate
         cls.inst = rDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],
@@ -680,13 +721,16 @@ class TestrDockParallelPH4(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if rDock.check_installation() is None:
-            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = rDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("rDock installation not found")
+        # Instantiate
         cls.inst = rDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],
@@ -714,13 +758,16 @@ class TestrDockParallelScaff1(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if rDock.check_installation() is None:
-            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+
         cls.obj = rDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("rDock installation not found")
+        # Instantiate
         cls.inst = rDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],
@@ -750,13 +797,16 @@ class TestrDockParallelScaff2(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-        # Check installation
-        if rDock.check_installation() is None:
-            raise unittest.SkipTest("No rDock installation found, please ensure proper installation and executable paths")
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        # Instantiate
+        
         cls.obj = rDock
+        # Check installation
+        try:
+            cls.obj.check_installation()
+        except RuntimeError:
+            raise unittest.SkipTest("rDock installation not found")
+        # Instantiate
         cls.inst = rDock(
             prefix='test',
             receptor=test_files['DRD2_receptor'],

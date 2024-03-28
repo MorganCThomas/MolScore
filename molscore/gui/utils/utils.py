@@ -191,6 +191,8 @@ def send2pymol(name, path, pymol, col=None):
 def _find_sdf(query_dir, step, batch_idx):
     if query_dir is None:
          return
+    step = int(step)
+    batch_idx = int(batch_idx)
     # Search for an sdf file
     possible_files = glob(os.path.join(query_dir, str(step), f'{step}_{batch_idx}-*.sd*'))
     # Try without variant
@@ -260,7 +262,7 @@ def save_sdf(mol_paths, mol_names, out_file):
 
 
 # ----- Plotting -----
-def plotly_plot(y, main_df, size=(1000, 500), x='step'):
+def plotly_plot(y, main_df, size=(1000, 500), x='step', trendline='median', trendline_only=False):
     if y == 'valid':
         tdf = main_df.groupby(['run', 'step'])[y].agg(lambda x: (x == 'true').mean()).reset_index()
         fig = px.line(data_frame=tdf, x='step', y=y, range_y=(0, 1), color='run', template='plotly_white')
@@ -277,13 +279,39 @@ def plotly_plot(y, main_df, size=(1000, 500), x='step'):
             )
     else:
         if x == 'index': x = 'idx'
-        fig = px.scatter(
-            data_frame=main_df, x=x, y=y, color='run',
-            hover_data=['run', 'step', 'batch_idx', y],
-            trendline='rolling', trendline_options=dict(function='median', window=100),
-            trendline_color_override='black',
-            opacity=0.4, template='plotly_white'
+        if trendline:
+            n_runs = len(main_df.run.unique())
+            if n_runs > 1: trendline_color = False
+            else: trendline_color = 'black'
+            if trendline in ['max', 'min']:
+                fig = px.scatter(
+                    data_frame=main_df, x=x, y=y, color='run',
+                    hover_data=['run', 'step', 'batch_idx', y],
+                    trendline='expanding', trendline_options=dict(function=trendline),
+                    trendline_color_override=trendline_color,
+                    opacity=0.4, template='plotly_white'
+                )
+            else:
+                fig = px.scatter(
+                    data_frame=main_df, x=x, y=y, color='run',
+                    hover_data=['run', 'step', 'batch_idx', y],
+                    trendline='rolling', trendline_options=dict(function=trendline, window=100),
+                    trendline_color_override=trendline_color,
+                    opacity=0.4, template='plotly_white'
+                )
+            
+            if trendline_only:
+                fig.data = [t for t in fig.data if t.mode == "lines"]
+                fig.update_traces(showlegend=True) #trendlines have showlegend=False by default
+
+        else:           
+            fig = px.scatter(
+                data_frame=main_df, x=x, y=y, color='run',
+                hover_data=['run', 'step', 'batch_idx', y],
+                opacity=0.4, template='plotly_white'
             )
+
+
     return fig
 
 try:

@@ -52,7 +52,7 @@ class LigandPreparation:
 
 
 class LigPrep(LigandPreparation):
-    def __init__(self, dask_client=None, timeout: float = 120.0, logger=None, pH: float = 7.0, pHt: float = 1.0, bff: int = 16, max_stereo: int = 8):
+    def __init__(self, dask_client=None, timeout: float = 120.0, logger=None, pH: float = 7.0, pHt: float = 1.0, bff: int = 16, max_stereo: int = 8, **kwargs):
         """
         Initialize LigPrep ligand preparation
         :param dask_client: Scheduler address for dask parallelization
@@ -143,7 +143,7 @@ class LigPrep(LigandPreparation):
 
 
 class Epik(LigandPreparation):
-    def __init__(self, dask_client=None, timeout: float = 120.0, logger=None, RDKit_stereoisomers: bool = True, max_stereo: int = 16):
+    def __init__(self, dask_client=None, timeout: float = 120.0, logger=None, RDKit_stereoisomers: bool = True, max_stereo: int = 16, **kwargs):
         """
         Initialize Epik for ligand preparation, by default only enumerates the most likely protomer/tautomer and then enumerates stereoisomers.
         :param dask_client: Scheduler address for dask parallelization
@@ -268,7 +268,7 @@ class Epik(LigandPreparation):
 
 
 class Moka(LigandPreparation):
-    def __init__(self, dask_client=None, timeout: float = 120.0, logger=None):
+    def __init__(self, dask_client=None, timeout: float = 120.0, logger=None, **kwargs):
         """
         Initialize Moka/Corina ligand preparation
         :param dask_client: Scheduler address for dask parallelization
@@ -354,7 +354,10 @@ class GypsumDL(LigandPreparation):
         https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3
         https://durrantlab.pitt.edu/gypsum-dl/
     """
-    def __init__(self, dask_client=None, timeout=30.0, logger=None, pH: float = 7.0, pHt: float = 1.0, **kwargs):
+    def __init__(
+        self, dask_client=None, timeout=30.0, logger=None, pH: float = 7.0, pHt: float = 1.0,
+        skip_geometry_optimize: bool = True, thoroughness: int = 1, enforce_tautomer: str = None,
+        max_variants_per_compound: int = 8, **kwargs):
         """
         Initialize LigPrep ligand preparation
         :param dask_client: Scheduler address for dask parallelization or number of workers
@@ -362,11 +365,15 @@ class GypsumDL(LigandPreparation):
         :param logger: Currently used logger if present
         :param pH: pH at which to protonate molecules at
         :param pHt: pH Tolerance
+        :param skip_geometry_optimize: Skip geometry optimization
+        :param thoroughness: How many molecules to generate per 'max_variant'
+        :param enforce_tautomer: Enforce a particular tautomer by way of a well-defined SMARTS, if not present in any, don't enforce.
         """
         super().__init__(timeout=timeout, logger=logger)
         self.dask_client = dask_client
         self.timeout = timeout
-
+        self.enforce_tautomer = enforce_tautomer
+        
         n_jobs = 1
         job_manager="serial"
         self.gypsum_params = {
@@ -382,11 +389,11 @@ class GypsumDL(LigandPreparation):
             "min_ph": pH,
             "max_ph": pH,
             "pka_precision": pHt,
-            "thoroughness": 1,
-            "max_variants_per_compound": 8,
+            "thoroughness": thoroughness,
+            "max_variants_per_compound": max_variants_per_compound,
             "second_embed": False,
             "2d_output_only": False,
-            "skip_optimize_geometry": True,
+            "skip_optimize_geometry": skip_geometry_optimize,
             "skip_alternate_ring_conformations": True, # Errors
             "skip_adding_hydrogen": False,
             "skip_making_tautomers": False,
@@ -471,10 +478,18 @@ class GypsumDL(LigandPreparation):
         else:
             # Normal prepare and embed
             if logger: logger.debug('Preparing protonation states, tautomers and stereoisomers with Gypsum-DL')
-            prepare_smiles(contnrs, self.gypsum_params)
+            contnrs = catch_prepare_smiles(contnrs, self.gypsum_params)
             if logger: logger.debug('Preparing 3D embedding with Gypsum-DL')
-            prepare_3d(contnrs, self.gypsum_params)
+            contnrs = catch_prepare_3d(contnrs, self.gypsum_params)
 
+        # Enforce specified tautomers
+        if self.enforce_tautomer:
+            taut = Chem.MolFromSmarts(self.enforce_tautomer)
+            for contnr in contnrs:
+                if any([mol.rdkit_mol.HasSubstructMatch(taut) for mol in contnr.mols]):
+                    # Delete mols that don't match
+                    contnr.mols = [mol for mol in contnr.mols if mol.rdkit_mol.HasSubstructMatch(taut)]
+        
         # Add in name and unique id to each molecule.
         add_mol_id_props(contnrs)
 

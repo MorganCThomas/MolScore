@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from rdkit.Chem import AllChem as Chem
 
 from molscore.scoring_functions.descriptors import MolecularDescriptors
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
 logger = logging.getLogger('plants')
@@ -31,6 +31,12 @@ class PLANTSDock:
         'SCORE_NORM_CRT_WEIGHT', 'SCORE_RB_PEN_NORM_CRT_HEVATOMS', 'SCORE_NORM_CONTACT', 'EVAL', 'TIME', 
         'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant'
         ]
+    
+    @staticmethod
+    def check_installation():
+        # Check installation
+        if not ('PLANTS' in list(os.environ.keys())):
+            raise RuntimeError("PLANTS installation not found, please install and add to os environment (e.g., export PLANTS=<path_to_plants_executable>)")
 
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike], cluster: Union[str, int] = None,
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0, dock_timeout: float = 120.0,
@@ -44,7 +50,11 @@ class PLANTSDock:
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param dock_timeout: Timeout before killing an individual docking simulation (seconds) (only if using Dask for parallelisation)
         :param kwargs:
-        """        
+        """
+        # Check requirements
+        check_openbabel()
+        self.check_installation()
+        
         # Convert necessary file formats
         self.subprocess = timedSubprocess(shell=True)
         if receptor.endswith('.pdb'):
@@ -72,13 +82,11 @@ class PLANTSDock:
         self.docking_results = None
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name, 
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Set default PLANTS params & find binding site center
@@ -102,7 +110,7 @@ class PLANTSDock:
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
+        if self.client is not None:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
@@ -146,7 +154,7 @@ class PLANTSDock:
         logger.debug('PLANTS called')
         p = timedSubprocess(timeout=self.dock_timeout).run
 
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, plants_commands)
             results = self.client.gather(futures)
         else:
@@ -237,7 +245,7 @@ class PLANTSDock:
         :param parallel: Whether to run using Dask
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_files = [os.path.join(k, 'docked_ligands.sdf') for k in keep] + [os.path.join(k, 'ranking.csv') for k in keep]
@@ -301,7 +309,7 @@ class PLANTSDock:
         logger.addHandler(fh)
 
         # Refresh Dask every few hundred iterations
-        if self.cluster is not None:
+        if self.client is not None:
             if int(step) % 250 == 0:
                 self.client.restart()
 

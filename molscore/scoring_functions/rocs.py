@@ -194,7 +194,7 @@ class GlideDockFromROCS(GlideDock, ROCS):
         logger.addHandler(fh)
 
         # Refresh Dask every few hundred iterations
-        if self.cluster is not None:
+        if self.client is not None:
             if int(step) % 250 == 0:
                 self.client.restart()
 

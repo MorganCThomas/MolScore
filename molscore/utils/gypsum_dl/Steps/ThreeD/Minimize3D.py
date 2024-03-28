@@ -20,6 +20,7 @@ geometry.
 import __future__
 
 import copy
+import operator
 
 import molscore.utils.gypsum_dl.Utils as Utils
 import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
@@ -74,14 +75,14 @@ def minimize_3d(
     params = []
     ones_without_nonaro_rngs = set([])
     for contnr in contnrs:
-        if contnr.num_nonaro_rngs == 0:
+        #if contnr.num_nonaro_rngs == 0:
             # Because ones with nonaromatic rings have already been minimized,
-            # so they can be skipped here.
-            for mol in contnr.mols:
-                ones_without_nonaro_rngs.add(mol.contnr_idx)
-                params.append(
-                    tuple([mol, max_variants_per_compound, thoroughness, second_embed])
-                )
+            # so they can be skipped here. (Not if this step has been skipped: MCT 20/03/24)
+        for mol in contnr.mols:
+            ones_without_nonaro_rngs.add(mol.contnr_idx)
+            params.append(
+                tuple([mol, max_variants_per_compound, thoroughness, second_embed])
+            )
     params = tuple(params)
 
     # Run the inputs through the parallelizer.
@@ -104,15 +105,19 @@ def minimize_3d(
         results.append(mol)
         contnr_list_not_empty.add(mol.contnr_idx)
 
+    # MCT 21/03/24: contnr index might not relate to the index in the contnrs list
+    # Use a map instead
+    contnr_map = {contnr.contnr_idx: contnr for contnr in contnrs}
+
     # Go through each of the containers that are not empty and remove current
     # ones. Because you'll be replacing them with optimized versions.
     for i in contnr_list_not_empty:
-        contnrs[i].mols = []
+        contnr_map[i].mols = []
 
     # Go through each of the minimized mols, and populate containers they
     # belong to.
     for mol in results:
-        contnrs[mol.contnr_idx].add_mol(mol)
+        contnr_map[mol.contnr_idx].add_mol(mol)
 
     # Alert the user to any errors.
     for contnr in contnrs:
@@ -150,22 +155,27 @@ def parallel_minit(mol, max_variants_per_compound, thoroughness, second_embed):
     """
 
     # Not minimizing. Just adding the conformers.
-    mol.add_conformers(thoroughness * max_variants_per_compound, 0.1, False)
+    mol.add_conformers(thoroughness * max_variants_per_compound, 0.01, False)
 
     if len(mol.conformers) > 0:
         # Because it is possible to find a molecule that has no
         # acceptable conformers (i.e., is not possible geometrically).
         # Consider this:
-        # O=C([C@@]1([C@@H]2O[C@@H]([C@@]1(C3=O)C)CC2)C)N3c4sccn4
+        # O=C([C@@]1([C@@H]max_variants_per_compound2O[C@@H]([C@@]1(C3=O)C)CC2)C)N3c4sccn4
 
         # Further minimize the unoptimized conformers that were among the best
-        # scoring.
-        max_vars_per_cmpd = max_variants_per_compound
-        for i in range(len(mol.conformers[:max_vars_per_cmpd])):
+        # scoring. 
+        # MCT: 20/03/24: This should be controlled by thoroughness not max_vars_per_cmpd
+        # MCT: max_vars_per_cmpd = max_variants_per_compound
+        # MCT: for i in range(len(mol.conformers[:max_vars_per_cmpd])):
+        for i in range(len(mol.conformers)): # MCT
             mol.conformers[i].minimize()
 
         # Remove similar conformers
         # mol.eliminate_structurally_similar_conformers()
+
+        # MCT: 20/03/24: Sort conformers by lowest energy again after minimization
+        mol.conformers.sort(key=operator.attrgetter("energy"))
 
         # Get the best scoring (lowest energy) of these minimized conformers
         new_mol = copy.deepcopy(mol)

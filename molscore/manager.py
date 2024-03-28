@@ -717,7 +717,7 @@ class MolScore:
 
     # Additional methods only run if called directly
 
-    def compute_metrics(self, endpoints: list = None, thresholds: list = None, chemistry_filters_basic=True, budget=None, n_jobs=1, target_smiles=None):
+    def compute_metrics(self, endpoints: list = None, thresholds: list = None, chemistry_filters_basic=True, budget=None, n_jobs=1, target_smiles=None, benchmark=None):
         """
         Compute a suite of metrics
 
@@ -734,7 +734,7 @@ class MolScore:
             assert all([ep in self.main_df.columns for ep in endpoints])
         if thresholds is None:
             thresholds = [0.0]
-        SM = ScoreMetrics(scores=self.main_df, budget=budget, n_jobs=n_jobs, target_smiles=target_smiles)
+        SM = ScoreMetrics(scores=self.main_df, budget=budget, n_jobs=n_jobs, target_smiles=target_smiles, benchmark=benchmark)
         results = SM.get_metrics(endpoints=endpoints, thresholds=thresholds, chemistry_filters_basic=chemistry_filters_basic)
         # Change the name of the default score to "Score"
         results = {k.replace(self.configs["scoring"]["method"], "Score"): v for k,v in results.items()}
@@ -799,7 +799,7 @@ class MolScoreBenchmark:
                 self.configs.append(str(config))
 
         if self.custom_benchmark:
-            assert os.isdir(self.custom_benchmark), f"Custom benchmark directory {self.custom_benchmark} not found"
+            assert os.path.isdir(self.custom_benchmark), f"Custom benchmark directory {self.custom_benchmark} not found"
             for config in os.listdir(self.custom_benchmark):
                 if config.endswith(".json"):
                     self.configs.append(os.path.join(self.custom_benchmark, config))
@@ -855,7 +855,10 @@ class MolScoreBenchmark:
         results = []
         # Compute results
         for MS in self.results:
-            metrics = MS.compute_metrics(endpoints=endpoints, thresholds=thresholds, chemistry_filters_basic=chemistry_filters_basic, budget=self.budget, n_jobs=n_jobs, target_smiles=target_smiles)
+            if MS.main_df is None:
+                print(f"Skipping summary of {MS.configs['task']} as no results found")
+                continue
+            metrics = MS.compute_metrics(endpoints=endpoints, thresholds=thresholds, chemistry_filters_basic=chemistry_filters_basic, budget=self.budget, n_jobs=n_jobs, target_smiles=target_smiles, benchmark=self.benchmark)
             metrics.update({"model_name": self.model_name, "model_parameters": self.model_parameters, "task": MS.configs["task"]})
             results.append(metrics)
         # Save results

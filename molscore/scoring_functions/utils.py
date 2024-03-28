@@ -1,9 +1,11 @@
 from typing import Union, Sequence, Callable
 from functools import partial
+import platform
 import subprocess
 import multiprocessing
 import threading
 import os
+import shutil
 import time
 import gzip
 import signal
@@ -22,9 +24,17 @@ import pystow
 os.environ['PYSTOW_NAME'] = '.pidgin_data'
 from zenodo_client import Zenodo as ZenodoBase
 
+# ----- Requirements related -----
+def check_openbabel():
+    if shutil.which('obabel') is None:
+        raise RuntimeError("OpenBabel is required for this function, please install it using conda or mamba e.g., mamba install openbabel -c conda-forge")
+
 # ----- Multiprocessing related -----
 def Pool(*args):
-    context = multiprocessing.get_context("fork")
+    if platform.system() == "Linux":
+        context = multiprocessing.get_context("fork")
+    else:
+        context = multiprocessing.get_context("spawn")
     return context.Pool(*args)
 
 
@@ -376,6 +386,17 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
         mol = None
 
     return mol
+
+
+def canonize_smiles(smiles_or_mol, return_none=True):
+    mol = get_mol(smiles_or_mol)
+    if mol:
+        return Chem.MolToSmiles(mol)
+    else:
+        if return_none:
+            return None
+        else:
+            return smiles_or_mol
 
 
 def read_mol(mol_path: os.PathLike, i=0):

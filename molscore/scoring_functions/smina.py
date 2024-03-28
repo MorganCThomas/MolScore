@@ -10,6 +10,7 @@ import os
 import atexit
 import logging
 import glob
+import shutil
 import subprocess
 from typing import Union
 from itertools import takewhile
@@ -17,7 +18,7 @@ from tempfile import TemporaryDirectory
 
 from rdkit import Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
@@ -35,6 +36,11 @@ class SminaDock:
     """
     return_metrics = ['docking_score', 'NetCharge', 'PositiveCharge', 'NegativeCharge', 'best_variant']
 
+    @staticmethod
+    def check_installation():
+        if shutil.which('smina') is None:
+            raise RuntimeError("Smina not found. Please install with mamba install smina==2017.11.9.")
+    
     def __init__(self, prefix: str, receptor: Union[str, os.PathLike], ref_ligand: Union[str, os.PathLike],
                  cpus: int = 1, cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
@@ -49,6 +55,10 @@ class SminaDock:
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         """
+        # Check smina installation
+        check_openbabel()
+        self.check_installation()
+
         # If receptor is pdb, convert
         if receptor.endswith('.pdb'):
             pdbqt_receptor = receptor.replace('.pdb', '.pdbqt')
@@ -68,18 +78,16 @@ class SminaDock:
         self.temp_dir = TemporaryDirectory()
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name,
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
+        if self.client is not None:
             self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
         else:
             self.ligand_protocol = self.ligand_protocol(logger=logger)
@@ -107,7 +115,7 @@ class SminaDock:
         logger.debug('Smina called')
         p = timedSubprocess(timeout=self.dock_timeout).run
 
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, smina_commands)
             results = self.client.gather(futures)
         else:
@@ -226,7 +234,7 @@ class SminaDock:
         :param parallel: Whether to run using Dask (requires scheduler address during initialisation).
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_poses = [f'{k}_docked.sdf' for k in keep]

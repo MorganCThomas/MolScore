@@ -12,7 +12,7 @@ from importlib import resources
 
 from rdkit.Chem import AllChem as Chem
 
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils
+from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel, timedFunc2
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 
@@ -32,6 +32,7 @@ class rDock:
         'SCORE', 
         'SCORE.INTER',
         'SCORE.INTRA',
+        'TETHERED.RMSD',
         'NetCharge', 'PositiveCharge', 'NegativeCharge',
         'best_variant'
         ]
@@ -53,31 +54,55 @@ class rDock:
 
     @staticmethod
     def check_installation():
-        return shutil.which('rbdock')
+        if shutil.which('rbdock') is None:
+            raise RuntimeError("Could not find rDock path, please ensure proper installation.")
 
     @staticmethod
-    def cavity_config(receptor_file, ligand_file):
+    def cavity_config(receptor_file, ligand_file = None, xyz = None, cavity_kwargs = {}):
         config = \
 f"""RBT_PARAMETER_FILE_V1.00
 TITLE gart_DUD
 
 RECEPTOR_FILE {os.path.basename(receptor_file)}
 RECEPTOR_FLEX 3.0
-
+"""
+        assert ligand_file or xyz, "Either ligand_file or xyz must be provided"
+        if ligand_file:
+            config += \
+f"""
 ##################################################################
 ### CAVITY DEFINITION: REFERENCE LIGAND METHOD
 ##################################################################
 SECTION MAPPER
     SITE_MAPPER RbtLigandSiteMapper
     REF_MOL {os.path.basename(ligand_file)}
-    RADIUS 8.0
-    SMALL_SPHERE 1.0
-    MIN_VOLUME 100
-    MAX_CAVITIES 1
-    VOL_INCR 0.0
-GRIDSTEP 0.5
+    RADIUS {cavity_kwargs['RADIUS']}
+    SMALL_SPHERE {cavity_kwargs['SMALL_SPHERE']}
+    MIN_VOLUME {cavity_kwargs['MIN_VOLUME']}
+    MAX_CAVITIES {cavity_kwargs['MAX_CAVITIES']}
+    VOL_INCR {cavity_kwargs['VOL_INCR']}
+GRIDSTEP {cavity_kwargs['GRIDSTEP']}
 END_SECTION
-
+"""
+        else:
+            config += \
+f"""
+##################################################################
+### CAVITY DEFINITION: SPHERE METHOD
+##################################################################
+SECTION MAPPER
+    SITE_MAPPER RbtSphereSiteMapper
+    CENTER ({xyz[0]:.3f},{xyz[1]:.3f},{xyz[2]:.3f})
+    RADIUS {cavity_kwargs['RADIUS']}
+    SMALL_SPHERE {cavity_kwargs['SMALL_SPHERE']}
+    LARGE_SPHERE {cavity_kwargs['LARGE_SPHERE']}
+    MAX_CAVITIES {cavity_kwargs['MAX_CAVITIES']}
+GRIDSTEP {cavity_kwargs['GRIDSTEP']}
+END_SECTION
+"""
+        
+        config +=\
+f"""
 #################################
 #CAVITY RESTRAINT PENALTY
 #################################
@@ -90,7 +115,7 @@ END_SECTION
     
     @staticmethod
     def add_pharmacophore_constraint(config, constraints=None, optional_constraints=None, n_optional=1):
-        if constraints and optional_constraints:
+        if optional_constraints:
              config += \
 f"""
 #################################
@@ -100,19 +125,6 @@ SECTION PHARMA
     SCORING_FUNCTION RbtPharmaSF
     WEIGHT 1.0
     CONSTRAINTS_FILE {os.path.basename(constraints)}
-    OPTIONAL_FILE {os.path.basename(optional_constraints)}
-    NOPT {n_optional}
-END_SECTION
-"""
-        elif optional_constraints and not constraints:
-            config += \
-f"""
-#################################
-## PHARMACOPHORIC RESTRAINTS
-#################################
-SECTION PHARMA
-    SCORING_FUNCTION RbtPharmaSF
-    WEIGHT 1.0
     OPTIONAL_FILE {os.path.basename(optional_constraints)}
     NOPT {n_optional}
 END_SECTION
@@ -149,11 +161,13 @@ END_SECTION
 """
         return config
 
-    def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None,
+    def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None, ref_xyz: list[float] = None,
+                 cavity_kwargs: dict = {"RADIUS": 10.0, "SMALL_SPHERE": 1.5, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5},
                  cluster: Union[str, int] = None, 
-                 ligand_preparation: str = 'GypsumDL', prep_timeout: float = 30.0,
+                 ligand_preparation: str = 'GypsumDL', ligand_preparation_kwargs: dict = {}, prep_timeout: float = 30.0,
                  dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
-                 dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 1.0, dock_substructure_max_rot: int = 30.0,
+                 dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 0.5,
+                 dock_substructure_max_rot: int = 10.0, dock_substructure_max_rmsd: float = 2.0,
                  dock_constraints: Union[str, os.PathLike] = None,
                  dock_opt_constraints: Union[str, os.PathLike] = None, dock_n_opt_constraints: int = 1,
                  **kwargs):
@@ -162,8 +176,11 @@ END_SECTION
         :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2]
         :param receptor: Path to receptor file (.pdb)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
+        :param ref_xyz: XYZ coordinates of the centre of the docking box
+        :param cavity_kwargs: Dictionary of parameters for cavity generation, any changes will update defaults so only need to supply the changing parameter, see rDock manual for details
         :param cluster: Address to Dask scheduler for parallel processing via dask or number of local workers to use
         :param ligand_preparation: Use LigPrep (default), rdkit stereoenum + Epik most probable state, Moka+Corina abundancy > 20 or GypsumDL [LigPrep, Epik, Moka, GypsumDL]
+        :param ligand_preparation_kwargs: Additional keyword arguments for ligand preparation
         :param prep_timeout: Timeout (seconds) before killing a ligand preparation process (e.g., long running RDKit jobs)
         :param dock_protocol: Select from docking protocols or path to a custom .prm protocol [dock, dock_solv, dock_grid, dock_solv_grid, minimise, minimise_solv, score, score_solv]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
@@ -171,15 +188,17 @@ END_SECTION
         :param dock_substructure_constraints: SMARTS pattern to constrain ligands to reference ligand
         :param dock_substructure_max_trans: Maximum allowed translation of tethered substructure
         :param dock_substructure_max_rot: Maximum allowed rotation of tethered substructure
+        :param dock_substructure_max_rmsd: Maximum allowed RMSD of tethered substructure
         :param dock_constraints: Path to rDock pharmacophoric constriants file that are mandatory
         :param dock_opt_constraints: Path to rDock pharmacophoric constriants file that are optional
         :param dock_n_opt_constraints: Number of optional constraints required
         """
         # Check rDock installation
-        assert self.check_installation() is not None, "Could not find rDock path, please ensure proper installation"
+        self.check_installation()
+        check_openbabel()
 
         # Check if preset is provided
-        assert preset or (receptor and ref_ligand), "Either preset or receptor and ref_ligand must be provided"
+        assert preset or (receptor and (ref_ligand or ref_xyz)), "Either preset or receptor and ref_ligand/ref_xyz must be provided"
         if preset:
             assert preset in self.presets.keys(), f"preset must be one of {self.presets.keys()}"
             receptor = str(self.presets[preset]['receptor'])
@@ -193,21 +212,27 @@ END_SECTION
         self.subprocess = timedSubprocess(timeout=None, shell=True)
         
         # If receptor is pdb, convert
-        if receptor.endswith('.pdb'):
-            mol2_receptor = receptor.replace('.pdb', '.mol2')
+        assert os.path.exists(receptor), f"Receptor file {receptor} not found"
+        if not receptor.endswith('.mol2'):
+            mol2_receptor = receptor.rsplit(".", 1)[0] + '.mol2'
             self.subprocess.run(f"obabel {receptor} -O {mol2_receptor}")
-            receptor = mol2_receptor
+            receptor = os.path.abspath(mol2_receptor)
 
         # If ref_ligand doesn't end with sd, replace
-        if not ref_ligand.endswith('.sd'):
-            sd_ligand = ref_ligand.rsplit(".", 1)[0] + ".sd"
-            self.subprocess.run(f"obabel {ref_ligand} -O {sd_ligand}")
-            ref_ligand = sd_ligand
+        if ref_ligand:
+            assert os.path.exists(ref_ligand), f"Reference ligand file {ref_ligand} not found"
+            if not ref_ligand.endswith('.sd'):
+                sd_ligand = ref_ligand.rsplit(".", 1)[0] + ".sd"
+                self.subprocess.run(f"obabel {ref_ligand} -O {sd_ligand}")
+                ref_ligand = os.path.abspath(sd_ligand)
         
         # Specify class attributes
         self.prefix = prefix.replace(" ", "_")
-        self.receptor = os.path.abspath(receptor)
-        self.ref = os.path.abspath(ref_ligand)
+        self.receptor = receptor
+        self.ref = ref_ligand
+        self.xyz = ref_xyz
+        self.cavity_kwargs = {"RADIUS": 10.0, "SMALL_SPHERE": 1.5, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5} 
+        self.cavity_kwargs.update(cavity_kwargs)
         self.file_names = None
         self.variants = None
         self.dock_timeout = float(dock_timeout)
@@ -218,27 +243,27 @@ END_SECTION
         self.rdock_env = 'rbdock'
         self.rcav_env = 'rbcavity'
         self.substructure_smarts = dock_substructure_constraints
+        self.substructure_max_rmsd = dock_substructure_max_rmsd
         self.dock_constraints = os.path.abspath(dock_constraints) if dock_constraints else dock_constraints
         self.dock_opt_constraints = os.path.abspath(dock_opt_constraints) if dock_opt_constraints else dock_opt_constraints
         self.dock_n_opt_constraints = dock_n_opt_constraints
-        self.rdock_files = [self.receptor, self.ref]
+        self.rdock_files = [self.receptor]
+        if self.ref: self.rdock_files.append(self.ref)
 
         # Setup dask
-        self.cluster = cluster
         self.client = DaskUtils.setup_dask(
-            cluster_address_or_n_workers=self.cluster,
+            cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name,
             logger=logger
             )
-        if self.client is None: self.cluster = None
         atexit.register(self._close_dask)
 
         # Select ligand preparation protocol
         self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
-        if self.cluster is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger)
+        if self.client is not None:
+            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger, **ligand_preparation_kwargs)
         else:
-            self.ligand_protocol = self.ligand_protocol(logger=logger)
+            self.ligand_protocol = self.ligand_protocol(logger=logger, **ligand_preparation_kwargs)
 
         # Select docking protocol
         if dock_protocol in ['dock', 'dock_solv', 'dock_grid', 'dock_solv_grid', 'minimise', 'minimise_solv', 'score', 'score_solv']:
@@ -249,9 +274,14 @@ END_SECTION
         # Prepare grid file in tempfiles
         os.environ['RBT_HOME'] = self.temp_dir.name
         # Write config
-        rec_prm = self.cavity_config(self.receptor, self.ref)
+        rec_prm = self.cavity_config(self.receptor, self.ref, self.xyz, self.cavity_kwargs)
         # Add PH4 constriants
         if self.dock_constraints or self.dock_opt_constraints:
+            # If only optional provided we have to create an empty mandatory file
+            if self.dock_opt_constraints and not self.dock_constraints:
+                self.dock_constraints = os.path.join(self.temp_dir.name, 'empty.restr')
+                with open(self.dock_constraints, 'wt') as f: 
+                    pass
             rec_prm = self.add_pharmacophore_constraint(rec_prm, self.dock_constraints, self.dock_opt_constraints, self.dock_n_opt_constraints)
             if self.dock_constraints: self.rdock_files.append(self.dock_constraints)
             if self.dock_opt_constraints: self.rdock_files.append(self.dock_opt_constraints)
@@ -269,9 +299,10 @@ END_SECTION
             f.write(rec_prm)
         self.rdock_files.append(self.rec_prm)
         # Prepare cavity
-        self.subprocess.run(f"{self.rcav_env} -was -r {self.rec_prm}")
+        self.subprocess.run(f"{self.rcav_env} -was -d -r {self.rec_prm}")
         self.cavity = os.path.join(self.temp_dir.name, 'cavity.as')
-        self.rdock_files.append(self.cavity)
+        grid = os.path.join(self.temp_dir.name, 'cavity_cav1.grd')
+        self.rdock_files.extend([self.cavity, grid])
 
     def _close_dask(self):
         if self.client:
@@ -285,7 +316,8 @@ END_SECTION
         self.subprocess.run(f'cp {" ".join(self.rdock_files)} {cwd}')
 
     @staticmethod
-    def _align_mol(query: os.PathLike, ref_mol: Chem.rdchem.Mol, smarts: str, logger: logging.Logger):
+    def _align_mol(query: os.PathLike, ref_mol: Chem.rdchem.Mol, smarts: str, max_rmsd: float, logger: logging.Logger):
+        # TODO return several variants for multiple ref matches? E.g., variant-1_205 i.e.,  +0{count}
         # Load query file
         with Chem.SDMolSupplier(query, removeHs=False) as suppl:
             query_mol = suppl[0]
@@ -309,22 +341,26 @@ END_SECTION
             if 0 in query_match:
                 query_match.remove(0)
             query_mol.SetProp("TETHERED ATOMS", ",".join([str(a) for a in query_match]))
-            # Save aligned mol
-            with Chem.SDWriter(query) as writer:
-                writer.write(query_mol)
+            query_mol.SetProp("TETHERED.RMSD", str(min(rmsds)))
+            # Save aligned mol if below max_rmsd
+            if (max_rmsd) and (min(rmsds) <= max_rmsd):
+                with Chem.SDWriter(query) as writer:
+                    writer.write(query_mol)
         else:
             # TODO unspecified constrained docking by MCS
             logger.warning(f"No substructure match found for {query}, skipping alignment.")
         
     def align_mols(self, varients, varient_files):
         logger.debug('Aligning molecules for tethered docking')
-        if self.cluster:
-            p = partial(self._align_mol, ref_mol=self.ref_mol, smarts=self.substructure_smarts, logger=logger)
+        if self.client:
+            p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
+            p = partial(p, ref_mol=self.ref_mol, smarts=self.substructure_smarts, max_rmsd=self.substructure_max_rmsd, logger=logger)
             futures = self.client.map(p, varient_files)
             results = self.client.gather(futures)
         else:
             for vfile in varient_files:
-                self._align_mol(vfile, self.ref_mol, self.substructure_smarts)
+                p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
+                p(vfile, ref_mol=self.ref_mol, smarts=self.substructure_smarts, max_rmsd=self.substructure_max_rmsd, logger=logger)
         return varients, varient_files     
     
     def reformat_ligands(self, varients, varient_files):
@@ -334,14 +370,14 @@ END_SECTION
         for vfile in varient_files:
             new_vfile = vfile.replace(".sdf", ".sd")
             new_varient_files.append(new_vfile)
-            if self.cluster:
+            if self.client:
                 p = timedSubprocess()
                 futures.append(self.client.submit(p.run, f"obabel {vfile} -O {new_vfile}"))
             else:
-                self.subprocess.run(f"obabel -i {vfile} -O {new_vfile}")
+                self.subprocess.run(f"obabel {vfile} -O {new_vfile}")
         
         # Wait for parallel jobs
-        if self.cluster: self.client.gather(futures)
+        if self.client: self.client.gather(futures)
         
         return varients, new_varient_files
 
@@ -355,7 +391,7 @@ END_SECTION
                 in_lig = os.path.join(self.directory, f'{name}-{variant}_prepared.sd')
                 out_lig = os.path.join(self.directory, f'{name}-{variant}_docked')
                 out_log = os.path.join(self.directory, f'{name}-{variant}_rbdock.log')
-                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} --allH'
+                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} -allH'
                 rdock_commands.append(command)
 
         # Initialize subprocess
@@ -364,7 +400,7 @@ END_SECTION
         p = partial(p.run, cwd=self.directory)
 
         # Submit docking subprocesses
-        if self.cluster is not None:
+        if self.client is not None:
             futures = self.client.map(p, rdock_commands)
             results = self.client.gather(futures)
         else:
@@ -394,8 +430,9 @@ END_SECTION
                 if os.path.exists(out_file):
                     # Try to load it in, and grab the score
                     try:
-                        rdock_out = Chem.ForwardSDMolSupplier(out_file, sanitize=False) 
-                        for mol in rdock_out:  
+                        rdock_out = Chem.SDMolSupplier(out_file, sanitize=False) 
+                        for mol_idx in range(len(rdock_out)):
+                            mol = rdock_out[mol_idx]
                             mol = manually_charge_mol(mol) # RDKit doesn't like rDock charged files
                             dscore = mol.GetPropsAsDict()['SCORE']
                             
@@ -403,6 +440,7 @@ END_SECTION
                             if best_score[name] is None:
                                 best_score[name] = dscore
                                 best_variants[i] = f'{name}-{variant}'
+                                # TODO TETHERED.RMSD isn't read because of previous error in rDock sd formatting without ">""
                                 docking_result.update({f'{self.prefix}_' + k: v
                                                         for k, v in mol.GetPropsAsDict().items()
                                                         if k in self.return_metrics})
@@ -463,7 +501,7 @@ END_SECTION
         :param parallel: Whether to run using Dask (requires scheduler address during initialisation).
         """
         # If no cluster is provided ensure parallel is False
-        if (parallel is True) and (self.cluster is None):
+        if (parallel is True) and (self.client is None):
             parallel = False
 
         keep_poses = [f'{k}_docked.sd' for k in keep]
