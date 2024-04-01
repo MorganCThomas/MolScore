@@ -212,7 +212,7 @@ class ScoreMetrics:
             top1, top10, top100 = self.top_avg(top_n=[1, 10, 100], endpoint=endpoint, basic_filter=False, target_filter=False)
             score = np.mean([top1, top10, top100])
         if any([task.lower().startswith(name) for name in [
-            "celecoxxib",
+            "celecoxib",
             "troglitazone",
             "thiothixene"]]):
             score, = self.top_avg(top_n=[1], endpoint=endpoint, basic_filter=False, target_filter=False)
