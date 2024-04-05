@@ -94,7 +94,7 @@ Scoring functionality present in **molscore**, some scoring functions require ex
 |Ligand preparation|RDKit->Epik, Moka->Corina, Ligprep, [Gypsum-DL](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3)|
 |3D Similarity|ROCS, Open3DAlign|
 |2D Similarity|Fingerprint similarity (any RDKit fingerprint and similarity measure), substructure match/filter, [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)|
-|Predictive models|Scikit-learn (classification/regression), [PIDGINv5](https://zenodo.org/record/7547691#.ZCcLyo7MIhQ)<sup>a</sup>, [ChemProp](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237)|
+|Predictive models|Scikit-learn (classification/regression), [PIDGINv5](https://zenodo.org/record/7547691#.ZCcLyo7MIhQ)<sup>a</sup>, [ChemProp](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237), [ADMET-AI](https://www.biorxiv.org/content/10.1101/2023.12.28.573531v1)|
 |Synthesizability|[RAscore](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc05401a), [AiZynthFinder](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00472-1), SAscore, ReactionFilters (Scaffold decoration)|
 |Descriptors|RDKit, Maximum consecutive rotatable bonds, Penalized LogP, LinkerDescriptors (Fragment linking) etc.|
 |Transformation methods|Linear, linear threshold, step threshold, Gaussian|
