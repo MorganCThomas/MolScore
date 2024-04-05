@@ -162,7 +162,7 @@ END_SECTION
         return config
 
     def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None, ref_xyz: list[float] = None,
-                 cavity_kwargs: dict = {"RADIUS": 10.0, "SMALL_SPHERE": 1.5, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5},
+                 cavity_kwargs: dict = {"RADIUS": 10.0, "SMALL_SPHERE": 2.0, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5},
                  cluster: Union[str, int] = None, 
                  ligand_preparation: str = 'GypsumDL', ligand_preparation_kwargs: dict = {}, prep_timeout: float = 30.0,
                  dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
@@ -231,7 +231,7 @@ END_SECTION
         self.receptor = receptor
         self.ref = ref_ligand
         self.xyz = ref_xyz
-        self.cavity_kwargs = {"RADIUS": 10.0, "SMALL_SPHERE": 1.5, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5} 
+        self.cavity_kwargs = {"RADIUS": 10.0, "SMALL_SPHERE": 2.0, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5} 
         self.cavity_kwargs.update(cavity_kwargs)
         self.file_names = None
         self.variants = None
