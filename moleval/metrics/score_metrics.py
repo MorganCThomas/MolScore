@@ -231,7 +231,7 @@ class ScoreMetrics:
         if self.benchmark == "MolOpt":
             # Right now all Molopt metrics are already computed
             pass
-        if self.benchmark == "GuacaMol":
+        elif self.benchmark == "GuacaMol":
             # Score
             benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
             # Quality
