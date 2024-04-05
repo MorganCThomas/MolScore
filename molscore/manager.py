@@ -28,11 +28,12 @@ class MolScore:
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
 
-    def __init__(self, model_name: str, task_config: os.PathLike, output_dir: str = None, budget: int = None):
+    def __init__(self, model_name: str, task_config: os.PathLike, output_dir: str = None, add_run_dir: bool = True, budget: int = None):
         """
         :param model_name: Name of generative model, used for file naming and documentation
         :param task_config: Path to task config file
         :param output_dir: Overwrites the output directory specified in the task config file
+        :param add_run_dir: Adds a run directory within the output directory
         :param budget: Budget number of molecules to run MolScore task for until molscore.finished is True
         """
         # Load in configuration file (json)
@@ -58,12 +59,14 @@ class MolScore:
 
         # Setup save directory
         self.run_name = "_".join([time.strftime("%Y_%m_%d", time.localtime()),
-                                  self.model_name,
-                                  self.configs['task'].replace(" ", "_")])
+                            self.model_name,
+                            self.configs['task'].replace(" ", "_")])
         if output_dir is not None:
-            self.save_dir = os.path.join(os.path.abspath(output_dir), self.run_name)
+            self.save_dir = os.path.abspath(output_dir)
         else:
-            self.save_dir = os.path.join(os.path.abspath(self.configs['output_dir']), self.run_name)
+            self.save_dir = os.path.abspath(self.configs['output_dir'])
+        if add_run_dir:
+            self.save_dir = os.path.join(self.save_dir, self.run_name)
         # Check to see if we're loading from previous results
         if self.configs['load_from_previous']:
             assert os.path.exists(self.configs['previous_dir']), "Previous directory does not exist"
@@ -759,6 +762,7 @@ class MolScoreBenchmark:
         model_name: str,
         output_dir: os.PathLike,
         budget: int,
+        add_benchmark_dir: bool = True,
         model_parameters: dict = {},
         benchmark: str = None,
         custom_benchmark: os.PathLike = None,
@@ -771,6 +775,7 @@ class MolScoreBenchmark:
         :param model_name: Name of model to run
         :param output_dir: Directory to save results to
         :param budget: Budget number of molecules to run MolScore task for
+        :param add_benchmark_dir: Whether to add benchmark directory to output directory
         :param model_parameters: Parameters of the model for record
         :param benchmark: Name of benchmark to run
         :param custom_benchmark: Path to custom benchmark directory
@@ -834,8 +839,9 @@ class MolScoreBenchmark:
         if not self.configs:
             raise ValueError("No configs found to run, this could be due to include/exclude resulting in zero configs to run")
 
-        # Add name to ouput dir
-        self.output_dir = os.path.join(self.output_dir, f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}")
+        # Add benchmark directory
+        if add_benchmark_dir:
+            self.output_dir = os.path.join(self.output_dir, f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}")
 
     def __iter__(self):
         for config_path in self.configs:

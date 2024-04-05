@@ -1,7 +1,6 @@
 import os
 import json
 import argparse
-import unittest
 import subprocess
 from tqdm import tqdm
 
