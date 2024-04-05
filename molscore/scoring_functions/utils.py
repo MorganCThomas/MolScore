@@ -29,6 +29,12 @@ def check_openbabel():
     if shutil.which('obabel') is None:
         raise RuntimeError("OpenBabel is required for this function, please install it using conda or mamba e.g., mamba install openbabel -c conda-forge")
 
+def check_exe(command):
+    if shutil.which(command) is None:
+        return False
+    else:
+        return True
+
 # ----- Multiprocessing related -----
 def Pool(*args):
     if platform.system() == "Linux":

@@ -13,22 +13,15 @@ def main(configs: list):
     mg = MockGenerator(augment_invalids=True, augment_duplicates=True)
     for config in configs:
         print(f"\nTesting: {config}")
-        # Ensure output directory re-directed to test_out
-        with open(config, 'rt') as f:
-            cf = json.load(f)
-        cf['output_dir'] = os.path.join(os.path.dirname(__file__), 'test_out')
-        with tempfile.NamedTemporaryFile(mode='wt') as tconfig:
-            with open(tconfig.name, 'wt') as f:
-                json.dump(cf, f, indent=2)
-            # Run
-            print(f"Running {os.path.basename(config).split('.')[0]}:")
-            ms = MolScore(model_name='test', task_config=tconfig.name)
-            # Score 5 smiles 5 times
-            for i in tqdm(range(5)):
-                output = ms(mg.sample(10))
-            ms.write_scores()
-            ms.kill_monitor()
-            print(f"Output:\n{ms.main_df.head(10)}\n")
+        # Run
+        print(f"Running {os.path.basename(config).split('.')[0]}:")
+        ms = MolScore(model_name='test', task_config=config, output_dir=os.path.join(os.path.dirname(__file__), 'test_out'))
+        # Score 5 smiles 5 times
+        for i in tqdm(range(5)):
+            output = ms(mg.sample(10))
+        ms.write_scores()
+        ms.kill_monitor()
+        print(f"Output:\n{ms.main_df.head(10)}\n")
     return
 
 

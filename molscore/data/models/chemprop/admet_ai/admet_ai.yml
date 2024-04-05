@@ -1,0 +1,11 @@
+name: admet_ai
+channels:
+  - conda-forge
+  - anaconda
+  - defaults
+dependencies:
+  - python=3.10
+  - flask=2.2.5
+  - pip
+  - pip:
+    - admet_ai

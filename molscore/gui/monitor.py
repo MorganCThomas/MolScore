@@ -90,6 +90,10 @@ def main():
 
     st.sidebar.title('MolScore Monitor')
     if SS.main_df is not None:
+        # Radio buttons for navigation
+        st.sidebar.header('Navigation:')
+        nav = st.sidebar.radio(label='Select page', options=['Main', 'Multi-plot', 'MPO', 'Scaffold memory'])
+
         # Header
         if len(SS.input_dirs) > 1:
             st.sidebar.header("Currently loaded:\nMultiple runs")
@@ -112,9 +116,15 @@ def main():
             add_run(input_dir, SS=SS)
             SS.dock_path = any([utils.check_dock_paths(d) for d in SS.input_dirs])
 
-        # Radio buttons for navigation
-        st.sidebar.header('Navigation:')
-        nav = st.sidebar.radio(label='Select page', options=['Main', 'Multi-plot', 'MPO', 'Scaffold memory'])
+        # Option to rename runs
+        st.sidebar.header('Rename runs:')
+        rename_map = {}
+        for run in SS.main_df.run.unique():
+            new_name = st.sidebar.text_input(label=f'{run}', key=f'{run}_rename', help='Rename this to custom name')
+            rename_map[run] = new_name
+        if st.sidebar.button('Rename', help='Rename runs to specified names'):
+            utils.rename_runs(SS=SS, rename_map=rename_map)
+            st.rerun()
 
         # ----- Main page -----
         if nav == 'Main':

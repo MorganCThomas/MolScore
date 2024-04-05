@@ -10,7 +10,7 @@ import subprocess
 from typing import Union
 from importlib import resources
 
-from molscore.scoring_functions.utils import timedSubprocess, get_mol
+from molscore.scoring_functions.utils import timedSubprocess, get_mol, check_exe
 
 logger = logging.getLogger('aizynthfinder')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -34,7 +34,7 @@ class AiZynthFinder:
         filter_policy: str='filter_policy_all', stock: Union[str, os.PathLike]='zinc_stock', n_jobs: int=1,
         iteration_limit: int = 100, return_first: bool=False, time_limit: int=120, C: float=1.4,
         cutoff_cumulative: float=0.995, cutoff_number: int=50, max_transforms: int=6,
-        exclude_target_from_stock: bool=False, use_rdchiral: bool=True, **kwargs
+        exclude_target_from_stock: bool=False, use_rdchiral: bool=True, env_engine='mamba', **kwargs
     ):
         """
         :param prefix: Prefix to identify scoring function instance if used multiple times
@@ -52,12 +52,21 @@ class AiZynthFinder:
         :param max_transforms: The maximum depth of the search tree
         :param exclude_target_from_stock: If the target is in stock it will be broken down if this property is True
         :param use_rdchiral: If true, will apply templates with RDChiral, otherwise RDKit will be used
+        :param env_engine: Engine to be used to handle python environments
         """
         self.prefix = prefix.replace(" ", "_")
         self.config_file = tempfile.NamedTemporaryFile(mode='w+t', suffix='_config.yml')
         self.n_jobs = n_jobs
         self.subprocess = timedSubprocess(timeout=None, shell=False)
         self.env = 'aizynth-env'
+
+        # Set environment engine
+        if (env_engine=='mamba') and check_exe('mamba'):
+            self.engine = 'mamba'
+        elif check_exe('conda'):
+            self.engine = 'conda'
+        else:
+            raise ValueError(f"Could not find mamba or conda executables needed to create and run this environment")
 
         # Check/create AiZynth Environment
         if not self._check_env():
@@ -77,7 +86,7 @@ class AiZynthFinder:
                 if os.path.exists(input):
                     return input
                 else:
-                    raise FileNotFoundError                
+                    raise FileNotFoundError(f"File not found for {input}, please specify.")             
         
         # Write config policy to tempfile
         if (config_file is None) or (config_file in ['.', 'None']):
@@ -128,15 +137,15 @@ class AiZynthFinder:
             
         
     def _check_env(self):
-        cmd = "conda info --envs"
+        cmd = "{self.engine} info --envs"
         out = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True)
         envs = [line.split(" ")[0] for line in out.stdout.decode().splitlines()[2:]]
         return self.env in envs
 
     
     def _create_env(self):
-        cmd = f"conda create \"python>=3.8,<3.10\" -n {self.env} -y ; " \
-              f"conda run -n {self.env} pip install aizynthfinder"
+        cmd = f"{self.engine} create \"python>=3.8,<3.10\" -n {self.env} -y ; " \
+              f"{self.engine} run -n {self.env} pip install aizynthfinder"
         try:
             out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, check=True)
         except subprocess.CalledProcessError as e:
@@ -169,7 +178,7 @@ class AiZynthFinder:
         # Specify output file
         output_file = os.path.join(directory, 'aizynth_out.json')
         # Submit job to aizynthcli (specify filter policy if not None)
-        cmd = f"conda run -n {self.env} " \
+        cmd = f"{self.engine} run -n {self.env} " \
               f"aizynthcli --smiles {smiles_file.name} --config {self.config_file.name} --output {output_file} --nproc {int(self.n_jobs)}" # --filter my_policy
         if self.filter_policy:
             cmd += f" --filter my_policy"

@@ -29,8 +29,12 @@ system. (Description provided by Harrison Green.)
 
 import __future__
 import multiprocessing
+import platform
 # ------- Explicitly set fork context -------
-multiprocessing = multiprocessing.get_context("fork")
+if platform.system() == "Linux":
+    context = multiprocessing.get_context("fork")
+else:
+    context = multiprocessing.get_context("spawn")
 # -------------------------------------------
 import sys
 

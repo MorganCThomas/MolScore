@@ -212,7 +212,7 @@ class ScoreMetrics:
             top1, top10, top100 = self.top_avg(top_n=[1, 10, 100], endpoint=endpoint, basic_filter=False, target_filter=False)
             score = np.mean([top1, top10, top100])
         if any([task.lower().startswith(name) for name in [
-            "celecoxxib",
+            "celecoxib",
             "troglitazone",
             "thiothixene"]]):
             score, = self.top_avg(top_n=[1], endpoint=endpoint, basic_filter=False, target_filter=False)
@@ -231,7 +231,7 @@ class ScoreMetrics:
         if self.benchmark == "MolOpt":
             # Right now all Molopt metrics are already computed
             pass
-        if self.benchmark == "GuacaMol":
+        elif self.benchmark == "GuacaMol":
             # Score
             benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
             # Quality

@@ -69,6 +69,12 @@ def update(SS):
             SS.main_df.sort_values(by=['run', 'idx'])
 
 
+def rename_runs(SS, rename_map):
+    assert len(set(list(rename_map.values()))) == len(set(list(rename_map.values()))), "New names must be unique"
+    for k, v in rename_map.items():
+        SS.main_df.loc[SS.main_df.run == k, 'run'] = v
+
+
 def check_dock_paths(input_path):
     subdirectories = [x for x in os.walk(os.path.abspath(input_path))][0][1]
     dock_paths = []

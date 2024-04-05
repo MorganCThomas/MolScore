@@ -1,0 +1,11 @@
+name: chemprop
+channels:
+  - conda-forge
+  - anaconda
+  - defaults
+dependencies:
+  - python=3.8
+  - flask=2.2.5
+  - pip
+  - pip:
+    - chemprop
