@@ -24,9 +24,9 @@ setup(
         "pandas",
         "matplotlib",
         "seaborn",
-        "rdkit >= 2019.03.2",
-        "dask == 2023.6.0",
-        "dask-jobqueue == 0.8.2",
+        "rdkit >= 2019.03.2, < 2024", # 2024 changes MolStandardize import
+        "dask", # == 2023.6.0",
+        "dask-jobqueue", # == 0.8.2",
         "scikit-learn == 1.1.3",
         "torch",
         "zenodo-client",

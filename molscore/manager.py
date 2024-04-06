@@ -7,10 +7,9 @@ import atexit
 import logging
 import numpy as np
 import subprocess
-from importlib import resources
 
 import molscore.scoring_functions as scoring_functions
-from molscore import utils
+from molscore import utils, resources
 from molscore.gui import monitor_path
 import molscore.scaffold_memory as scaffold_memory
 

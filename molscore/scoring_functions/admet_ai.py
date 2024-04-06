@@ -7,8 +7,8 @@ import atexit
 import socket
 import logging
 import subprocess
-from importlib import resources
 
+from molscore import resources
 from molscore.scoring_functions.utils import timedSubprocess
 from molscore.scoring_functions.base import BaseServerSF
 

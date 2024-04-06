@@ -9,6 +9,7 @@ import atexit
 import socket
 import logging
 import subprocess
+from typing import List, Dict
 
 from molscore.scoring_functions.utils import timedSubprocess, check_exe
 
@@ -34,7 +35,7 @@ class BaseSF:
         self.prefix = prefix.strip().replace(' ', '_')  # Prefix to seperate multiple uses of the same class
         raise NotImplementedError("This is an abstract method")
     
-    def __call__(self, smiles: list, file_names, directory, **kwargs) -> list[dict]:
+    def __call__(self, smiles: list, file_names, directory, **kwargs) -> List[Dict]:
         raise NotImplementedError("This is an abstract method")
         # Results should be a list of dictionaries. Each dictionary corresponds to an input SMILES and should 'smiles' key. Every other key should be '<prefix>_<return_metric>'
         # For example,
