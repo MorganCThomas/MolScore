@@ -8,8 +8,8 @@ import logging
 import json
 import subprocess
 from typing import Union
-from importlib import resources
 
+from molscore import resources
 from molscore.scoring_functions.utils import timedSubprocess, get_mol, check_exe
 
 logger = logging.getLogger('aizynthfinder')

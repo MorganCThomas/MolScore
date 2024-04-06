@@ -7,7 +7,8 @@ import os
 import ast
 import time
 import signal
-from importlib import resources
+
+from molscore import resources
 
 logger = logging.getLogger('legacy_qsar')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

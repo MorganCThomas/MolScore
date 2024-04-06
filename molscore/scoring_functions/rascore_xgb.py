@@ -11,11 +11,11 @@ import subprocess
 import pandas as pd
 import numpy as np
 import pickle as pkl
-from importlib import resources
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from molscore import resources
 from molscore.scoring_functions.utils import get_mol, timedSubprocess, Pool
 
 logger = logging.getLogger('rascore_xgb')

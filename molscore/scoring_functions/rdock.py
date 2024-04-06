@@ -8,10 +8,10 @@ from functools import partial
 from typing import Union
 from itertools import takewhile
 from tempfile import TemporaryDirectory
-from importlib import resources
 
 from rdkit.Chem import AllChem as Chem
 
+from molscore import resources
 from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel, timedFunc2
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
