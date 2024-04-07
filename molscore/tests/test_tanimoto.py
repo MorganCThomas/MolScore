@@ -1,8 +1,11 @@
-import unittest
 import json
-from molscore.tests.mock_generator import MockGenerator
-from molscore.tests.base_tests import BaseTests
-from molscore.scoring_functions.similarity import TanimotoSimilarity, MolecularSimilarity
+import unittest
+
+from molscore.scoring_functions.similarity import (
+    MolecularSimilarity,
+    TanimotoSimilarity,
+)
+from molscore.tests import BaseTests, MockGenerator
 
 
 class TestTanimotoECFP4MeanSingle(BaseTests.TestScoringFunction):
@@ -10,14 +13,14 @@ class TestTanimotoECFP4MeanSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=False,
             counts=False,
-            method='mean',
-            n_jobs=1
+            method="mean",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -28,14 +31,14 @@ class TestTanimotoECFP4MaxSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=False,
             counts=False,
-            method='max',
-            n_jobs=1
+            method="max",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -46,14 +49,14 @@ class TestTanimotoFCFP4MeanSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=True,
             counts=False,
-            method='mean',
-            n_jobs=1
+            method="mean",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -64,14 +67,14 @@ class TestTanimotoFCFP4MaxSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=True,
             counts=False,
-            method='max',
-            n_jobs=1
+            method="max",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -82,14 +85,14 @@ class TestTanimotoECFC4MeanSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=False,
             counts=True,
-            method='mean',
-            n_jobs=1
+            method="mean",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -100,14 +103,14 @@ class TestTanimotoECFC4MaxSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=False,
             counts=True,
-            method='max',
-            n_jobs=1
+            method="max",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -118,14 +121,14 @@ class TestTanimotoFCFC4MeanSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=True,
             counts=True,
-            method='mean',
-            n_jobs=1
+            method="mean",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -136,14 +139,14 @@ class TestTanimotoFCFC4MaxSingle(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=True,
             counts=True,
-            method='max',
-            n_jobs=1
+            method="max",
+            n_jobs=1,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -154,14 +157,14 @@ class TestTanimotoFCFC4MeanParallel(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=True,
             counts=True,
-            method='mean',
-            n_jobs=6
+            method="mean",
+            n_jobs=6,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
@@ -172,19 +175,21 @@ class TestTanimotoFCFC4MaxParallel(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123)
         self.obj = TanimotoSimilarity
         self.inst = TanimotoSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
             radius=2,
             bits=1024,
             features=True,
             counts=True,
-            method='max',
-            n_jobs=6
+            method="max",
+            n_jobs=6,
         )
         self.input = mg.sample(64)
         self.output = self.inst(self.input)
 
+
 # ---- Test new version ----
+
 
 class TestSimilarityECFP4(BaseTests.TestScoringFunction):
     @classmethod
@@ -193,14 +198,14 @@ class TestSimilarityECFP4(BaseTests.TestScoringFunction):
         # Instantiate
         cls.obj = MolecularSimilarity
         cls.inst = MolecularSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
-            fp='ECFP4',
+            fp="ECFP4",
             thresh=None,
-            method='max',
-            n_jobs=1
+            method="max",
+            n_jobs=1,
         )
-        print(f"\nSimilarity Input: fp=ECFP4, method=max")
+        print("\nSimilarity Input: fp=ECFP4, method=max")
         # Call
         cls.input = mg.sample(5)
         cls.output = cls.inst(smiles=cls.input)
@@ -214,14 +219,14 @@ class TestSimilarityECFP4Parallel(BaseTests.TestScoringFunction):
         # Instantiate
         cls.obj = MolecularSimilarity
         cls.inst = MolecularSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(10),
-            fp='ECFP4',
+            fp="ECFP4",
             thresh=None,
-            method='max',
-            n_jobs=4
+            method="max",
+            n_jobs=4,
         )
-        print(f"\nSimilarity Input: fp=ECFP4, method=max")
+        print("\nSimilarity Input: fp=ECFP4, method=max")
         # Call
         cls.input = mg.sample(5)
         cls.output = cls.inst(smiles=cls.input)
@@ -235,18 +240,19 @@ class TestSimilarityECFP4ThreshMeanParallel(BaseTests.TestScoringFunction):
         # Instantiate
         cls.obj = MolecularSimilarity
         cls.inst = MolecularSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(1000),
-            fp='ECFP4',
+            fp="ECFP4",
             thresh=0.35,
-            method='mean',
-            n_jobs=4
+            method="mean",
+            n_jobs=4,
         )
-        print(f"\nSimilarity Input: fp=ECFP4, thresh=0.35, method=mean")
+        print("\nSimilarity Input: fp=ECFP4, thresh=0.35, method=mean")
         # Call
         cls.input = mg.sample(5)
         cls.output = cls.inst(smiles=cls.input)
         print(f"Similarity Output:\n{json.dumps(cls.output, indent=2)}\n")
+
 
 class TestSimilarityECFP4ThreshMaxParallel(BaseTests.TestScoringFunction):
     @classmethod
@@ -255,19 +261,19 @@ class TestSimilarityECFP4ThreshMaxParallel(BaseTests.TestScoringFunction):
         # Instantiate
         cls.obj = MolecularSimilarity
         cls.inst = MolecularSimilarity(
-            prefix='test',
+            prefix="test",
             ref_smiles=mg.sample(1000),
-            fp='ECFP4',
+            fp="ECFP4",
             thresh=0.35,
-            method='max',
-            n_jobs=4
+            method="max",
+            n_jobs=4,
         )
-        print(f"\nSimilarity Input: fp=ECFP4, thresh=0.35, method=max")
+        print("\nSimilarity Input: fp=ECFP4, thresh=0.35, method=max")
         # Call
         cls.input = mg.sample(5)
         cls.output = cls.inst(smiles=cls.input)
         print(f"Similarity Output:\n{json.dumps(cls.output, indent=2)}\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

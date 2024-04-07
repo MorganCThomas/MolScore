@@ -1,11 +1,13 @@
 __version__ = "1.4"
+__all__ = ["MolScore", "MolScoreBenchmark", "MockGenerator"]
 
-# Import lib resources
+# Import lib resources depending on python version
 import sys
+
 if sys.version_info[1] < 9:
-    import importlib_resources as resources 
+    import importlib_resources as resources
 else:
     from importlib import resources
 
-# Import managers 
 from molscore.manager import MolScore, MolScoreBenchmark
+from molscore.utils import MockGenerator

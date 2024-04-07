@@ -7,8 +7,13 @@ class MockGenerator:
     Mock generator that provides molecules as SMILES
     """
 
-    def __init__(self, smi_file: str = None, seed_no: int = 123,
-                 augment_invalids: bool = False, augment_duplicates: bool = False):
+    def __init__(
+        self,
+        smi_file: str = None,
+        seed_no: int = 123,
+        augment_invalids: bool = False,
+        augment_duplicates: bool = False,
+    ):
         """
         Mock generator that provides molecules as SMILES given a smiles_file, otherwise, uses inbuilt sample
          from ChEMBL.
@@ -19,10 +24,10 @@ class MockGenerator:
         :param augment_duplicates: Forcefully augment duplicates by copying certain SMILES strings
         """
         if smi_file is None:
-            with resources.open_text('molscore.data', 'sample.smi') as f:
+            with resources.open_text("molscore.data", "sample.smi") as f:
                 self.smiles = f.read().splitlines()
         else:
-            with open(smi_file, 'r') as f:
+            with open(smi_file, "r") as f:
                 self.smiles = f.read().splitlines()
         self.augment_invalids = augment_invalids
         self.augment_duplicates = augment_duplicates
@@ -64,7 +69,9 @@ class MockGenerator:
                     random_index = round(random.uniform(0, len(sample_smiles) - 1))
                     if len(duplicated_smiles) > 0:
                         if sample_smiles[random_index] not in duplicated_smiles:
-                            invalid_smiles.append(sample_smiles.pop(random_index))  # remove from sample size
+                            invalid_smiles.append(
+                                sample_smiles.pop(random_index)
+                            )  # remove from sample size
                             i += 1
                     else:
                         invalid_smiles.append(sample_smiles.pop(random_index))
@@ -74,7 +81,7 @@ class MockGenerator:
                 invalid_smiles = [list(smi) for smi in invalid_smiles]
                 for i in range(len(invalid_smiles)):
                     random.shuffle(invalid_smiles[i])
-                invalid_smiles = [''.join(smi) for smi in invalid_smiles]
+                invalid_smiles = ["".join(smi) for smi in invalid_smiles]
                 sample_smiles += invalid_smiles
 
                 # Give it a final shuffle

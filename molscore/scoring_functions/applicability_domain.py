@@ -1,20 +1,18 @@
-import os
 import logging
-import numpy as np
-from typing import Union
+import os
 from functools import partial
+from typing import Union
 
-from molscore.scoring_functions.descriptors import Descriptors as molscore_descriptors
-from molscore.scoring_functions.utils import get_mol, Fingerprints, SimilarityMeasures, Pool
-
+import numpy as np
+from rdkit.Chem import QED, Crippen, Descriptors, FindMolChiralCenters
 from rdkit.Chem import AllChem as Chem
-from rdkit.Chem import QED, Descriptors, Crippen,FindMolChiralCenters
-from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit.Chem.rdMolDescriptors import CalcFractionCSP3
+from rdkit.Chem.Scaffolds import MurckoScaffold
 
+from molscore.scoring_functions.utils import Fingerprints, Pool, get_mol
 
-logger = logging.getLogger('applicability_domain')
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("applicability_domain")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
@@ -30,9 +28,18 @@ class ApplicabilityDomain:
     Note: Only range is computed here, MolecularSimilarity can be used to compute distance to reference FPs
     """
 
-    return_metrics = ['in_AD']
+    return_metrics = ["in_AD"]
 
-    def __init__(self, prefix, ref_smiles: Union[os.PathLike, str, list], fp: str = None, qed: bool = False, physchem: bool = True, n_jobs: int = 1, **kwargs):
+    def __init__(
+        self,
+        prefix,
+        ref_smiles: Union[os.PathLike, str, list],
+        fp: str = None,
+        qed: bool = False,
+        physchem: bool = True,
+        n_jobs: int = 1,
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param ref_smiles: A file_path to or list of reference smiles used to define the applicability domain.
@@ -48,17 +55,21 @@ class ApplicabilityDomain:
 
         # If file path provided, load smiles.
         if isinstance(ref_smiles, str):
-            with open(ref_smiles, 'r') as f:
+            with open(ref_smiles, "r") as f:
                 self.ref_smiles = f.read().splitlines()
         else:
-            assert isinstance(ref_smiles, list) and (len(ref_smiles) > 0), "None list or empty list provided"
+            assert isinstance(ref_smiles, list) and (
+                len(ref_smiles) > 0
+            ), "None list or empty list provided"
             self.ref_smiles = ref_smiles
 
         # Calculate features
-        logger.info('Computing reference features')
+        logger.info("Computing reference features")
         with Pool(self.n_jobs) as pool:
             mols = [m for m in pool.imap(get_mol, self.ref_smiles) if m is not None]
-            pfunc = partial(self.compute_features, fp=self.fp, qed=self.qed, physchem=self.physchem)
+            pfunc = partial(
+                self.compute_features, fp=self.fp, qed=self.qed, physchem=self.physchem
+            )
             self.ref_features = np.asarray([f for f in pool.imap(pfunc, mols)])
 
         # Compound bounds
@@ -82,15 +93,21 @@ class ApplicabilityDomain:
             Crippen.MolMR,
             Descriptors.MolWt,
             CalcFractionCSP3,
-            Descriptors.HeavyAtomCount
+            Descriptors.HeavyAtomCount,
         ]
         physchem_features = [d(mol) for d in descriptors]
         # Add BM/HA ratio custom features
         bm_mol = MurckoScaffold.GetScaffoldForMol(mol)
-        physchem_features.append(Descriptors.HeavyAtomCount(bm_mol) / Descriptors.HeavyAtomCount(mol))
+        physchem_features.append(
+            Descriptors.HeavyAtomCount(bm_mol) / Descriptors.HeavyAtomCount(mol)
+        )
         # Add ring info
         ri = mol.GetRingInfo().AtomRings()
-        n_ring, max_ring, min_ring = len(ri), len(max(ri, key=len, default=())), len(min(ri, key=len, default=()))
+        n_ring, max_ring, min_ring = (
+            len(ri),
+            len(max(ri, key=len, default=())),
+            len(min(ri, key=len, default=())),
+        )
         physchem_features += [n_ring, max_ring, min_ring]
         # Add charge info
         charges = []
@@ -102,7 +119,12 @@ class ApplicabilityDomain:
         return physchem_features
 
     @staticmethod
-    def compute_features(mol: Union[Chem.rdchem.Mol, str], fp: str = None, qed: bool = False, physchem: bool = True) -> list:
+    def compute_features(
+        mol: Union[Chem.rdchem.Mol, str],
+        fp: str = None,
+        qed: bool = False,
+        physchem: bool = True,
+    ) -> list:
         """
         Compute features as specified during initialisation
         """
@@ -112,7 +134,7 @@ class ApplicabilityDomain:
 
             if fp:
                 fp = list(Fingerprints.get(mol, name=fp, nBits=1024, asarray=True))
-                if mol_features is None: 
+                if mol_features is None:
                     mol_features = fp
                 else:
                     mol_features += fp
@@ -137,19 +159,23 @@ class ApplicabilityDomain:
         """
         Calculate the score for a single smiles
         """
-        result = {'smiles': smi}
+        result = {"smiles": smi}
         # Compute features
-        smi_features = ApplicabilityDomain.compute_features(smi, fp=fp, qed=qed, physchem=physchem)
+        smi_features = ApplicabilityDomain.compute_features(
+            smi, fp=fp, qed=qed, physchem=physchem
+        )
         if smi_features is not None:
             # Check domain
             above_min = ref_min <= smi_features
             below_max = ref_max >= smi_features
             in_domain = above_min & below_max
-            result.update({f'{prefix}_in_AD': float(in_domain.all())})
+            result.update({f"{prefix}_in_AD": float(in_domain.all())})
         else:
-            result.update({f'{prefix}_{m}': 0.0 for m in ApplicabilityDomain.return_metrics})
+            result.update(
+                {f"{prefix}_{m}": 0.0 for m in ApplicabilityDomain.return_metrics}
+            )
         return result
-    
+
     def score(self, smiles: list, **kwargs) -> list:
         """
         Calculate the binary scores representing whether smiles are within the AD (1.0) or not (0.0)
@@ -158,10 +184,18 @@ class ApplicabilityDomain:
         """
         # Compute features
         with Pool(self.n_jobs) as pool:
-            pfunc = partial(self.score_smi, prefix=self.prefix, ref_max=self.ref_max, ref_min=self.ref_min, fp=self.fp, qed=self.qed, physchem=self.physchem)
+            pfunc = partial(
+                self.score_smi,
+                prefix=self.prefix,
+                ref_max=self.ref_max,
+                ref_min=self.ref_min,
+                fp=self.fp,
+                qed=self.qed,
+                physchem=self.physchem,
+            )
             results = [r for r in pool.imap(pfunc, smiles)]
         return results
-    
+
     def __call__(self, smiles: list, **kwargs):
         """
         Calculate the binary scores representing whether smiles are within the AD (1.0) or not (0.0)

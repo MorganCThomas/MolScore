@@ -1,49 +1,57 @@
-import os
 import gzip
 import json
-import zipfile
 import logging
 import pickle as pkl
-import numpy as np
+import zipfile
 from functools import partial
+
+import numpy as np
 
 from molscore.scoring_functions.utils import Fingerprints, Pool, Zenodo
 
-logger = logging.getLogger('pidgin')
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("pidgin")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
-class PIDGIN():
+
+class PIDGIN:
     """
     Download and run PIDGIN classification models (~11GB) via Zenodo to return the positive predictions, atleast one uniprot must be specified.
     """
-    return_metrics = ['pred_proba']
 
-    zenodo = Zenodo(access_token='0') # Set access token to zero as it's required zenodo-client API but not Zenodo for downloading public data
-    
+    return_metrics = ["pred_proba"]
+
+    zenodo = Zenodo(
+        access_token="0"
+    )  # Set access token to zero as it's required zenodo-client API but not Zenodo for downloading public data
+
     @classmethod
     def get_pidgin_record_id(cls):
         # This feature is broken in zenodo-client currently (17/10/23, v0.3.2): returns 'latest' and not actual record id
-        return '7547691'
+        return "7547691"
 
     # Download list of uniprots
     @classmethod
     def get_uniprot_list(cls):
-        uniprots_path = cls.zenodo.download(record_id=cls.get_pidgin_record_id(), name='uniprots.json')
-        with open(uniprots_path, 'rt') as f:
+        uniprots_path = cls.zenodo.download(
+            record_id=cls.get_pidgin_record_id(), name="uniprots.json"
+        )
+        with open(uniprots_path, "rt") as f:
             uniprots = json.load(f)
-        uniprots = ['None'] + uniprots
+        uniprots = ["None"] + uniprots
         return uniprots
 
     # Download uniprot groups
     @classmethod
     def get_uniprot_groups(cls):
-        groups = {'None': None}
-        groups_path = cls.zenodo.download(record_id=cls.get_pidgin_record_id(), name='uniprots_groups.json')
-        with open(groups_path, 'rt') as f:
+        groups = {"None": None}
+        groups_path = cls.zenodo.download(
+            record_id=cls.get_pidgin_record_id(), name="uniprots_groups.json"
+        )
+        with open(groups_path, "rt") as f:
             groups.update(json.load(f))
         return groups
 
@@ -62,20 +70,34 @@ class PIDGIN():
             :param binarise: Binarise predicted probability and return ratio of actives based on optimal predictive thresholds (GHOST)
             :param kwargs:
             """
-        setattr(cls.__init__, '__doc__', init_docstring)
+        setattr(cls.__init__, "__doc__", init_docstring)
 
     def __init__(
-        self, prefix: str, uniprot: str = None, uniprots: list = None, uniprot_set: str = None, thresh: str = '100 uM',
-        exclude_uniprot: str = None, exclude_uniprots: list = None,
-        n_jobs: int = 1, method: str = 'mean', binarise=False, **kwargs):
+        self,
+        prefix: str,
+        uniprot: str = None,
+        uniprots: list = None,
+        uniprot_set: str = None,
+        thresh: str = "100 uM",
+        exclude_uniprot: str = None,
+        exclude_uniprots: list = None,
+        n_jobs: int = 1,
+        method: str = "mean",
+        binarise=False,
+        **kwargs,
+    ):
         """This docstring is must be populated by calling PIDGIN.set_docstring() first."""
         # Make sure something is selected
-        self.uniprot = uniprot if uniprot != 'None' else None
+        self.uniprot = uniprot if uniprot != "None" else None
         self.uniprots = uniprots if uniprots is not None else []
-        self.uniprot_set = uniprot_set if uniprot_set != 'None' else None
-        self.exclude_uniprot = exclude_uniprot if exclude_uniprot != 'None' else None
+        self.uniprot_set = uniprot_set if uniprot_set != "None" else None
+        self.exclude_uniprot = exclude_uniprot if exclude_uniprot != "None" else None
         self.exclude_uniprots = exclude_uniprots if exclude_uniprots is not None else []
-        assert (self.uniprot is not None) or (len(self.uniprots) > 0) or (self.uniprot_set is not None), "Either uniprot, uniprots or uniprot set must be specified"
+        assert (
+            (self.uniprot is not None)
+            or (len(self.uniprots) > 0)
+            or (self.uniprot_set is not None)
+        ), "Either uniprot, uniprots or uniprot set must be specified"
         # Set other attributes
         self.prefix = prefix.replace(" ", "_")
         self.thresh = thresh.replace(" ", "").replace(".", "")
@@ -83,7 +105,7 @@ class PIDGIN():
         self.models = []
         self.model_names = []
         self.ghost_thresholds = []
-        self.fp = 'ECFP4'
+        self.fp = "ECFP4"
         self.nBits = 2048
         self.agg = getattr(np, method)
         self.binarise = binarise
@@ -103,32 +125,40 @@ class PIDGIN():
         self.uniprots = list(set(self.uniprots))
 
         # Download PIDGIN
-        logger.warning('If not downloaded, PIDGIN will be downloaded which is a large file ~ 11GB and may take some several minutes')
-        pidgin_path = self.zenodo.download(record_id=self.pidgin_record_id, name='trained_models.zip')
-        with zipfile.ZipFile(pidgin_path, 'r') as zip_file:
+        logger.warning(
+            "If not downloaded, PIDGIN will be downloaded which is a large file ~ 11GB and may take some several minutes"
+        )
+        pidgin_path = self.zenodo.download(
+            record_id=self.pidgin_record_id, name="trained_models.zip"
+        )
+        with zipfile.ZipFile(pidgin_path, "r") as zip_file:
             for uni in self.uniprots:
                 try:
                     # Load .json to get ghost thresh
-                    with zip_file.open(f'{uni}.json') as meta_file:
-                            metadata = json.load(meta_file)
-                            opt_thresh = metadata[thresh]['train']['params']['opt_threshold']
-                            self.ghost_thresholds.append(opt_thresh)
+                    with zip_file.open(f"{uni}.json") as meta_file:
+                        metadata = json.load(meta_file)
+                        opt_thresh = metadata[thresh]["train"]["params"][
+                            "opt_threshold"
+                        ]
+                        self.ghost_thresholds.append(opt_thresh)
                     # Load classifier
-                    with zip_file.open(f'{uni}_{self.thresh}.pkl.gz') as model_file:
-                        with gzip.open(model_file, 'rb') as f:
+                    with zip_file.open(f"{uni}_{self.thresh}.pkl.gz") as model_file:
+                        with gzip.open(model_file, "rb") as f:
                             clf = pkl.load(f)
                             self.models.append(clf)
-                            self.model_names.append(f'{uni}@{self.thresh}')
+                            self.model_names.append(f"{uni}@{self.thresh}")
                 except (FileNotFoundError, KeyError):
-                    logger.warning(f'{uni} model at {thresh} not found, omitting')
+                    logger.warning(f"{uni} model at {thresh} not found, omitting")
                     continue
 
         # Run some checks
         assert len(self.models) != 0, "No models were found"
         if self.binarise:
-            logger.info('Running with binarise=True so setting method=mean')
+            logger.info("Running with binarise=True so setting method=mean")
             self.agg = np.mean
-            assert len(self.ghost_thresholds) == len(self.models), "Mismatch between models and thresholds"
+            assert len(self.ghost_thresholds) == len(
+                self.models
+            ), "Mismatch between models and thresholds"
 
     def score(self, smiles: list, **kwargs):
         """
@@ -139,28 +169,34 @@ class PIDGIN():
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
+        results = [{"smiles": smi, f"{self.prefix}_pred_proba": 0.0} for smi in smiles]
         valid = []
         fps = []
         predictions = []
         aggregated_predictions = []
         # Calculate fps
         with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
-            [(valid.append(i), fps.append(fp))
-            for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-            if fp is not None]
+            pcalculate_fp = partial(
+                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+            )
+            [
+                (valid.append(i), fps.append(fp))
+                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
+                if fp is not None
+            ]
 
         # Return early if there's no results
         if len(fps) == 0:
             for r in results:
-                r.update({f'{self.prefix}_{name}': 0.0 for name in self.model_names})
-                r.update({f'{self.prefix}_pred_proba': 0.0})
+                r.update({f"{self.prefix}_{name}": 0.0 for name in self.model_names})
+                r.update({f"{self.prefix}_pred_proba": 0.0})
             return results
-        
+
         # Predict
         for clf in self.models:
-            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]  # Input (smiles, bits)
+            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[
+                :, 1
+            ]  # Input (smiles, bits)
             predictions.append(prediction)
         predictions = np.asarray(predictions).transpose()  # Reshape to (smiles, models)
 
@@ -172,14 +208,18 @@ class PIDGIN():
         # Update results
         for i, row in zip(valid, predictions):
             for j, name in enumerate(self.model_names):
-                results[i].update({f'{self.prefix}_{name}': float(row[j])}) # JSON doesn't like numpy types
+                results[i].update(
+                    {f"{self.prefix}_{name}": float(row[j])}
+                )  # JSON doesn't like numpy types
 
         # Aggregate
         aggregated_predictions = self.agg(predictions, axis=1)
 
         # Update results
         for i, prob in zip(valid, aggregated_predictions):
-            results[i].update({f'{self.prefix}_pred_proba': float(prob)}) # JSON doesn't like numpy types
+            results[i].update(
+                {f"{self.prefix}_pred_proba": float(prob)}
+            )  # JSON doesn't like numpy types
 
         return results
 

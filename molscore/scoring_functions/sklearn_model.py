@@ -1,28 +1,34 @@
-from functools import partial
 import glob
 import os
-import rdkit
-import numpy as np
-from rdkit.Chem import rdMolDescriptors
-from rdkit import Chem
-from rdkit.Avalon import pyAvalonTools
-from rdkit import rdBase
-import joblib
 import pickle as pkl
+from functools import partial
 from typing import Union
 
+import joblib
+import numpy as np
+from rdkit import rdBase
+
 from molscore.scoring_functions.utils import Fingerprints, Pool
-rdBase.DisableLog('rdApp.error')
+
+rdBase.DisableLog("rdApp.error")
 
 
 class SKLearnClassifier:
     """
     Score structures by loading a pre-trained sklearn classifier and return the predicted values
     """
-    return_metrics = ['pred_proba']
 
-    def __init__(self, prefix: str, model_path: Union[str, os.PathLike],
-                 fp: str, nBits: int = 1024, n_jobs: int = 1, **kwargs):
+    return_metrics = ["pred_proba"]
+
+    def __init__(
+        self,
+        prefix: str,
+        model_path: Union[str, os.PathLike],
+        fp: str,
+        nBits: int = 1024,
+        n_jobs: int = 1,
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model (saved using joblib)
@@ -39,10 +45,10 @@ class SKLearnClassifier:
         self.n_jobs = n_jobs
 
         # Load in model and assign to attribute
-        if model_path.endswith('.joblib'):
+        if model_path.endswith(".joblib"):
             self.model = joblib.load(model_path)
-        elif model_path.endswith('.pkl') or model_path.endswith('.pickle'):
-            with open(model_path, 'rb') as f:
+        elif model_path.endswith(".pkl") or model_path.endswith(".pickle"):
+            with open(model_path, "rb") as f:
                 self.model = pkl.load(f)
         else:
             raise TypeError(f"Unrecognized file extension: {os.rsplit('.', 1)[-1]}")
@@ -57,19 +63,25 @@ class SKLearnClassifier:
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
 
-        results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
+        results = [{"smiles": smi, f"{self.prefix}_pred_proba": 0.0} for smi in smiles]
         valid = []
         fps = []
         with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
-            [(valid.append(i), fps.append(fp.reshape(1, -1)))
-             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-             if fp is not None]
+            pcalculate_fp = partial(
+                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+            )
+            [
+                (valid.append(i), fps.append(fp.reshape(1, -1)))
+                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
+                if fp is not None
+            ]
 
-        if len(valid) != 0 :
-            probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
+        if len(valid) != 0:
+            probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[
+                :, 1
+            ]
             for i, prob in zip(valid, probs):
-                results[i].update({f'{self.prefix}_pred_proba': prob})
+                results[i].update({f"{self.prefix}_pred_proba": prob})
 
         return results
 
@@ -78,10 +90,18 @@ class SKLearnRegressor(SKLearnClassifier):
     """
     Score structures by loading a pre-trained sklearn regressor and return the predicted values
     """
-    return_metrics = ['predict']
 
-    def __init__(self, prefix: str, model_path: os.PathLike,
-                 fp: str, nBits: int = 1024, n_jobs: int = 1, **kwargs):
+    return_metrics = ["predict"]
+
+    def __init__(
+        self,
+        prefix: str,
+        model_path: os.PathLike,
+        fp: str,
+        nBits: int = 1024,
+        n_jobs: int = 1,
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model (saved using joblib)
@@ -90,7 +110,9 @@ class SKLearnRegressor(SKLearnClassifier):
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
         :param kwargs:
         """
-        super().__init__(prefix=prefix, model_path=model_path, fp=fp, nBits=nBits, n_jobs=n_jobs)
+        super().__init__(
+            prefix=prefix, model_path=model_path, fp=fp, nBits=nBits, n_jobs=n_jobs
+        )
 
     def __call__(self, smiles: list, **kwargs):
         """
@@ -102,34 +124,46 @@ class SKLearnRegressor(SKLearnClassifier):
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
 
-        results = [{'smiles': smi, f'{self.prefix}_predict': 0.0} for smi in smiles]
+        results = [{"smiles": smi, f"{self.prefix}_predict": 0.0} for smi in smiles]
         valid = []
         fps = []
         with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
-            [(valid.append(i), fps.append(fp.reshape(1, -1)))
-             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-             if fp is not None]
+            pcalculate_fp = partial(
+                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+            )
+            [
+                (valid.append(i), fps.append(fp.reshape(1, -1)))
+                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
+                if fp is not None
+            ]
 
-        if len(valid) != 0 :
+        if len(valid) != 0:
             preds = self.model.predict(np.asarray(fps).reshape(len(fps), -1))
             for i, pred in zip(valid, preds):
-                results[i].update({f'{self.prefix}_predict': pred})
+                results[i].update({f"{self.prefix}_predict": pred})
 
         return results
 
 
 # Backwards compatability
 SKLearnModel = SKLearnClassifier
-    
+
 
 class EnsembleSKLearnModel(SKLearnModel):
     """
     This class loads different random seeds of a defined sklearn
     model and returns the average of the predicted values.
     """
-    def __init__(self, prefix: str, model_path: os.PathLike,
-                 fp: str, nBits: int, n_jobs: int = 1, **kwargs):
+
+    def __init__(
+        self,
+        prefix: str,
+        model_path: os.PathLike,
+        fp: str,
+        nBits: int,
+        n_jobs: int = 1,
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param model_path: Path to pre-trained model (saved using joblib)
@@ -138,30 +172,33 @@ class EnsembleSKLearnModel(SKLearnModel):
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing of fps
         :param kwargs:
         """
-        super().__init__(prefix, model_path, 
-                        fp, nBits, n_jobs, **kwargs)
-        changing = self.model_path.split('_')
-        del changing[len(changing)-1]
-        changing = '_'.join(changing)
-        self.replicates = sorted(glob.glob(str(changing) + '*.joblib'))
+        super().__init__(prefix, model_path, fp, nBits, n_jobs, **kwargs)
+        changing = self.model_path.split("_")
+        del changing[len(changing) - 1]
+        changing = "_".join(changing)
+        self.replicates = sorted(glob.glob(str(changing) + "*.joblib"))
 
         # Load in model and assign to attribute
         self.models = []
         for f in self.replicates:
             self.models.append(joblib.load(f))
-    
+
     def __call__(self, smiles: list, **kwargs):
-        results = [{'smiles': smi, f'{self.prefix}_pred_proba': 0.0} for smi in smiles]
+        results = [{"smiles": smi, f"{self.prefix}_pred_proba": 0.0} for smi in smiles]
         valid = []
         fps = []
         predictions = []
         averages = []
         with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True)
-            [(valid.append(i), fps.append(fp))
-             for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-             if fp is not None]
-        
+            pcalculate_fp = partial(
+                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+            )
+            [
+                (valid.append(i), fps.append(fp))
+                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
+                if fp is not None
+            ]
+
         # Predicting the probabilies and appending them to a list.
         for m in self.models:
             prediction = m.predict_proba(np.asarray(fps).reshape(len(fps), -1))[:, 1]
@@ -170,6 +207,6 @@ class EnsembleSKLearnModel(SKLearnModel):
         averages = predictions.mean(axis=0)
 
         for i, prob in zip(valid, averages):
-            results[i].update({f'{self.prefix}_pred_proba': prob})
+            results[i].update({f"{self.prefix}_pred_proba": prob})
 
         return results

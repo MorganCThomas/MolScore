@@ -1,23 +1,26 @@
-import os
 import atexit
-import logging
 import glob
+import logging
+import os
 import shutil
-import subprocess
 from functools import partial
-from typing import Union
-from itertools import takewhile
 from tempfile import TemporaryDirectory
+from typing import Union
 
 from rdkit.Chem import AllChem as Chem
 
 from molscore import resources
-from molscore.scoring_functions.utils import timedSubprocess, DaskUtils, check_openbabel, timedFunc2
-from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
+from molscore.scoring_functions.descriptors import MolecularDescriptors
+from molscore.scoring_functions.utils import (
+    DaskUtils,
+    check_openbabel,
+    timedFunc2,
+    timedSubprocess,
+)
 
-logger = logging.getLogger('rdock')
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("rdock")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
@@ -28,39 +31,57 @@ class rDock:
     """
     Scores structures based on their rDock docking score
     """
+
     return_metrics = [
-        'SCORE', 
-        'SCORE.INTER',
-        'SCORE.INTRA',
-        'TETHERED.RMSD',
-        'NetCharge', 'PositiveCharge', 'NegativeCharge',
-        'best_variant'
-        ]
+        "SCORE",
+        "SCORE.INTER",
+        "SCORE.INTRA",
+        "TETHERED.RMSD",
+        "NetCharge",
+        "PositiveCharge",
+        "NegativeCharge",
+        "best_variant",
+    ]
     presets = {
         "5HT2A": {
-            "receptor": resources.files('molscore.data.structures.6A93').joinpath("6A93p_rec.pdb"),
-            "ref_ligand": resources.files('molscore.data.structures.6A93').joinpath('6A93p_risperidone.sdf'),
+            "receptor": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_rec.pdb"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_risperidone.sdf"
+            ),
         },
         "5HT2A-3x32": {
-            "receptor": resources.files('molscore.data.structures.6A93').joinpath('6A93p_rec.pdb'),
-            "ref_ligand": resources.files('molscore.data.structures.6A93').joinpath('6A93p_risperidone.sdf'),
-            "dock_constraints": resources.files('molscore.data.structures.6A93').joinpath('6A93p_3x32Cat.restr'),
+            "receptor": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_rec.pdb"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_risperidone.sdf"
+            ),
+            "dock_constraints": resources.files(
+                "molscore.data.structures.6A93"
+            ).joinpath("6A93p_3x32Cat.restr"),
         },
         "DRD2": {
-            "receptor": resources.files('molscore.data.structures.6CM4').joinpath('6CM4p_rec.pdb'),
-            "ref_ligand": resources.files('molscore.data.structures.6CM4').joinpath('6CM4p_risperidone.sdf'),
-        }
+            "receptor": resources.files("molscore.data.structures.6CM4").joinpath(
+                "6CM4p_rec.pdb"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.6CM4").joinpath(
+                "6CM4p_risperidone.sdf"
+            ),
+        },
     }
 
     @staticmethod
     def check_installation():
-        if shutil.which('rbdock') is None:
-            raise RuntimeError("Could not find rDock path, please ensure proper installation.")
+        if shutil.which("rbdock") is None:
+            raise RuntimeError(
+                "Could not find rDock path, please ensure proper installation."
+            )
 
     @staticmethod
-    def cavity_config(receptor_file, ligand_file = None, xyz = None, cavity_kwargs = {}):
-        config = \
-f"""RBT_PARAMETER_FILE_V1.00
+    def cavity_config(receptor_file, ligand_file=None, xyz=None, cavity_kwargs={}):
+        config = f"""RBT_PARAMETER_FILE_V1.00
 TITLE gart_DUD
 
 RECEPTOR_FILE {os.path.basename(receptor_file)}
@@ -68,8 +89,7 @@ RECEPTOR_FLEX 3.0
 """
         assert ligand_file or xyz, "Either ligand_file or xyz must be provided"
         if ligand_file:
-            config += \
-f"""
+            config += f"""
 ##################################################################
 ### CAVITY DEFINITION: REFERENCE LIGAND METHOD
 ##################################################################
@@ -85,8 +105,7 @@ GRIDSTEP {cavity_kwargs['GRIDSTEP']}
 END_SECTION
 """
         else:
-            config += \
-f"""
+            config += f"""
 ##################################################################
 ### CAVITY DEFINITION: SPHERE METHOD
 ##################################################################
@@ -100,9 +119,8 @@ SECTION MAPPER
 GRIDSTEP {cavity_kwargs['GRIDSTEP']}
 END_SECTION
 """
-        
-        config +=\
-f"""
+
+        config += """
 #################################
 #CAVITY RESTRAINT PENALTY
 #################################
@@ -112,12 +130,13 @@ SECTION CAVITY
 END_SECTION
 """
         return config
-    
+
     @staticmethod
-    def add_pharmacophore_constraint(config, constraints=None, optional_constraints=None, n_optional=1):
+    def add_pharmacophore_constraint(
+        config, constraints=None, optional_constraints=None, n_optional=1
+    ):
         if optional_constraints:
-             config += \
-f"""
+            config += f"""
 #################################
 ## PHARMACOPHORIC RESTRAINTS
 #################################
@@ -130,8 +149,7 @@ SECTION PHARMA
 END_SECTION
 """
         else:
-            config += \
-f"""
+            config += f"""
 #################################
 ## PHARMACOPHORIC RESTRAINTS
 #################################
@@ -144,10 +162,19 @@ END_SECTION
         return config
 
     @staticmethod
-    def add_tether_constraint(config, translation="TETHERED", rotation="TETHERED", dihedral="FREE", max_trans=1.0, max_rot=30.0):
-        assert all(param in ["FIXED", "TETHERED", "FREE"] for param in [translation, rotation, dihedral]), "translation, rotation and dihedral must be one of FIXED, TETHERED or FREE"
-        config += \
-f"""
+    def add_tether_constraint(
+        config,
+        translation="TETHERED",
+        rotation="TETHERED",
+        dihedral="FREE",
+        max_trans=1.0,
+        max_rot=30.0,
+    ):
+        assert all(
+            param in ["FIXED", "TETHERED", "FREE"]
+            for param in [translation, rotation, dihedral]
+        ), "translation, rotation and dihedral must be one of FIXED, TETHERED or FREE"
+        config += f"""
 #################################
 ## LIGAND RESTRAINTS
 #################################
@@ -161,16 +188,38 @@ END_SECTION
 """
         return config
 
-    def __init__(self, prefix: str, preset: str = None, receptor: Union[str, os.PathLike] = None, ref_ligand: Union[str, os.PathLike] = None, ref_xyz: list = None,
-                 cavity_kwargs: dict = {"RADIUS": 10.0, "SMALL_SPHERE": 2.0, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5},
-                 cluster: Union[str, int] = None, 
-                 ligand_preparation: str = 'GypsumDL', ligand_preparation_kwargs: dict = {}, prep_timeout: float = 30.0,
-                 dock_protocol: Union[str, os.PathLike] = 'dock', dock_timeout: float = 120.0, n_runs: int = 5,
-                 dock_substructure_constraints: str = None, dock_substructure_max_trans: float = 0.5,
-                 dock_substructure_max_rot: int = 10.0, dock_substructure_max_rmsd: float = 2.0,
-                 dock_constraints: Union[str, os.PathLike] = None,
-                 dock_opt_constraints: Union[str, os.PathLike] = None, dock_n_opt_constraints: int = 1,
-                 **kwargs):
+    def __init__(
+        self,
+        prefix: str,
+        preset: str = None,
+        receptor: Union[str, os.PathLike] = None,
+        ref_ligand: Union[str, os.PathLike] = None,
+        ref_xyz: list = None,
+        cavity_kwargs: dict = {
+            "RADIUS": 10.0,
+            "SMALL_SPHERE": 2.0,
+            "LARGE_SPHERE": 5.0,
+            "MAX_CAVITIES": 1,
+            "MIN_VOLUME": 100,
+            "VOL_INCR": 0.0,
+            "GRIDSTEP": 0.5,
+        },
+        cluster: Union[str, int] = None,
+        ligand_preparation: str = "GypsumDL",
+        ligand_preparation_kwargs: dict = {},
+        prep_timeout: float = 30.0,
+        dock_protocol: Union[str, os.PathLike] = "dock",
+        dock_timeout: float = 120.0,
+        n_runs: int = 5,
+        dock_substructure_constraints: str = None,
+        dock_substructure_max_trans: float = 0.5,
+        dock_substructure_max_rot: int = 10.0,
+        dock_substructure_max_rmsd: float = 2.0,
+        dock_constraints: Union[str, os.PathLike] = None,
+        dock_opt_constraints: Union[str, os.PathLike] = None,
+        dock_n_opt_constraints: int = 1,
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2]
@@ -198,125 +247,181 @@ END_SECTION
         check_openbabel()
 
         # Check if preset is provided
-        assert preset or (receptor and (ref_ligand or ref_xyz)), "Either preset or receptor and ref_ligand/ref_xyz must be provided"
+        assert preset or (
+            receptor and (ref_ligand or ref_xyz)
+        ), "Either preset or receptor and ref_ligand/ref_xyz must be provided"
         if preset:
-            assert preset in self.presets.keys(), f"preset must be one of {self.presets.keys()}"
-            receptor = str(self.presets[preset]['receptor'])
-            ref_ligand = str(self.presets[preset]['ref_ligand'])
-            if 'dock_constraints' in self.presets[preset].keys():
-                dock_constraints = str(self.presets[preset]['dock_constraints'])
-            if 'dock_opt_constraints' in self.presets[preset].keys():
-                dock_opt_constraints = str(self.presets[preset]['dock_opt_constraints'])
+            assert (
+                preset in self.presets.keys()
+            ), f"preset must be one of {self.presets.keys()}"
+            receptor = str(self.presets[preset]["receptor"])
+            ref_ligand = str(self.presets[preset]["ref_ligand"])
+            if "dock_constraints" in self.presets[preset].keys():
+                dock_constraints = str(self.presets[preset]["dock_constraints"])
+            if "dock_opt_constraints" in self.presets[preset].keys():
+                dock_opt_constraints = str(self.presets[preset]["dock_opt_constraints"])
 
         # Control subprocess in/out
         self.subprocess = timedSubprocess(timeout=None, shell=True)
-        
+
         # If receptor is pdb, convert
         assert os.path.exists(receptor), f"Receptor file {receptor} not found"
-        if not receptor.endswith('.mol2'):
-            mol2_receptor = receptor.rsplit(".", 1)[0] + '.mol2'
+        if not receptor.endswith(".mol2"):
+            mol2_receptor = receptor.rsplit(".", 1)[0] + ".mol2"
             self.subprocess.run(f"obabel {receptor} -O {mol2_receptor}")
             receptor = os.path.abspath(mol2_receptor)
 
         # If ref_ligand doesn't end with sd, replace
         if ref_ligand:
-            assert os.path.exists(ref_ligand), f"Reference ligand file {ref_ligand} not found"
-            if not ref_ligand.endswith('.sd'):
+            assert os.path.exists(
+                ref_ligand
+            ), f"Reference ligand file {ref_ligand} not found"
+            if not ref_ligand.endswith(".sd"):
                 sd_ligand = ref_ligand.rsplit(".", 1)[0] + ".sd"
                 self.subprocess.run(f"obabel {ref_ligand} -O {sd_ligand}")
                 ref_ligand = os.path.abspath(sd_ligand)
-        
+
         # Specify class attributes
         self.prefix = prefix.replace(" ", "_")
         self.receptor = receptor
         self.ref = ref_ligand
         self.xyz = ref_xyz
-        self.cavity_kwargs = {"RADIUS": 10.0, "SMALL_SPHERE": 2.0, "LARGE_SPHERE": 5.0, "MAX_CAVITIES": 1, "MIN_VOLUME": 100, "VOL_INCR": 0.0, "GRIDSTEP": 0.5} 
+        self.cavity_kwargs = {
+            "RADIUS": 10.0,
+            "SMALL_SPHERE": 2.0,
+            "LARGE_SPHERE": 5.0,
+            "MAX_CAVITIES": 1,
+            "MIN_VOLUME": 100,
+            "VOL_INCR": 0.0,
+            "GRIDSTEP": 0.5,
+        }
         self.cavity_kwargs.update(cavity_kwargs)
         self.file_names = None
         self.variants = None
         self.dock_timeout = float(dock_timeout)
-        if 'timeout' in kwargs.items(): self.dock_timeout = float(kwargs['timeout']) # Back compatability
+        if "timeout" in kwargs.items():
+            self.dock_timeout = float(kwargs["timeout"])  # Back compatability
         self.prep_timeout = float(prep_timeout)
         self.temp_dir = TemporaryDirectory()
         self.n_runs = n_runs
-        self.rdock_env = 'rbdock'
-        self.rcav_env = 'rbcavity'
+        self.rdock_env = "rbdock"
+        self.rcav_env = "rbcavity"
         self.substructure_smarts = dock_substructure_constraints
         self.substructure_max_rmsd = dock_substructure_max_rmsd
-        self.dock_constraints = os.path.abspath(dock_constraints) if dock_constraints else dock_constraints
-        self.dock_opt_constraints = os.path.abspath(dock_opt_constraints) if dock_opt_constraints else dock_opt_constraints
+        self.dock_constraints = (
+            os.path.abspath(dock_constraints) if dock_constraints else dock_constraints
+        )
+        self.dock_opt_constraints = (
+            os.path.abspath(dock_opt_constraints)
+            if dock_opt_constraints
+            else dock_opt_constraints
+        )
         self.dock_n_opt_constraints = dock_n_opt_constraints
         self.rdock_files = [self.receptor]
-        if self.ref: self.rdock_files.append(self.ref)
+        if self.ref:
+            self.rdock_files.append(self.ref)
 
         # Setup dask
         self.client = DaskUtils.setup_dask(
             cluster_address_or_n_workers=cluster,
             local_directory=self.temp_dir.name,
-            logger=logger
-            )
-        atexit.register(self._close_dask)
+            logger=logger,
+        )
+        atexit.register(DaskUtils._close_dask, self.client)
 
         # Select ligand preparation protocol
-        self.ligand_protocol = [p for p in ligand_preparation_protocols if ligand_preparation.lower() == p.__name__.lower()][0] # Back compatible
+        self.ligand_protocol = [
+            p
+            for p in ligand_preparation_protocols
+            if ligand_preparation.lower() == p.__name__.lower()
+        ][0]  # Back compatible
         if self.client is not None:
-            self.ligand_protocol = self.ligand_protocol(dask_client=self.client, timeout=self.prep_timeout, logger=logger, **ligand_preparation_kwargs)
+            self.ligand_protocol = self.ligand_protocol(
+                dask_client=self.client,
+                timeout=self.prep_timeout,
+                logger=logger,
+                **ligand_preparation_kwargs,
+            )
         else:
-            self.ligand_protocol = self.ligand_protocol(logger=logger, **ligand_preparation_kwargs)
+            self.ligand_protocol = self.ligand_protocol(
+                logger=logger, **ligand_preparation_kwargs
+            )
 
         # Select docking protocol
-        if dock_protocol in ['dock', 'dock_solv', 'dock_grid', 'dock_solv_grid', 'minimise', 'minimise_solv', 'score', 'score_solv']:
+        if dock_protocol in [
+            "dock",
+            "dock_solv",
+            "dock_grid",
+            "dock_solv_grid",
+            "minimise",
+            "minimise_solv",
+            "score",
+            "score_solv",
+        ]:
             self.dock_protocol = dock_protocol + ".prm"
         else:
             self.dock_protocol = os.path.abspath(dock_protocol)
-        
+
         # Prepare grid file in tempfiles
-        os.environ['RBT_HOME'] = self.temp_dir.name
+        os.environ["RBT_HOME"] = self.temp_dir.name
         # Write config
-        rec_prm = self.cavity_config(self.receptor, self.ref, self.xyz, self.cavity_kwargs)
+        rec_prm = self.cavity_config(
+            self.receptor, self.ref, self.xyz, self.cavity_kwargs
+        )
         # Add PH4 constriants
         if self.dock_constraints or self.dock_opt_constraints:
             # If only optional provided we have to create an empty mandatory file
             if self.dock_opt_constraints and not self.dock_constraints:
-                self.dock_constraints = os.path.join(self.temp_dir.name, 'empty.restr')
-                with open(self.dock_constraints, 'wt') as f: 
+                self.dock_constraints = os.path.join(self.temp_dir.name, "empty.restr")
+                with open(self.dock_constraints, "wt") as f:
                     pass
-            rec_prm = self.add_pharmacophore_constraint(rec_prm, self.dock_constraints, self.dock_opt_constraints, self.dock_n_opt_constraints)
-            if self.dock_constraints: self.rdock_files.append(self.dock_constraints)
-            if self.dock_opt_constraints: self.rdock_files.append(self.dock_opt_constraints)
+            rec_prm = self.add_pharmacophore_constraint(
+                rec_prm,
+                self.dock_constraints,
+                self.dock_opt_constraints,
+                self.dock_n_opt_constraints,
+            )
+            if self.dock_constraints:
+                self.rdock_files.append(self.dock_constraints)
+            if self.dock_opt_constraints:
+                self.rdock_files.append(self.dock_opt_constraints)
         # Add substructure constraints
         if self.substructure_smarts:
-            rec_prm = self.add_tether_constraint(rec_prm, max_trans=dock_substructure_max_trans, max_rot=dock_substructure_max_rot)
+            rec_prm = self.add_tether_constraint(
+                rec_prm,
+                max_trans=dock_substructure_max_trans,
+                max_rot=dock_substructure_max_rot,
+            )
             with Chem.SDMolSupplier(self.ref, removeHs=False) as suppl:
                 self.ref_mol = suppl[0]
-            assert self.ref_mol.GetSubstructMatch(Chem.MolFromSmarts(self.substructure_smarts)), f"Substructure {self.substructure_smarts} not found in reference ligand"
+            assert self.ref_mol.GetSubstructMatch(
+                Chem.MolFromSmarts(self.substructure_smarts)
+            ), f"Substructure {self.substructure_smarts} not found in reference ligand"
         # Copy files to RBT home
         self.subprocess.run(f'cp {" ".join(self.rdock_files)} {self.temp_dir.name}')
         # Write config
-        self.rec_prm = os.path.join(self.temp_dir.name, 'cavity.prm')
-        with open(self.rec_prm, 'wt') as f:
+        self.rec_prm = os.path.join(self.temp_dir.name, "cavity.prm")
+        with open(self.rec_prm, "wt") as f:
             f.write(rec_prm)
         self.rdock_files.append(self.rec_prm)
         # Prepare cavity
         self.subprocess.run(f"{self.rcav_env} -was -d -r {self.rec_prm}")
-        self.cavity = os.path.join(self.temp_dir.name, 'cavity.as')
-        grid = os.path.join(self.temp_dir.name, 'cavity_cav1.grd')
+        self.cavity = os.path.join(self.temp_dir.name, "cavity.as")
+        grid = os.path.join(self.temp_dir.name, "cavity_cav1.grd")
         self.rdock_files.extend([self.cavity, grid])
 
-    def _close_dask(self):
-        if self.client:
-            self.client.close()
-            # If local cluster close that too, can't close remote cluster
-            try: self.client.cluster.close()
-            except: pass
-    
     def _move_rdock_files(self, cwd):
-        os.environ['RBT_HOME'] = cwd
+        os.environ["RBT_HOME"] = cwd
         self.subprocess.run(f'cp {" ".join(self.rdock_files)} {cwd}')
 
     @staticmethod
-    def _align_mol(query: os.PathLike, ref_mol: Chem.rdchem.Mol, smarts: str, max_rmsd: float, logger: logging.Logger):
+    def _align_mol(
+        query: os.PathLike,
+        ref_mol: Chem.rdchem.Mol,
+        smarts: str,
+        max_rmsd: float,
+        logger: logging.Logger,
+    ):
         # TODO return several variants for multiple ref matches? E.g., variant-1_205 i.e.,  +0{count}
         # Load query file
         with Chem.SDMolSupplier(query, removeHs=False) as suppl:
@@ -333,8 +438,17 @@ END_SECTION
             Chem.EmbedMultipleConfs(query_mol, numConfs=50, ETversion=2)
             rmsds = []
             for i in range(query_mol.GetNumConformers()):
-                rmsds.append(Chem.AlignMol(query_mol, ref_mol, prbCid=i, atomMap=list(zip(query_match, ref_match))))
-            query_mol = Chem.Mol(query_mol, confId=sorted(enumerate(rmsds), key=lambda x: x[1])[0][0])
+                rmsds.append(
+                    Chem.AlignMol(
+                        query_mol,
+                        ref_mol,
+                        prbCid=i,
+                        atomMap=list(zip(query_match, ref_match)),
+                    )
+                )
+            query_mol = Chem.Mol(
+                query_mol, confId=sorted(enumerate(rmsds), key=lambda x: x[1])[0][0]
+            )
             # Set tethered atoms
             query_match = list(query_match)
             # NOTE rDock can't accept 0 index, but doesn't seem 1-indexed ...
@@ -348,21 +462,35 @@ END_SECTION
                     writer.write(query_mol)
         else:
             # TODO unspecified constrained docking by MCS
-            logger.warning(f"No substructure match found for {query}, skipping alignment.")
-        
+            logger.warning(
+                f"No substructure match found for {query}, skipping alignment."
+            )
+
     def align_mols(self, varients, varient_files):
-        logger.debug('Aligning molecules for tethered docking')
+        logger.debug("Aligning molecules for tethered docking")
         if self.client:
             p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
-            p = partial(p, ref_mol=self.ref_mol, smarts=self.substructure_smarts, max_rmsd=self.substructure_max_rmsd, logger=logger)
+            p = partial(
+                p,
+                ref_mol=self.ref_mol,
+                smarts=self.substructure_smarts,
+                max_rmsd=self.substructure_max_rmsd,
+                logger=logger,
+            )
             futures = self.client.map(p, varient_files)
-            results = self.client.gather(futures)
+            _ = self.client.gather(futures)
         else:
             for vfile in varient_files:
                 p = timedFunc2(self._align_mol, timeout=self.prep_timeout)
-                p(vfile, ref_mol=self.ref_mol, smarts=self.substructure_smarts, max_rmsd=self.substructure_max_rmsd, logger=logger)
-        return varients, varient_files     
-    
+                p(
+                    vfile,
+                    ref_mol=self.ref_mol,
+                    smarts=self.substructure_smarts,
+                    max_rmsd=self.substructure_max_rmsd,
+                    logger=logger,
+                )
+        return varients, varient_files
+
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .sd via obabel (RDKit doesn't write charge in a rDock friendly way)"""
         futures = []
@@ -372,13 +500,16 @@ END_SECTION
             new_varient_files.append(new_vfile)
             if self.client:
                 p = timedSubprocess()
-                futures.append(self.client.submit(p.run, f"obabel {vfile} -O {new_vfile}"))
+                futures.append(
+                    self.client.submit(p.run, f"obabel {vfile} -O {new_vfile}")
+                )
             else:
                 self.subprocess.run(f"obabel {vfile} -O {new_vfile}")
-        
+
         # Wait for parallel jobs
-        if self.client: self.client.gather(futures)
-        
+        if self.client:
+            self.client.gather(futures)
+
         return varients, new_varient_files
 
     def run_rDock(self, ligand_paths):
@@ -388,26 +519,25 @@ END_SECTION
         rdock_commands = []
         for name in self.file_names:
             for variant in self.variants[name]:
-                in_lig = os.path.join(self.directory, f'{name}-{variant}_prepared.sd')
-                out_lig = os.path.join(self.directory, f'{name}-{variant}_docked')
-                out_log = os.path.join(self.directory, f'{name}-{variant}_rbdock.log')
-                command = f'{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} -allH'
+                in_lig = os.path.join(self.directory, f"{name}-{variant}_prepared.sd")
+                out_lig = os.path.join(self.directory, f"{name}-{variant}_docked")
+                command = f"{self.rdock_env} -i {in_lig} -o {out_lig} -r cavity.prm -p {self.dock_protocol} -n {self.n_runs} -allH"
                 rdock_commands.append(command)
 
         # Initialize subprocess
-        logger.debug('rDock called')
+        logger.debug("rDock called")
         p = timedSubprocess(timeout=self.dock_timeout)
         p = partial(p.run, cwd=self.directory)
 
         # Submit docking subprocesses
         if self.client is not None:
             futures = self.client.map(p, rdock_commands)
-            results = self.client.gather(futures)
+            _ = self.client.gather(futures)
         else:
-            results = [p(command) for command in rdock_commands]
-        logger.debug('rDock finished')
+            _ = [p(command) for command in rdock_commands]
+        logger.debug("rDock finished")
         return self
-    
+
     def get_docking_scores(self, smiles, return_best_variant=True):
         # Iterate over variants
         best_variants = self.file_names.copy()
@@ -415,83 +545,124 @@ END_SECTION
 
         # For each molecule
         for i, (smi, name) in enumerate(zip(smiles, self.file_names)):
-            docking_result = {'smiles': smi}
-            
+            docking_result = {"smiles": smi}
+
             # If no variants enumerate 0
             if len(self.variants[name]) == 0:
-                logger.debug(f'{name}_docked.sd does not exist')
+                logger.debug(f"{name}_docked.sd does not exist")
                 if best_score[name] is None:  # Only if no other score for prefix
-                    docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
-                    logger.debug(f'Returning 0.0 as no variants exist')
+                    docking_result.update(
+                        {f"{self.prefix}_" + k: 0.0 for k in self.return_metrics}
+                    )
+                    logger.debug("Returning 0.0 as no variants exist")
 
             # For each variant
             for variant in self.variants[name]:
-                out_file = os.path.join(self.directory, f'{name}-{variant}_docked.sd')
+                out_file = os.path.join(self.directory, f"{name}-{variant}_docked.sd")
                 if os.path.exists(out_file):
                     # Try to load it in, and grab the score
                     try:
-                        rdock_out = Chem.SDMolSupplier(out_file, sanitize=False) 
+                        rdock_out = Chem.SDMolSupplier(out_file, sanitize=False)
                         for mol_idx in range(len(rdock_out)):
                             mol = rdock_out[mol_idx]
-                            mol = manually_charge_mol(mol) # RDKit doesn't like rDock charged files
-                            dscore = mol.GetPropsAsDict()['SCORE']
-                            
+                            mol = manually_charge_mol(
+                                mol
+                            )  # RDKit doesn't like rDock charged files
+                            dscore = mol.GetPropsAsDict()["SCORE"]
+
                             # If molecule doesn't have a score yet append it and the variant
                             if best_score[name] is None:
                                 best_score[name] = dscore
-                                best_variants[i] = f'{name}-{variant}'
+                                best_variants[i] = f"{name}-{variant}"
                                 # TODO TETHERED.RMSD isn't read because of previous error in rDock sd formatting without ">""
-                                docking_result.update({f'{self.prefix}_' + k: v
-                                                        for k, v in mol.GetPropsAsDict().items()
-                                                        if k in self.return_metrics})
+                                docking_result.update(
+                                    {
+                                        f"{self.prefix}_" + k: v
+                                        for k, v in mol.GetPropsAsDict().items()
+                                        if k in self.return_metrics
+                                    }
+                                )
                                 # Add charge info
-                                net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
-                                docking_result.update({f'{self.prefix}_NetCharge': net_charge,
-                                                        f'{self.prefix}_PositiveCharge': positive_charge,
-                                                        f'{self.prefix}_NegativeCharge': negative_charge})
-                                logger.debug(f'Docking score for {name}-{variant}: {dscore}')
+                                net_charge, positive_charge, negative_charge = (
+                                    MolecularDescriptors.charge_counts(mol)
+                                )
+                                docking_result.update(
+                                    {
+                                        f"{self.prefix}_NetCharge": net_charge,
+                                        f"{self.prefix}_PositiveCharge": positive_charge,
+                                        f"{self.prefix}_NegativeCharge": negative_charge,
+                                    }
+                                )
+                                logger.debug(
+                                    f"Docking score for {name}-{variant}: {dscore}"
+                                )
 
                             # If docking score is better change it...
                             elif dscore < best_score[name]:
                                 best_score[name] = dscore
-                                best_variants[i] = f'{name}-{variant}'
-                                docking_result.update({f'{self.prefix}_' + k: v
-                                                        for k, v in mol.GetPropsAsDict().items()
-                                                        if k in self.return_metrics})
+                                best_variants[i] = f"{name}-{variant}"
+                                docking_result.update(
+                                    {
+                                        f"{self.prefix}_" + k: v
+                                        for k, v in mol.GetPropsAsDict().items()
+                                        if k in self.return_metrics
+                                    }
+                                )
                                 # Add charge info
-                                net_charge, positive_charge, negative_charge = MolecularDescriptors.charge_counts(mol)
-                                docking_result.update({f'{self.prefix}_NetCharge': net_charge,
-                                                        f'{self.prefix}_PositiveCharge': positive_charge,
-                                                        f'{self.prefix}_NegativeCharge': negative_charge})
-                                logger.debug(f'Found better {name}-{variant}: {dscore}')
+                                net_charge, positive_charge, negative_charge = (
+                                    MolecularDescriptors.charge_counts(mol)
+                                )
+                                docking_result.update(
+                                    {
+                                        f"{self.prefix}_NetCharge": net_charge,
+                                        f"{self.prefix}_PositiveCharge": positive_charge,
+                                        f"{self.prefix}_NegativeCharge": negative_charge,
+                                    }
+                                )
+                                logger.debug(f"Found better {name}-{variant}: {dscore}")
 
                             # Otherwise ignore
                             else:
                                 pass
 
                     # If parsing the molecule threw an error and nothing stored, append 0
-                    except:
-                        logger.debug(f'Error processing {name}-{variant}_docked.sd file')
-                        if best_score[name] is None:  # Only if no other score for prefix
-                            best_variants[i] = f'{name}-{variant}'
-                            docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
-                            logger.debug(f'Returning 0.0 unless a successful variant is found')
+                    except Exception:
+                        logger.debug(
+                            f"Error processing {name}-{variant}_docked.sd file"
+                        )
+                        if (
+                            best_score[name] is None
+                        ):  # Only if no other score for prefix
+                            best_variants[i] = f"{name}-{variant}"
+                            docking_result.update(
+                                {
+                                    f"{self.prefix}_" + k: 0.0
+                                    for k in self.return_metrics
+                                }
+                            )
+                            logger.debug(
+                                "Returning 0.0 unless a successful variant is found"
+                            )
 
                 # If path doesn't exist and nothing store, append 0
                 else:
-                    logger.debug(f'{name}-{variant}_docked.sd does not exist')
+                    logger.debug(f"{name}-{variant}_docked.sd does not exist")
                     if best_score[name] is None:  # Only if no other score for prefix
-                        best_variants[i] = f'{name}-{variant}'
-                        docking_result.update({f'{self.prefix}_' + k: 0.0 for k in self.return_metrics})
-                        logger.debug(f'Returning 0.0 unless a successful variant is found')
+                        best_variants[i] = f"{name}-{variant}"
+                        docking_result.update(
+                            {f"{self.prefix}_" + k: 0.0 for k in self.return_metrics}
+                        )
+                        logger.debug(
+                            "Returning 0.0 unless a successful variant is found"
+                        )
 
             # Add best variant information to docking result
-            docking_result.update({f'{self.prefix}_best_variant': best_variants[i]})
+            docking_result.update({f"{self.prefix}_best_variant": best_variants[i]})
             self.docking_results.append(docking_result)
 
-        logger.debug(f'Best scores: {best_score}')
+        logger.debug(f"Best scores: {best_score}")
         if return_best_variant:
-            logger.debug(f'Returning best variants: {best_variants}')
+            logger.debug(f"Returning best variants: {best_variants}")
             return best_variants
 
     def remove_files(self, keep: list = [], parallel: bool = True):
@@ -504,18 +675,22 @@ END_SECTION
         if (parallel is True) and (self.client is None):
             parallel = False
 
-        keep_poses = [f'{k}_docked.sd' for k in keep]
-        logger.debug(f'Keeping pose files: {keep_poses}')
+        keep_poses = [f"{k}_docked.sd" for k in keep]
+        logger.debug(f"Keeping pose files: {keep_poses}")
         del_files = []
         for name in self.file_names:
             # Grab files
-            files = glob.glob(os.path.join(self.directory, f'{name}*'))
-            logger.debug(f'Glob found {len(files)} files')
+            files = glob.glob(os.path.join(self.directory, f"{name}*"))
+            logger.debug(f"Glob found {len(files)} files")
 
             if len(files) > 0:
                 try:
-                    files = [file for file in files
-                             if not ("log.txt" in file) and not any([p in file for p in keep_poses])]
+                    files = [
+                        file
+                        for file in files
+                        if "log.txt" not in file
+                        and not any([p in file for p in keep_poses])
+                    ]
 
                     if parallel:
                         [del_files.append(file) for file in files]
@@ -523,7 +698,7 @@ END_SECTION
                         [os.remove(file) for file in files]
                 # No need to stop if files can't be found and deleted
                 except FileNotFoundError:
-                    logger.debug('File not found.')
+                    logger.debug("File not found.")
                     pass
 
         if parallel:
@@ -531,29 +706,45 @@ END_SECTION
             _ = self.client.gather(futures)
         return self
 
-    def __call__(self, smiles: list, directory: str, file_names: list, cleanup: bool = True, **kwargs):
+    def __call__(
+        self,
+        smiles: list,
+        directory: str,
+        file_names: list,
+        cleanup: bool = True,
+        **kwargs,
+    ):
         # Assign some attributes
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
         self.file_names = file_names
         self.docking_results = []
 
         # Create log directory
-        self.directory = os.path.join(os.path.abspath(directory), f'{self.prefix}_rDock', step)
+        self.directory = os.path.join(
+            os.path.abspath(directory), f"{self.prefix}_rDock", step
+        )
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
         # Add logging file handler
-        fh = logging.FileHandler(os.path.join(self.directory, f'{step}_log.txt'))
+        fh = logging.FileHandler(os.path.join(self.directory, f"{step}_log.txt"))
         fh.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
         # Prepare ligands
-        self.variants, variant_paths = self.ligand_protocol(smiles=smiles, directory=self.directory, file_names=self.file_names, logger=logger)
+        self.variants, variant_paths = self.ligand_protocol(
+            smiles=smiles,
+            directory=self.directory,
+            file_names=self.file_names,
+            logger=logger,
+        )
         if self.substructure_smarts:
             self.variants, variant_paths = self.align_mols(self.variants, variant_paths)
-        self.variants, variant_paths = self.reformat_ligands(self.variants, variant_paths)
+        self.variants, variant_paths = self.reformat_ligands(
+            self.variants, variant_paths
+        )
 
         # Dock ligands
         self.run_rDock(variant_paths)
@@ -562,7 +753,8 @@ END_SECTION
         best_variants = self.get_docking_scores(smiles, return_best_variant=True)
 
         # Cleanup
-        if cleanup: self.remove_files(keep=best_variants, parallel=True)
+        if cleanup:
+            self.remove_files(keep=best_variants, parallel=True)
         fh.close()
         logger.removeHandler(fh)
         self.directory = None
@@ -573,14 +765,15 @@ END_SECTION
         assert len(smiles) == len(self.docking_results)
 
         return self.docking_results
-    
+
+
 def manually_charge_mol(mol):
     """Manually charge non-full valent atoms, assuming all explicit hydrogens are present"""
     PT = Chem.GetPeriodicTable()
     for atom in mol.GetAtoms():
         e = atom.GetSymbol()
         # Skip sulfur
-        if e == 'S':
+        if e == "S":
             continue
         v = atom.GetExplicitValence()
         dv = PT.GetDefaultValence(atom.GetAtomicNum())

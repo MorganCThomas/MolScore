@@ -1,10 +1,11 @@
 import os
-from typing import Union, List, Dict, Any
+from typing import Union
 import numpy as np
 from rdkit.Chem import AllChem as Chem
-from rdkit.Chem import rdMolDescriptors, rdmolops, DataStructs
+from rdkit.Chem import rdMolDescriptors, rdmolops
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 from rdkit.Avalon import pyAvalonTools
+
 
 def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     """
@@ -26,21 +27,21 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
 
 
 def read_mol(mol_path: os.PathLike, i=0):
-    if mol_path.endswith('.mol2') or mol_path.endswith('.mol'):
+    if mol_path.endswith(".mol2") or mol_path.endswith(".mol"):
         mol = Chem.MolFromMolFile(mol_path, sanitize=False, strictParsing=False)
 
-    elif mol_path.endswith('.sdf'):
+    elif mol_path.endswith(".sdf"):
         suppl = Chem.ForwardSDMolSupplier(mol_path, sanitize=False)
         for i, mol in enumerate(suppl):
             if i == i:
                 break
 
-    elif mol_path.endswith('.pdb'):
+    elif mol_path.endswith(".pdb"):
         mol = Chem.MolFromPDBFile(mol_path, sanitize=False)
 
     else:
         raise TypeError(f"Cannot read molecule, unknown input file type: {mol_path}")
-    
+
     return mol
 
 
@@ -50,7 +51,9 @@ class Fingerprints:
     """
 
     @staticmethod
-    def get(mol: Union[str, Chem.rdchem.Mol], name: str, nBits: int, asarray: bool = False):
+    def get(
+        mol: Union[str, Chem.rdchem.Mol], name: str, nBits: int, asarray: bool = False
+    ):
         """
         Get fp by str instead of method
         :param mol: RDKit mol or Smiles
@@ -62,7 +65,7 @@ class Fingerprints:
         generator = getattr(Fingerprints, name, None)
 
         if generator is None:
-            raise KeyError(f"\'{name}\' not recognised as a valid fingerprint")
+            raise KeyError(f"'{name}' not recognised as a valid fingerprint")
 
         if mol is not None:
             return generator(mol, nBits, asarray)
@@ -71,9 +74,15 @@ class Fingerprints:
     @staticmethod
     def ECFP4(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nBits))
+            return np.asarray(
+                rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=2, nBits=nBits
+                )
+            )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nBits)
+            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                mol, radius=2, nBits=nBits
+            )
 
     @staticmethod
     def ECFP4c(mol, nBits, asarray):
@@ -90,28 +99,44 @@ class Fingerprints:
     @staticmethod
     def FCFP4(mol, nBits, asarray):
         if asarray:
-            np.asarray(rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nBits, useFeatures=True))
+            np.asarray(
+                rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=2, nBits=nBits, useFeatures=True
+                )
+            )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nBits, useFeatures=True)
+            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                mol, radius=2, nBits=nBits, useFeatures=True
+            )
 
     @staticmethod
     def FCFP4c(mol, nBits, asarray):
         if asarray:
-            fp = rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=True, useFeatures=True)
+            fp = rdMolDescriptors.GetMorganFingerprint(
+                mol, radius=2, useCounts=True, useFeatures=True
+            )
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
                 nidx = idx % nBits
                 nfp[0, nidx] += int(v)
             return nfp.reshape(-1)
         else:
-            return rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=True, useFeatures=True)
+            return rdMolDescriptors.GetMorganFingerprint(
+                mol, radius=2, useCounts=True, useFeatures=True
+            )
 
     @staticmethod
     def ECFP6(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits))
+            return np.asarray(
+                rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=3, nBits=nBits
+                )
+            )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits)
+            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                mol, radius=3, nBits=nBits
+            )
 
     @staticmethod
     def ECFP6c(mol, nBits, asarray):
@@ -128,21 +153,31 @@ class Fingerprints:
     @staticmethod
     def FCFP6(mol, nBits, asarray):
         if asarray:
-            np.asarray(rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits, useFeatures=True))
+            np.asarray(
+                rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=3, nBits=nBits, useFeatures=True
+                )
+            )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits, useFeatures=True)
+            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                mol, radius=3, nBits=nBits, useFeatures=True
+            )
 
     @staticmethod
     def FCFP6c(mol, nBits, asarray):
         if asarray:
-            fp = rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=True, useFeatures=True)
+            fp = rdMolDescriptors.GetMorganFingerprint(
+                mol, radius=3, useCounts=True, useFeatures=True
+            )
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
                 nidx = idx % nBits
                 nfp[0, nidx] += int(v)
             return nfp.reshape(-1)
         else:
-            return rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=True, useFeatures=True)
+            return rdMolDescriptors.GetMorganFingerprint(
+                mol, radius=3, useCounts=True, useFeatures=True
+            )
 
     # Substructure fingerprints
     @staticmethod
@@ -175,35 +210,51 @@ class Fingerprints:
     @staticmethod
     def hashAP(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits))
+            return np.asarray(
+                rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
+            )
         else:
-            return rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
+            return rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(
+                mol, nBits=nBits
+            )
 
     @staticmethod
     def hashTT(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits=nBits))
+            return np.asarray(
+                rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(
+                    mol, nBits=nBits
+                )
+            )
         else:
-            return rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(mol, nBits=nBits)
+            return rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(
+                mol, nBits=nBits
+            )
 
     @staticmethod
     def RDK5(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2))
+            return np.asarray(
+                rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
+            )
         else:
             return rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
 
     @staticmethod
     def RDK6(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2))
+            return np.asarray(
+                rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
+            )
         else:
             return rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
 
     @staticmethod
     def RDK7(mol, nBits, asarray):
         if asarray:
-            return np.asarray(rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2))
+            return np.asarray(
+                rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
+            )
         else:
             return rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
 
