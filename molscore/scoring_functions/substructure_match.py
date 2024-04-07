@@ -4,9 +4,10 @@ https://github.com/MolecularAI/Reinvent
 """
 
 import os
-from rdkit import Chem
 from functools import partial
 from typing import Union
+
+from rdkit import Chem
 
 from molscore.scoring_functions.utils import Pool
 
@@ -15,10 +16,17 @@ class SubstructureMatch:
     """
     Score structures based on desirable substructures in a molecule (1 returned for a match)
     """
-    return_metrics = ['substruct_match']
 
-    def __init__(self, prefix: str, smarts: Union[list, os.PathLike],
-                 n_jobs: int = 1, method: str = 'any', **kwargs):
+    return_metrics = ["substruct_match"]
+
+    def __init__(
+        self,
+        prefix: str,
+        smarts: Union[list, os.PathLike],
+        n_jobs: int = 1,
+        method: str = "any",
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., Benzimidazole)
         :param smarts: List of SMARTS or path to SMARTS file (format of a .smi i.e., txt with one row, no header)
@@ -29,15 +37,17 @@ class SubstructureMatch:
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
         self.smarts = smarts
-        assert method in ['any', 'all']
+        assert method in ["any", "all"]
         self.method = method
 
         # If file path provided, load smiles.
         if isinstance(smarts, str):
-            with open(smarts, 'r') as f:
+            with open(smarts, "r") as f:
                 self.smarts = f.read().splitlines()
         else:
-            assert isinstance(smarts, list) and (len(smarts) > 0), "None list or empty list provided"
+            assert isinstance(smarts, list) and (
+                len(smarts) > 0
+            ), "None list or empty list provided"
             self.smarts = smarts
 
     @staticmethod
@@ -52,12 +62,22 @@ class SubstructureMatch:
         """
         mol = Chem.MolFromSmiles(smi)
         if mol:
-            if method == 'any':
-                match = any([mol.HasSubstructMatch(Chem.MolFromSmarts(sub)) for sub in
-                             smarts if Chem.MolFromSmarts(sub)])
-            if method == 'all':
-                match = all([mol.HasSubstructMatch(Chem.MolFromSmarts(sub)) for sub in
-                             smarts if Chem.MolFromSmarts(sub)])
+            if method == "any":
+                match = any(
+                    [
+                        mol.HasSubstructMatch(Chem.MolFromSmarts(sub))
+                        for sub in smarts
+                        if Chem.MolFromSmarts(sub)
+                    ]
+                )
+            if method == "all":
+                match = all(
+                    [
+                        mol.HasSubstructMatch(Chem.MolFromSmarts(sub))
+                        for sub in smarts
+                        if Chem.MolFromSmarts(sub)
+                    ]
+                )
         else:
             match = 0
         return smi, int(match)
@@ -70,7 +90,11 @@ class SubstructureMatch:
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
         with Pool(self.n_jobs) as pool:
-            match_substructure_p = partial(self.match_substructure, smarts=self.smarts, method=self.method)
-            results = [{'smiles': smi, f'{self.prefix}_substruct_match': match}
-                       for smi, match in pool.imap(match_substructure_p, smiles)]
+            match_substructure_p = partial(
+                self.match_substructure, smarts=self.smarts, method=self.method
+            )
+            results = [
+                {"smiles": smi, f"{self.prefix}_substruct_match": match}
+                for smi, match in pool.imap(match_substructure_p, smiles)
+            ]
         return results

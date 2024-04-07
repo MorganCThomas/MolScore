@@ -1,47 +1,67 @@
-import os
 import json
-import unittest
+import os
 import subprocess
+import unittest
 
-from molscore.tests import test_files
-from molscore.tests.base_tests import BaseTests
-from molscore.tests.mock_generator import MockGenerator
-from molscore.scoring_functions import GlideDock, SminaDock, GninaDock, VinaDock, PLANTSDock, GOLDDock, ChemPLPGOLDDock, ASPGOLDDock, ChemScoreGOLDDock, GoldScoreGOLDDock, rDock
+from molscore.scoring_functions import (
+    ASPGOLDDock,
+    ChemPLPGOLDDock,
+    ChemScoreGOLDDock,
+    GlideDock,
+    GninaDock,
+    GOLDDock,
+    GoldScoreGOLDDock,
+    PLANTSDock,
+    SminaDock,
+    VinaDock,
+    rDock,
+)
+from molscore.tests import BaseTests, MockGenerator, test_files
 
 
 class TestGlideDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
         # Check installation
-        if not ('SCHRODINGER' in list(os.environ.keys())):
+        if "SCHRODINGER" not in list(os.environ.keys()):
             raise unittest.SkipTest("Schrodinger installation not found")
         # Check license
-        license_check = subprocess.run("$SCHRODINGER/licadmin STAT", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode().split("\n")
+        license_check = (
+            subprocess.run(
+                "$SCHRODINGER/licadmin STAT",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            .stdout.decode()
+            .split("\n")
+        )
         for line in license_check:
-            if 'Error getting status:' in line:
+            if "Error getting status:" in line:
                 raise unittest.SkipTest(line)
 
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
         # Prepare a grid file
-        input_file = os.path.join(cls.output_directory, 'glide.in')
-        with open(input_file, 'w') as f:
+        input_file = os.path.join(cls.output_directory, "glide.in")
+        with open(input_file, "w") as f:
             f.write(f"GRIDFILE   {test_files['GlideDock_grid']}\n")
-            f.write(f"PRECISION    SP\n")
+            f.write("PRECISION    SP\n")
         # Instantiate
         cls.obj = GlideDock
         cls.inst = GlideDock(
-            prefix='test',
+            prefix="test",
             glide_template=input_file,
-            ligand_preparation='LigPrep',
+            ligand_preparation="LigPrep",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -53,36 +73,46 @@ class TestGlideDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
         # Check installation
-        if not ('SCHRODINGER' in list(os.environ.keys())):
+        if "SCHRODINGER" not in list(os.environ.keys()):
             raise unittest.SkipTest("Schrodinger installation not found")
         # Check license
-        license_check = subprocess.run("$SCHRODINGER/licadmin STAT", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode().split("\n")
+        license_check = (
+            subprocess.run(
+                "$SCHRODINGER/licadmin STAT",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            .stdout.decode()
+            .split("\n")
+        )
         for line in license_check:
-            if 'Error getting status:' in line:
+            if "Error getting status:" in line:
                 raise unittest.SkipTest(line)
 
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
         # Prepare a grid file
-        input_file = os.path.join(cls.output_directory, 'glide.in')
-        with open(input_file, 'w') as f:
+        input_file = os.path.join(cls.output_directory, "glide.in")
+        with open(input_file, "w") as f:
             f.write(f"GRIDFILE   {test_files['GlideDock_grid']}\n")
-            f.write(f"PRECISION    SP\n")
+            f.write("PRECISION    SP\n")
         # Instantiate
         cls.obj = GlideDock
         cls.inst = GlideDock(
-            prefix='test',
+            prefix="test",
             glide_template=input_file,
-            ligand_preparation='LigPrep',
-            cluster=4
+            ligand_preparation="LigPrep",
+            cluster=4,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGlideDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -98,7 +128,7 @@ class TestSminaDockSerial(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        
+
         cls.obj = SminaDock
         # Check installation
         try:
@@ -107,17 +137,19 @@ class TestSminaDockSerial(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("Smina installation not found")
         # Instantiate
         cls.inst = SminaDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor_pdbqt'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
+            prefix="test",
+            receptor=test_files["DRD2_receptor_pdbqt"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
             cpus=8,
-            ligand_preparation='GypsumDL',
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nSminaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -131,7 +163,7 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        
+
         cls.obj = SminaDock
         # Check installation
         try:
@@ -140,18 +172,20 @@ class TestSminaDockParallel(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("Smina installation not found")
         # Instantiate
         cls.inst = SminaDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor_pdbqt'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
+            prefix="test",
+            receptor=test_files["DRD2_receptor_pdbqt"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
             cpus=1,
-            ligand_preparation='GypsumDL',
-            cluster=4
+            ligand_preparation="GypsumDL",
+            cluster=4,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nSminaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -176,19 +210,24 @@ class TestGninaDockSerial(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("Gnina installation not found")
         # Instantiate
         cls.inst = GninaDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor_pdbqt'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
+            prefix="test",
+            receptor=test_files["DRD2_receptor_pdbqt"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
             cpus=8,
-            ligand_preparation='GypsumDL',
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=True,
+        )
         print(f"\nGninaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
-    
+
     @classmethod
     def tearDownClass(cls):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
@@ -209,20 +248,25 @@ class TestGninaDockParallel(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("Gnina installation not found")
         # Instantiate
         cls.inst = GninaDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor_pdbqt'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
+            prefix="test",
+            receptor=test_files["DRD2_receptor_pdbqt"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
             cpus=1,
-            ligand_preparation='GypsumDL',
-            cluster=1
+            ligand_preparation="GypsumDL",
+            cluster=1,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=True,
+        )
         print(f"\nGninaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
-    
+
     @classmethod
     def tearDownClass(cls):
         cls.inst.client.close()
@@ -245,25 +289,30 @@ class TestVinaDockSerial(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("Vina installation not found")
         # Instantiate
         cls.inst = VinaDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            file_preparation='mgltools',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            file_preparation="mgltools",
             cpus=2,
-            ligand_preparation='GypsumDL',
-            dock_scoring='vina'
+            ligand_preparation="GypsumDL",
+            dock_scoring="vina",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=False)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=False,
+        )
         print(f"\nVinaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
-    
+
 
 class TestVinaDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
@@ -279,20 +328,25 @@ class TestVinaDockParallel(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("Vina installation not found")
         # Instantiate
         cls.inst = VinaDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            file_preparation='mgltools',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            file_preparation="mgltools",
             cpus=1,
             cluster=4,
-            ligand_preparation='GypsumDL',
-            dock_scoring='vina'
+            ligand_preparation="GypsumDL",
+            dock_scoring="vina",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=False)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=False,
+        )
         print(f"\nVinaDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -317,16 +371,18 @@ class TestPLANTSDockSerial(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("PLANTS installation not found")
         # Instantiate
         cls.inst = PLANTSDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nPLANTSDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -351,17 +407,19 @@ class TestPLANTSDockParallel(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("PLANTS installation not found")
         # Instantiate
         cls.inst = PLANTSDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
             cluster=4,
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nPLANTSDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -377,7 +435,7 @@ class TestGOLDDockSerial(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        
+
         cls.obj = GOLDDock
         # Check installation
         try:
@@ -386,16 +444,18 @@ class TestGOLDDockSerial(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("GOLD installation not found")
         # Instantiate
         cls.inst = GOLDDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -418,17 +478,19 @@ class TestGOLDDockParallel(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("GOLD installation not found")
         # Instantiate
         cls.inst = GOLDDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
             cluster=4,
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -453,17 +515,19 @@ class TestChemPLPGOLDDock(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("GOLD installation not found")
         # Instantiate
         cls.inst = ChemPLPGOLDDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
             cluster=4,
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -488,17 +552,19 @@ class TestASPGOLDDock(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("GOLD installation not found")
         # Instantiate
         cls.inst = ASPGOLDDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
             cluster=4,
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -523,17 +589,19 @@ class TestChemScoreGOLDDock(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("GOLD installation not found")
         # Instantiate
         cls.inst = ChemScoreGOLDDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
             cluster=4,
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -558,17 +626,19 @@ class TestGoldScoreGOLDDock(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("GOLD installation not found")
         # Instantiate
         cls.inst = GoldScoreGOLDDock(
-            prefix='test',
+            prefix="test",
             receptor=test_files["DRD2_receptor"],
             ref_ligand=test_files["DRD2_ref_ligand"],
             cluster=4,
-            ligand_preparation='GypsumDL'
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nGOLDDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -582,28 +652,35 @@ class TestOEDockSerial(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
         # Check installation
-        try: from molscore.scoring_functions.oedock import OEDock
-        except: raise unittest.SkipTest("OpenEye not found, please install via mamba install openeye-toolkits -c openeye")
-        if not ('OE_LICENSE' in list(os.environ.keys())):
-            raise unittest.SkipTest("OpenEye license not found, please install license and export to \'OE_LICENSE\'")
+        try:
+            from molscore.scoring_functions.oedock import OEDock
+        except ImportError:
+            raise unittest.SkipTest(
+                "OpenEye not found, please install via mamba install openeye-toolkits -c openeye"
+            )
+        if "OE_LICENSE" not in list(os.environ.keys()):
+            raise unittest.SkipTest(
+                "OpenEye license not found, please install license and export to 'OE_LICENSE'"
+            )
 
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
         # Instantiate
         cls.obj = OEDock
         cls.inst = OEDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -615,29 +692,36 @@ class TestOEDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
     @classmethod
     def setUpClass(cls):
-
         # Check installation
-        try: from molscore.scoring_functions.oedock import OEDock
-        except: raise unittest.SkipTest("OpenEye not found, please install via mamba install openeye-toolkits -c openeye")
-        if not ('OE_LICENSE' in list(os.environ.keys())):
-            raise unittest.SkipTest("OpenEye license not found, please install license and export to \'OE_LICENSE\'")
+        try:
+            from molscore.scoring_functions.oedock import OEDock
+        except ImportError:
+            raise unittest.SkipTest(
+                "OpenEye not found, please install via mamba install openeye-toolkits -c openeye"
+            )
+        if "OE_LICENSE" not in list(os.environ.keys()):
+            raise unittest.SkipTest(
+                "OpenEye license not found, please install license and export to 'OE_LICENSE'"
+            )
 
         # Clean the output directory
         os.makedirs(cls.output_directory, exist_ok=True)
         # Instantiate
         cls.obj = OEDock
         cls.inst = OEDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
-            cluster=4
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
+            cluster=4,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nOEDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -653,7 +737,7 @@ class TestrDockSerial(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        
+
         cls.obj = rDock
         # Check installation
         try:
@@ -662,24 +746,26 @@ class TestrDockSerial(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("rDock installation not found")
         # Instantiate
         cls.inst = rDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
             n_runs=2,
-            cluster=1
+            cluster=1,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
-    
+
 
 class TestrDockParallel(BaseTests.TestScoringFunction):
     # Only set up once per class, otherwise too long
@@ -696,18 +782,20 @@ class TestrDockParallel(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("rDock installation not found")
         # Instantiate
         cls.inst = rDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
             n_runs=2,
-            cluster=4
+            cluster=4,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -732,19 +820,24 @@ class TestrDockParallelPH4(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("rDock installation not found")
         # Instantiate
         cls.inst = rDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
-            dock_constraints=test_files['DRD2_rdock_constraint'],
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
+            dock_constraints=test_files["DRD2_rdock_constraint"],
             n_runs=2,
-            cluster=4
+            cluster=4,
         )
         # Call
         mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + mg.sample(4)
+        cls.input = [test_files["DRD2_ref_smiles"]] + mg.sample(4)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=True,
+        )
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -769,21 +862,30 @@ class TestrDockParallelScaff1(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("rDock installation not found")
         # Instantiate
         cls.inst = rDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
             dock_substructure_constraints="Fc1cc2oncc2cc1",
             dock_substructure_max_trans=0.0,
             dock_substructure_max_rot=0.0,
             n_runs=5,
-            cluster=4
+            cluster=4,
         )
         # Call
-        mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + ["Fc1cc2onc(CC)c2cc1", "Fc1cc2onc(CCC(=O))c2cc1", "Fc1cc2onc(C(=O)N)c2cc1", "Fc1cc2onc(CCCCC)c2cc1"]
+        cls.input = [test_files["DRD2_ref_smiles"]] + [
+            "Fc1cc2onc(CC)c2cc1",
+            "Fc1cc2onc(CCC(=O))c2cc1",
+            "Fc1cc2onc(C(=O)N)c2cc1",
+            "Fc1cc2onc(CCCCC)c2cc1",
+        ]
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=True,
+        )
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -799,7 +901,7 @@ class TestrDockParallelScaff2(BaseTests.TestScoringFunction):
     def setUpClass(cls):
         # Clean output directory
         os.makedirs(cls.output_directory, exist_ok=True)
-        
+
         cls.obj = rDock
         # Check installation
         try:
@@ -808,21 +910,30 @@ class TestrDockParallelScaff2(BaseTests.TestScoringFunction):
             raise unittest.SkipTest("rDock installation not found")
         # Instantiate
         cls.inst = rDock(
-            prefix='test',
-            receptor=test_files['DRD2_receptor'],
-            ref_ligand=test_files['DRD2_ref_ligand'],
-            ligand_preparation='GypsumDL',
+            prefix="test",
+            receptor=test_files["DRD2_receptor"],
+            ref_ligand=test_files["DRD2_ref_ligand"],
+            ligand_preparation="GypsumDL",
             dock_substructure_constraints="Fc1cc2oncc2cc1.Cc1nc2CCCCn2c(=O)c1",
             dock_substructure_max_trans=0.0,
             dock_substructure_max_rot=0.0,
             n_runs=5,
-            cluster=4
+            cluster=4,
         )
         # Call
-        mg = MockGenerator(seed_no=123)
-        cls.input = [test_files['DRD2_ref_smiles']] + ["Cc1nc2CCCCn2c(=O)c1CCCCCc1noc2cc(F)ccc21", "Cc1nc2CCCCn2c(=O)c1CCCCc1noc2cc(F)ccc21", "Cc1nc2CCCCn2c(=O)c1CCCCCCc1noc2cc(F)ccc21", "Cc1nc2CCCCn2c(=O)c1CCOCCc1noc2cc(F)ccc21"]
+        cls.input = [test_files["DRD2_ref_smiles"]] + [
+            "Cc1nc2CCCCn2c(=O)c1CCCCCc1noc2cc(F)ccc21",
+            "Cc1nc2CCCCn2c(=O)c1CCCCc1noc2cc(F)ccc21",
+            "Cc1nc2CCCCn2c(=O)c1CCCCCCc1noc2cc(F)ccc21",
+            "Cc1nc2CCCCn2c(=O)c1CCOCCc1noc2cc(F)ccc21",
+        ]
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names, cleanup=True)
+        cls.output = cls.inst(
+            smiles=cls.input,
+            directory=cls.output_directory,
+            file_names=file_names,
+            cleanup=True,
+        )
         print(f"\nrDock Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -832,5 +943,5 @@ class TestrDockParallelScaff2(BaseTests.TestScoringFunction):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

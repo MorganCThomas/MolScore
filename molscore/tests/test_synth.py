@@ -1,13 +1,10 @@
-import os
 import json
+import os
 import unittest
-from random import sample
-
-from molscore.tests.base_tests import BaseTests
-from molscore.tests.mock_generator import MockGenerator
 
 from molscore.scoring_functions.aizynthfinder import AiZynthFinder
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
+from molscore.tests import BaseTests, MockGenerator
 
 
 class TestAiZynthFinder(BaseTests.TestScoringFunction):
@@ -22,7 +19,9 @@ class TestAiZynthFinder(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123, augment_invalids=True)
         cls.input = mg.sample(10)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\AiZynthFinder Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -42,7 +41,9 @@ class TestRAScore(BaseTests.TestScoringFunction):
         mg = MockGenerator(seed_no=123, augment_invalids=True)
         cls.input = mg.sample(10)
         file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(smiles=cls.input, directory=cls.output_directory, file_names=file_names)
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
         print(f"\RAScore Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -50,5 +51,5 @@ class TestRAScore(BaseTests.TestScoringFunction):
         os.system(f"rm -r {os.path.join(cls.output_directory, '*')}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

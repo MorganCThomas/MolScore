@@ -2,22 +2,26 @@
 Adapted from
 https://github.com/MarcusOlivecrona/REINVENT
 """
-from __future__ import print_function, division
+
+from __future__ import division, print_function
+
 import os
+
 import numpy as np
-from rdkit import Chem
-from rdkit import rdBase
+from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem
 from sklearn.externals import joblib
-rdBase.DisableLog('rdApp.error')
+
+rdBase.DisableLog("rdApp.error")
 
 
 class ActivityModel:
-    """ This particular class uses the SVM taken from the REINVENT publication and
-     refactors code used for fingerprint generation.
-     https://github.com/MarcusOlivecrona/REINVENT
+    """This particular class uses the SVM taken from the REINVENT publication and
+    refactors code used for fingerprint generation.
+    https://github.com/MarcusOlivecrona/REINVENT
     """
-    return_metrics = ['pred_proba']
+
+    return_metrics = ["pred_proba"]
 
     def __init__(self, prefix: str, model_path: os.PathLike, **kwargs):
         """
@@ -38,15 +42,15 @@ class ActivityModel:
         """
         # If just a single str
         if isinstance(smiles, str):
-            results = {'smiles': smiles}
+            results = {"smiles": smiles}
             mol = Chem.MolFromSmiles(smiles)
 
             if mol:
                 fp = ActivityModel.fingerprints_from_mol(mol)
                 score = self.clf.predict_proba(fp)[:, 1]
-                results.update({f'{self.prefix}_pred_proba': float(score[0])})
+                results.update({f"{self.prefix}_pred_proba": float(score[0])})
             else:
-                results.update({f'{self.prefix}_pred_proba': 0.0})
+                results.update({f"{self.prefix}_pred_proba": 0.0})
             return results
 
         elif isinstance(smiles, list):
@@ -56,25 +60,25 @@ class ActivityModel:
 
             # Calculate fingerprints
             for i, smi in enumerate(smiles):
-                result = {'smiles': smi}
+                result = {"smiles": smi}
                 mol = Chem.MolFromSmiles(smi)
                 if mol:
                     fp = ActivityModel.fingerprints_from_mol(mol)
                     fps.append(fp.reshape(-1))
                     valid.append(i)
                 else:
-                    result.update({f'{self.prefix}_pred_proba': 0.0})
+                    result.update({f"{self.prefix}_pred_proba": 0.0})
                 results.append(result)
 
             # Grab prediction
             y_prob = self.clf.predict_proba(np.asarray(fps))[:, 1]
             for i, prob in zip(valid, y_prob):
-                results[i].update({f'{self.prefix}_pred_proba': prob})
+                results[i].update({f"{self.prefix}_pred_proba": prob})
 
             return results
 
         else:
-            print('smiles not provided in correct format')
+            print("smiles not provided in correct format")
             raise
 
     @classmethod
@@ -91,4 +95,3 @@ class ActivityModel:
             nidx = idx % size
             nfp[0, nidx] += int(v)
         return nfp
-

@@ -1,0 +1,39 @@
+{
+  "task": "Celecoxib_rediscovery",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": false
+  },
+  "scoring_functions": [
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Celecoxxib",
+        "ref_smiles": [
+          "Cc1ccc(-c2cc(C(F)(F)F)nn2-c2ccc(S(N)(=O)=O)cc2)cc1"
+        ],
+        "radius": 2,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "Celecoxxib_Sim",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}

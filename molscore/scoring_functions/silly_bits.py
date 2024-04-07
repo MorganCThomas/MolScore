@@ -1,27 +1,34 @@
-import os
 import logging
-import numpy as np
-from typing import Union
-from functools import partial
+import os
 from collections import defaultdict
+from functools import partial
+from typing import Union
 
 from rdkit.Chem import AllChem as Chem
 
-from molscore.scoring_functions.utils import get_mol, Pool, read_smiles
+from molscore.scoring_functions.utils import Pool, get_mol, read_smiles
 
-logger = logging.getLogger('silly_bits')
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("silly_bits")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
+
 class SillyBits:
     """Ratio of fingerprint bits not found in a reference dataset based on https://github.com/PatWalters/silly_walks"""
 
-    return_metrics = ['silly_ratio']
+    return_metrics = ["silly_ratio"]
 
-    def __init__(self, prefix: str, reference_smiles: os.PathLike, radius: int = 2, n_jobs=1, **kwargs):
+    def __init__(
+        self,
+        prefix: str,
+        reference_smiles: os.PathLike,
+        radius: int = 2,
+        n_jobs=1,
+        **kwargs,
+    ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., ChEMBLbits)
         :param reference_mols: List of SMILES or RDKit Mols
@@ -35,13 +42,13 @@ class SillyBits:
         # Load reference dataset
         reference_mols = read_smiles(reference_smiles)
         # Convert to mols from reference dataset and count fp bits
-        logger.info('Pre-processing SillyBits reference dataset')
+        logger.info("Pre-processing SillyBits reference dataset")
         with Pool(self.n_jobs) as pool:
             bit_counts = [bits for bits in pool.imap(self.count_bits, reference_mols)]
         for count_dict in bit_counts:
             for k, v in count_dict.items():
                 self.count_dict[k] += v
-            
+
     @staticmethod
     def count_bits(mol):
         count_dict = {}
@@ -70,8 +77,8 @@ class SillyBits:
             scores = [s for s in pool.imap(pfunc, smiles)]
         for smi, score in zip(smiles, scores):
             if score is not None:
-                results.append({'smiles': smi, f'{self.prefix}_silly_ratio': score[0]})
+                results.append({"smiles": smi, f"{self.prefix}_silly_ratio": score[0]})
             else:
                 # Going to provide one because invalid molecules are very silly
-                results.append({'smiles': smi, f'{self.prefix}_silly_ratio': 1.0})
+                results.append({"smiles": smi, f"{self.prefix}_silly_ratio": 1.0})
         return results
