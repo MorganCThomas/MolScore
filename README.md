@@ -72,7 +72,14 @@ Once the configuration file is saved, simply point to this file path and run *de
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/monitor_v1_5HT2A_main.png?raw=True)
 
 ## Citation & Publications
-Please cite MolScore (see citation [here](CITATION.rff)) if you use MolScore in your work.
+If you use this software, please cite it as below.
+
+    @article{thomas2023molscore,
+    title={MolScore: A scoring and evaluation framework for de novo drug design},
+    author={Thomas, Morgan and O'Boyle, Noel M and Bender, Andreas and de Graaf, Chris},
+    journal={ChemRxiv},
+    year={2023}
+    }
 
 This software was also utilised in the following publications:
 1. **Thomas, M., Smith, R.T., O’Boyle, N.M. et al. Comparison of structure- and ligand-based scoring functions for deep generative models: a GPCR case study. J Cheminform 13, 39 (2021). https://doi.org/10.1186/s13321-021-00516-0**
