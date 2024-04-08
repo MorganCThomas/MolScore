@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler
+from streamlit_plotly_events import plotly_events
 
 from molscore.gui.utils import utils
 from molscore.utils import (
@@ -54,7 +55,7 @@ def plotly_mpo_events(df, x_variables, step=None, k=None):
     )
     # Draw figure
     fig = plotly_parallel_plot(mdf)
-    selection = utils.plotly_events(fig, click_event=False, select_event=True)
+    selection = plotly_events(fig, click_event=False, select_event=True)
     # Map selection to melted df
     selection = [
         mdf[mdf.run == mdf.run.unique()[sel["curveNumber"]]].index[sel["pointNumber"]]
