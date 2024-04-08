@@ -1,6 +1,7 @@
 import os
 
 import streamlit as st
+from streamlit_plotly_events import plotly_events
 
 from molscore.gui.utils import utils
 
@@ -34,7 +35,7 @@ def single_plot(main_df, SS, dock_path=None):
     fig = utils.plotly_plot(
         y_axis, tdf, x=x_axis, trendline=trendline, trendline_only=trendline_only
     )
-    selection = utils.plotly_events(fig, click_event=False, select_event=True)
+    selection = plotly_events(fig, click_event=False, select_event=True)
     selection = [
         int(
             tdf[tdf.run == tdf.run.unique()[sel["curveNumber"] // 2]].index[

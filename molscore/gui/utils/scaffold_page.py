@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from rdkit.Chem import AllChem as Chem
+from streamlit_plotly_events import plotly_events
 
 from molscore.gui.utils import utils
 
@@ -98,7 +99,7 @@ def scaffold_plot(main_df, SS, dock_path=None):
     col1, col2 = st.columns([3, 1])
     with col1:
         st.subheader("Clusters histogram (click to show centroid)")
-        selection = utils.plotly_events(
+        selection = plotly_events(
             px.bar(
                 x=[i for i in range(len(memory_list))],
                 y=[len(c["members"]) for c in memory_list],
