@@ -226,6 +226,27 @@ class ScoreMetrics:
             score = np.mean([top1, top10, top100])
         return score
 
+    def libinvent_score(self, endpoint):
+        task = self.scores.task.unique()[0]
+        N = len(self.scores)
+        found = self.scores.loc[(self.scores.DRD2_pred_proba >= 0.4)]
+        N_found = len(found)
+        avg_score = found[endpoint].mean()
+        metrics = {
+            "LibINVENT_N": N_found,
+            "LibINVENT_Yield": N_found / N,
+            "LibINVENT_Avg_Score": avg_score
+        }
+        if task.lower() == "drd2_subfilt_df":
+            pass
+        elif task.lower() == "drd2_selrf_subfilt_df":
+            N_reaction_satisfied = len(self.scores.loc[self.scores.ReactionFilter_score == 1.0])
+            metrics["LibINVENT_Fully_Satisfied"] = N_reaction_satisfied / N
+        else:
+            print(f"Unknown LibINVENT task {task}")
+        
+        return metrics
+
     def add_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
         if self.benchmark == "MolOpt":
@@ -253,9 +274,8 @@ class ScoreMetrics:
                 benchmark_metrics["GuacaMol_Quality"] = 0
             else:
                 benchmark_metrics["GuacaMol_Quality"] = qf.score_mols(top100_mols)
-        #elif self.benchmark == "LibINVENT_Exp3":
-        #    # TODO
-        #    pass
+        elif self.benchmark == "LibINVENT_Exp1":
+            benchmark_metrics.update(self.libinvent_score(endpoint=endpoint))
         else:
             print(f"Benchmark specific metrics for {self.benchmark} have not been defined yet. Nothing further to add.")
         return benchmark_metrics
