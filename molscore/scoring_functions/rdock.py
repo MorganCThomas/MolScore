@@ -70,6 +70,14 @@ class rDock:
                 "6CM4p_risperidone.sdf"
             ),
         },
+        "BACE1_4B05": {
+            "receptor": resources.files("molscore.data.structures.4B05").joinpath(
+                "4B05p_rec.pdbqt"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.4B05").joinpath(
+                "AZD3839_rdkit.mol"
+            ),
+        },
     }
 
     @staticmethod
@@ -222,7 +230,7 @@ END_SECTION
     ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2]
+        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2, BACE1_4B05]
         :param receptor: Path to receptor file (.pdb)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param ref_xyz: XYZ coordinates of the centre of the docking box
@@ -439,7 +447,7 @@ END_SECTION
                 try:
                     ff = Chem.UFFGetMoleculeForceField(query_mol, confId=i)
                     ff.Minimize()
-                except Exception as e:
+                except Exception:
                     pass
                 # Align to scaff
                 rmsds.append(
@@ -456,11 +464,13 @@ END_SECTION
             )
             # Set tethered atoms (rDock indexing starts from 1)...
             query_match = list(query_match)
-            query_mol.SetProp("TETHERED ATOMS", ",".join([str(a+1) for a in query_match]))
+            query_mol.SetProp(
+                "TETHERED ATOMS", ",".join([str(a + 1) for a in query_match])
+            )
             query_mol.SetProp("TETHERED.RMSD", str(min(rmsds)))
             # Save aligned mol if below max_rmsd
             if max_rmsd:
-                if (min(rmsds) <= max_rmsd):
+                if min(rmsds) <= max_rmsd:
                     with Chem.SDWriter(query) as writer:
                         writer.write(query_mol)
                 else:
@@ -468,7 +478,7 @@ END_SECTION
                     os.remove(query)
             else:
                 with Chem.SDWriter(query) as writer:
-                        writer.write(query_mol)
+                    writer.write(query_mol)
         else:
             # TODO unspecified constrained docking by MCS
             logger.warning(
