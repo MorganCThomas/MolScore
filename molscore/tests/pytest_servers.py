@@ -6,6 +6,7 @@ import unittest
 from molscore.scoring_functions.admet_ai import ADMETAI
 from molscore.scoring_functions.chemprop import ChemPropModel
 from molscore.scoring_functions.legacy_qsar import LegacyQSAR
+from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.tests import BaseTests, MockGenerator, test_files
 
 """Note this fails due to Flask not handling unittesting correctly https://stackoverflow.com/questions/46792087/flask-unit-test-failed-to-establish-a-new-connection"""
@@ -77,6 +78,52 @@ class TestChemProp(BaseTests.TestScoringFunction):
             smiles=cls.input, directory=cls.output_directory, file_names=file_names
         )
         print(f"ChemProp Model Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst._kill_server()
+
+
+class TestLegacyQSAR(BaseTests.TestScoringFunction):
+    @classmethod
+    def setUpClass(cls):
+        # Instantiate
+        cls.obj = LegacyQSAR
+        cls.inst = LegacyQSAR(
+            prefix="DRD2",
+            env_engine="mamba",
+            model="molopt_DRD2",
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        cls.output = cls.inst(
+            smiles=cls.input
+        )
+        print(f"LegacyQSAR Model Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst._kill_server()
+
+
+class TestRAScore(BaseTests.TestScoringFunction):
+    @classmethod
+    def setUpClass(cls):
+        # Instantiate
+        cls.obj = RAScore_XGB
+        cls.inst = RAScore_XGB(
+            prefix="RAScore",
+            env_engine="mamba",
+            model="ChEMBL",
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        cls.output = cls.inst(
+            smiles=cls.input
+        )
+        print(f"RAScore Model Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
     def tearDownClass(cls):
