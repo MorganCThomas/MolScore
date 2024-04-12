@@ -482,8 +482,9 @@ END_SECTION
         else:
             # TODO unspecified constrained docking by MCS
             logger.warning(
-                f"No substructure match found for {query}, skipping alignment."
+                f"No substructure match found for {query}, skipping."
             )
+            os.remove(query)
 
     def align_mols(self, varients, varient_files):
         logger.debug("Aligning molecules for tethered docking")
