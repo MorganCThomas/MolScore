@@ -1,11 +1,12 @@
 import gzip
 import math
+import multiprocessing
 import os
 import pickle as pkl
+import platform
 from collections import defaultdict
 from functools import partial
 from io import BytesIO
-from multiprocessing import Pool
 
 import numpy as np
 from Levenshtein import distance as levenshtein
@@ -13,13 +14,13 @@ from PIL import Image
 from rdkit import Chem, DataStructs, SimDivFilters, rdBase
 from rdkit.Avalon import pyAvalonTools
 from rdkit.Chem import (
+    AllChem,
     Draw,
     Scaffolds,
+    rdDepictor,
     rdGeometry,
     rdMolDescriptors,
     rdmolops,
-    AllChem,
-    rdDepictor,
 )
 from rdkit.Chem.MolStandardize import Standardizer
 from rdkit.ML.Cluster import Butina
@@ -42,6 +43,14 @@ def enable_rdkit_log():
 
 def cuda_available():
     return cuda.is_available()
+
+
+def Pool(*args):
+    if platform.system() == "Linux":
+        context = multiprocessing.get_context("fork")
+    else:
+        context = multiprocessing.get_context("spawn")
+    return context.Pool(*args)
 
 
 def mapper(function, input: list, n_jobs: int = 1, progress_bar: bool = True):
