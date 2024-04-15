@@ -167,15 +167,11 @@ class ChemistryBuffer:
         # Either add as member or update centroid and score
         if sims[cidx] > self.diversity_threshold:
             if score > self.buffer.iloc[cidx]["score"]:
-                # Move old centroid to members
-                self.buffer.iat[cidx, 3].append(self.buffer.iat[cidx, 0])
-                # and add highest scoring centroid
-                self.buffer.iat[cidx, 0] = idx
+                # NOTE choice to not update centroid and fp here, which could lead to impure clusters
+                # Update the best score of cluster
                 self.buffer.iat[cidx, 1] = score
-                self.buffer.iat[cidx, 2] = fp
-            else:
-                # Add as member
-                self.buffer.iat[cidx, 3].append(idx)
+            # Add as member
+            self.buffer.iat[cidx, 3].append(idx)
         else:
             # Add as new centroid replacing lowest scoring which should be purged
             row = pd.Series([idx, score, fp, []], index=self.buffer.columns)

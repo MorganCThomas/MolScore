@@ -667,7 +667,7 @@ class ScoreMetrics:
 
         else:
             ax = sns.lineplot(
-                data=tdf, x=x, y=endpoint, label=label.capitalize(), palette="husl"
+                data=tdf, x=x, y=endpoint, label=label, palette="husl"
             )
 
         ax.set_xlabel(x.capitalize())
@@ -684,6 +684,7 @@ class ScoreMetrics:
         extrapolate=True,
         chemistry_filters_basic=False,
         chemistry_filter_target=False,
+        diverse=False,
     ):
         """
         Plot the AUC of the top n molecules
@@ -702,11 +703,12 @@ class ScoreMetrics:
             extrapolate=extrapolate,
             basic_filter=chemistry_filters_basic,
             target_filter=chemistry_filter_target,
+            diverse=diverse,
             return_trajectory=True,
         )
 
         ax = sns.lineplot(
-            x=x[0], y=y[0], palette="husl", label=label.capitalize() + f"-{top_n}"
+            x=x[0], y=y[0], palette="husl", label=label
         )
         ax.set_ylabel("Endpoint")
         ax.set_xlabel("Index")
@@ -745,7 +747,7 @@ class ScoreMetrics:
             return_trajectory=True,
         )
 
-        ax = sns.lineplot(x=x, y=y, palette="husl", label=label.capitalize())
+        ax = sns.lineplot(x=x, y=y, palette="husl", label=label)
         ax.set_ylabel("Yield")
         ax.set_xlabel("Index")
         ax.set_xticklabels([f"{int(x)/1000:.0f}k" for x in ax.get_xticks()])
