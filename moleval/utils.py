@@ -122,6 +122,7 @@ class Fingerprints:
         ]:
             if name == m.__name__:
                 fp = m
+                break
 
         if fp is not None:
             fp = m(mol, nBits)
