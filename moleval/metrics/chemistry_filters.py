@@ -65,7 +65,7 @@ class ChemistryFilter:
     def property_filter(mol, prop, min, max):
         mol = get_mol(mol)
         if mol:
-            value = getattr(Descriptors, "prop")(mol)
+            value = getattr(Descriptors, prop)(mol)
             if (value >= min) and (value <= max):
                 return True
             else:
@@ -102,7 +102,7 @@ class ChemistryFilter:
         return passes
 
     @staticmethod
-    def passes_target(self, mol, property_filters):
+    def passes_target(mol, property_filters):
         mol = get_mol(mol)
         if (mol is not None) and all([f(mol) for f in property_filters]):
             return True
@@ -122,7 +122,8 @@ class ChemistryFilter:
         return passes
 
     def filter_molecules(self, mols, basic=True, target=False):
-        results = mapper(self.n_jobs)(self.filter_molecule, mols)
+        func = partial(self.filter_molecule, basic=basic, target=target)
+        results = mapper(self.n_jobs)(func, mols)
         return results
 
 
