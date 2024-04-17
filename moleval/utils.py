@@ -27,7 +27,7 @@ from rdkit.ML.Cluster import Butina
 from torch import cuda
 from tqdm.auto import tqdm
 
-from moleval.metrics.metrics_utils import mol_passes_filters
+from moleval.metrics.metrics_utils import mol_passes_filters, get_mol
 
 
 def disable_rdkit_log():
@@ -74,16 +74,6 @@ class Fingerprints:
     """
     Class to organise Fingerprint generation
     """
-
-    @staticmethod
-    def check_mol(mol):
-        if isinstance(mol, str):
-            return Chem.MolFromSmiles(mol)
-        if isinstance(mol, Chem.rdchem.Mol):
-            return mol
-        else:
-            print("Unknown mol format")
-            raise
 
     @classmethod
     def get_fp(cls, name, mol, nBits):
@@ -132,26 +122,38 @@ class Fingerprints:
     # Circular fingerprints
     @classmethod
     def ECFP4(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+        
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=2, nBits=nBits
         )
 
     @classmethod
     def ECFP4_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+
         return np.asarray(
             rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=nBits)
         )
 
     @classmethod
     def ECFP4c(cls, mol):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+
         return rdMolDescriptors.GetMorganFingerprint(mol, 2, useCounts=True)
 
     @classmethod
     def ECFP4c_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+
         fp = rdMolDescriptors.GetMorganFingerprint(mol, 2, useCounts=True)
         nfp = np.zeros((1, nBits), np.int32)
         for idx, v in fp.GetNonzeroElements().items():
@@ -161,14 +163,20 @@ class Fingerprints:
 
     @classmethod
     def FCFP4(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=2, nBits=nBits, useFeatures=True
         )
 
     @classmethod
     def FCFP4_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+
         return np.asarray(
             rdMolDescriptors.GetMorganFingerprintAsBitVect(
                 mol, radius=2, nBits=nBits, useFeatures=True
@@ -177,14 +185,20 @@ class Fingerprints:
 
     @classmethod
     def FCFP4c(cls, mol):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+
         return rdMolDescriptors.GetMorganFingerprint(
             mol, 2, useCounts=True, useFeatures=True
         )
 
     @classmethod
     def FCFP4c_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         fp = rdMolDescriptors.GetMorganFingerprint(
             mol, 2, useCounts=True, useFeatures=True
         )
@@ -196,26 +210,38 @@ class Fingerprints:
 
     @classmethod
     def ECFP6(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=3, nBits=nBits
         )
 
     @classmethod
     def ECFP6_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return np.asarray(
             rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits)
         )
 
     @classmethod
     def ECFP6c(cls, mol):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=True)
 
     @classmethod
     def ECFP6c_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         fp = rdMolDescriptors.GetMorganFingerprint(mol, 3, useCounts=True)
         nfp = np.zeros((1, nBits), np.int32)
         for idx, v in fp.GetNonzeroElements().items():
@@ -225,14 +251,20 @@ class Fingerprints:
 
     @classmethod
     def FCFP6(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=3, nBits=nBits, useFeatures=True
         )
 
     @classmethod
     def FCFP6_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return np.asarray(
             rdMolDescriptors.GetMorganFingerprintAsBitVect(
                 mol, radius=3, nBits=nBits, useFeatures=True
@@ -241,14 +273,20 @@ class Fingerprints:
 
     @classmethod
     def FCFP6c(cls, mol):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetMorganFingerprint(
             mol, radius=3, useCounts=True, useFeatures=True
         )
 
     @classmethod
     def FCFP6c_arr(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         fp = rdMolDescriptors.GetMorganFingerprint(
             mol, 3, useCounts=True, useFeatures=True
         )
@@ -261,40 +299,61 @@ class Fingerprints:
     # Structural fingerprints
     @classmethod
     def Avalon(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return pyAvalonTools.GetAvalonFP(mol, nBits=nBits)
 
     @classmethod
     def MACCSkeys(cls, mol):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetMACCSKeysFingerprint(mol)
 
     # Path-based fingerprints
     @classmethod
     def hashAP(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
 
     @classmethod
     def hashTT(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(
             mol, nBits=nBits
         )
 
     @classmethod
     def RDK5(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
 
     @classmethod
     def RDK6(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
 
     @classmethod
     def RDK7(cls, mol, nBits):
-        mol = Fingerprints.check_mol(mol)
+        mol = get_mol(mol)
+        if mol is None:
+            return None
+            
         return rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
 
 

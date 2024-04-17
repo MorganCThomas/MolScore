@@ -141,17 +141,19 @@ class ChemistryBuffer:
 
         # Fill the buffer first
         if len(self.buffer) < self.buffer_size:
-            row = pd.Series(
-                [
-                    idx,
-                    score,
-                    Fingerprints.get_fp(name="ECFP4", mol=mol, nBits=2048),
-                    [],
-                ],
-                index=self.buffer.columns,
-            )
-            self.buffer.loc[len(self.buffer)] = row
-            self.filtered.add(idx)
+            fp = Fingerprints.get_fp(name="ECFP4", mol=mol, nBits=2048)
+            if fp:
+                row = pd.Series(
+                    [
+                        idx,
+                        score,
+                        fp,
+                        [],
+                    ],
+                    index=self.buffer.columns,
+                )
+                self.buffer.loc[len(self.buffer)] = row
+                self.filtered.add(idx)
             return
 
         # If score isn't good ignore too
@@ -161,6 +163,8 @@ class ChemistryBuffer:
 
         # Compute fingerprint and similarity
         fp = Fingerprints.get_fp(name="ECFP4", mol=mol, nBits=2048)
+        if fp is None:
+            return
         sims = BulkTanimotoSimilarity(fp, list(self.buffer.fp))
         cidx = np.argmax(sims)
 
