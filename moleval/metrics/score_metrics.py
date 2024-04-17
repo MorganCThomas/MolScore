@@ -22,7 +22,7 @@ class ScoreMetrics:
     def __init__(
         self,
         scores: pd.DataFrame = None,
-        target_smiles: list = None,
+        reference_smiles: list = None,
         budget: int = None,
         valid=True,
         unique=True,
@@ -36,9 +36,13 @@ class ScoreMetrics:
             scores.copy(deep=True), valid=valid, unique=unique, budget=budget
         )
         self.benchmark = benchmark
-        self.target_smiles = target_smiles if target_smiles else []
-        self._preprocess_target()
-        self.chemistry_filter = ChemistryFilter(n_jobs=self.n_jobs)
+        self.reference_smiles = reference_smiles if reference_smiles else []
+        self.reference_smiles, self.reference_scaffolds = self._preprocess_smiles(
+            self.reference_smiles
+        )
+        self.chemistry_filter = ChemistryFilter(
+            target=self.reference_smiles, n_jobs=self.n_jobs
+        )
         self._bcf_scores = None
         self._tcf_scores = None
         self._btcf_scores = None
@@ -95,11 +99,15 @@ class ScoreMetrics:
     def _preprocess_scores(self, scores, valid=True, unique=True, budget=None):
         if budget:
             scores = scores.iloc[:budget]
+        # Valid
+        scores.loc[:, "valid"] = scores["valid"].astype(bool)
+        self.valid_ratio = scores.valid.sum() / len(scores)
         if valid:
-            scores.loc[:, "valid"] = scores["valid"].astype(bool)
             scores = scores.loc[scores.valid == True]
+        # Unique
+        scores.loc[:, "unique"] = scores["unique"].astype(bool)
+        self.unique_ratio = scores.unique.sum() / len(scores)
         if unique:
-            scores.loc[:, "unique"] = scores["unique"].astype(bool)
             scores = scores.loc[scores.unique == True]
         # Add scaffold column if not present
         if "scaffold" not in scores.columns:
@@ -108,15 +116,15 @@ class ScoreMetrics:
             scores["scaffold"] = scaffs
         return scores
 
-    def _preprocess_target(self):
-        self.target_smiles = [
+    def _preprocess_smiles(self, smiles):
+        smiles = [
             smi
-            for smi in mapper(self.n_jobs)(neutralize_atoms, self.target_smiles)
+            for smi in mapper(self.n_jobs)(neutralize_atoms, smiles)
             if smi is not None
         ]
         get_scaff = partial(compute_scaffold, min_rings=1)
-        self.target_scaffolds = mapper(self.n_jobs)(get_scaff, self.target_smiles)
-        # TODO fps?
+        scaffolds = mapper(self.n_jobs)(get_scaff, smiles)
+        return smiles, scaffolds
 
     def top_avg(
         self,
@@ -292,18 +300,18 @@ class ScoreMetrics:
         else:
             return cumsum / self.budget
 
-    def targets_rediscovered(self, smiles, scaffold=False):
-        # Neutralize & canonize smiles
-        smiles = mapper(self.n_jobs)(neutralize_atoms, smiles)
-        if scaffold:
-            target = self.target_scaffolds
-        else:
-            target = self.target_smiles
-        # Put them both in sets
-        target = set(target)
-        smiles = set(smiles)
-        # Compute intersection
-        return len(target.intersection(smiles))
+    def targets_rediscovered(
+        self, smiles, target_smiles, scaffolds=[], target_scaffolds=[]
+    ):
+        query = set(smiles)
+        target = set(target_smiles)
+        rediscovered_smiles = len(target.intersection(query))
+        rediscovered_scaffolds = None
+        if scaffolds and target_scaffolds:
+            query = set(scaffolds)
+            target = set(target_scaffolds)
+            rediscovered_scaffolds = len(target.intersection(query))
+        return rediscovered_smiles, rediscovered_scaffolds
 
     def guacamol_score(self, endpoint):
         task = self.scores.task.unique()[0]
@@ -437,7 +445,8 @@ class ScoreMetrics:
         self,
         endpoints=[],
         thresholds=[],
-        chemistry_filters_basic=False,
+        target_smiles=[],
+        chemistry_filter_basic=False,
         chemistry_filter_target=False,
         diverse=True,
         run_synthesizability=False,
@@ -446,14 +455,23 @@ class ScoreMetrics:
     ):
         # NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
         metrics = {}
+        metrics.update(
+            {
+                "Valid": self.valid_ratio,
+                "Unique": self.unique_ratio,
+            }
+        )
 
         filters = [[False, False]]
-        if chemistry_filters_basic:
+        if chemistry_filter_basic:
             filters.append([True, False])
         if chemistry_filter_target:
             filters.append([False, True])
-        if chemistry_filters_basic and chemistry_filter_target:
+        if chemistry_filter_basic and chemistry_filter_target:
             filters.append([True, True])
+
+        if target_smiles:
+            target_smiles, target_scaffolds = self._preprocess_smiles(target_smiles)
 
         for basic, target in filters:
             prefix = ""
@@ -567,32 +585,32 @@ class ScoreMetrics:
                     pass
             # ----- Target related
             gen_smiles = self.filter(basic=basic, target=target).smiles.tolist()
-            if self.target_smiles:
+            gen_smiles, gen_scaffolds = self._preprocess_smiles(gen_smiles)
+            if target_smiles:
                 # Rediscovery rate and ratio
+                rediscovered_smiles, rediscovered_scaffolds = self.targets_rediscovered(
+                    gen_smiles, target_smiles, gen_scaffolds, target_scaffolds
+                )
                 metrics.update(
                     {
-                        prefix + "Rediscovery Rate": self.targets_rediscovered(
-                            gen_smiles, scaffold=False
-                        )
-                        / self.budget,
-                        prefix + "Rediscovery Rate Scaffold": self.targets_rediscovered(
-                            gen_smiles, scaffold=True
-                        )
-                        / self.budget,
-                        prefix + "Rediscovered Ratio": self.targets_rediscovered(
-                            gen_smiles, scaffold=False
-                        )
-                        / len(self.target_smiles),
-                        prefix
-                        + "Rediscovered Ratio Scaffold": self.targets_rediscovered(
-                            gen_smiles, scaffold=True
-                        )
-                        / len(self.target_scaffolds),
+                        prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                        prefix + "Rediscovered Ratio": rediscovered_smiles
+                        / len(target_smiles),
                     }
                 )
+                if rediscovered_scaffolds:
+                    metrics.update(
+                        {
+                            prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
+                            / self.budget,
+                            prefix
+                            + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
+                            / len(target_scaffolds),
+                        }
+                    )
                 # Fingerprint analogues
                 gen_ans, ref_ans = FingerprintAnaloguesMetric(n_jobs=self.n_jobs)(
-                    gen=gen_smiles, ref=self.target_smiles
+                    gen=gen_smiles, ref=target_smiles
                 )
                 metrics.update(
                     {
@@ -607,7 +625,10 @@ class ScoreMetrics:
                 )
         # ----- Further property related
         # MCF filters
-        metrics["B-CF"] = len(self.bcf_scores) / self.budget
+        metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
+        if chemistry_filter_target:
+            metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.budget
+            metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.budget
         # Predicted synthesizability (RAScore > 0.5?)
         if run_synthesizability:
             metrics["Predicted Synthesizability"] = np.mean(
@@ -666,9 +687,7 @@ class ScoreMetrics:
             ax.set_xticklabels(xlabels)
 
         else:
-            ax = sns.lineplot(
-                data=tdf, x=x, y=endpoint, label=label, palette="husl"
-            )
+            ax = sns.lineplot(data=tdf, x=x, y=endpoint, label=label, palette="husl")
 
         ax.set_xlabel(x.capitalize())
         ax.set_ylabel("Value")
@@ -707,9 +726,7 @@ class ScoreMetrics:
             return_trajectory=True,
         )
 
-        ax = sns.lineplot(
-            x=x[0], y=y[0], palette="husl", label=label
-        )
+        ax = sns.lineplot(x=x[0], y=y[0], palette="husl", label=label)
         ax.set_ylabel("Endpoint")
         ax.set_xlabel("Index")
         ax.set_xticklabels([f"{int(x)/1000:.0f}k" for x in ax.get_xticks()])
