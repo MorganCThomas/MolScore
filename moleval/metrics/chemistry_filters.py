@@ -113,12 +113,15 @@ class ChemistryFilter:
         mol = get_mol(mol)
         passes = False
         if mol:
+            passes_basic = True
+            passes_target = True
             if basic:
-                passes = self.passes_basic(mol)
+                passes_basic = self.passes_basic(mol)
             if target:
-                passes = self.passes_target(
+                passes_target = self.passes_target(
                     mol, property_filters=self.target_property_filters
                 )
+            passes = passes_basic and passes_target
         return passes
 
     def filter_molecules(self, mols, basic=True, target=False):
