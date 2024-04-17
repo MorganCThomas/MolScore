@@ -28,7 +28,8 @@ class ScoreMetrics:
         unique=True,
         n_jobs=1,
         benchmark=None,
-    ):
+    ):  
+        # Pre-process scores
         self.n_jobs = n_jobs
         self.total = len(scores)
         self.budget = budget if budget else self.total
@@ -36,6 +37,7 @@ class ScoreMetrics:
             scores.copy(deep=True), valid=valid, unique=unique, budget=budget
         )
         self.benchmark = benchmark
+        # Set up reference smiles and chemistry filter
         self.reference_smiles = reference_smiles if reference_smiles else []
         self.reference_smiles, self.reference_scaffolds = self._preprocess_smiles(
             self.reference_smiles
@@ -47,6 +49,27 @@ class ScoreMetrics:
         self._tcf_scores = None
         self._btcf_scores = None
         self._rascorer = None
+
+    def _reinitialize(self, scores, budget: int = None, benchmark: str = None, n_jobs: int = None):
+        # Re-initialize without recomputing reference smiles
+        self.total = len(scores)
+        if budget:
+            self.budget = budget
+        if not self.budget:
+            self.total
+        if benchmark:
+            self.benchmark = benchmark
+        if n_jobs:
+            self.n_jobs = n_jobs
+            self.chemistry_filter = ChemistryFilter(
+            target=self.reference_smiles, n_jobs=self.n_jobs
+            )
+        self.scores = self._preprocess_scores(
+            scores.copy(deep=True), valid=True, unique=True, budget=self.budget
+        )
+        self._bcf_scores = None
+        self._tcf_scores = None
+        self._btcf_scores = None
 
     @property
     def bcf_scores(self):
