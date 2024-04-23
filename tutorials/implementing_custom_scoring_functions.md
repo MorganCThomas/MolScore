@@ -93,7 +93,7 @@ if __name__ == '__main__':
     app.run(port=args.port)
 ```
 
-## Client side (i.e., MolScore scoring function)
+### Client side (i.e., MolScore scoring function)
 Now, we need to write a client side scoring function to send SMILES to our server and receive the results. An example `BaseServerSF` can be found at `molscore/scoring_functions/base.py` and can be inherited to deal with most of the automation. First, `BaseServerSF` will check if a named environment exists, if not, it will try to install it if provided a `environment.yaml`. Then, it will launch the server via the python environment. Then it will send SMILES to the server, receive the results, and add the prefix. 
 
 Continueing on from our QED example...
