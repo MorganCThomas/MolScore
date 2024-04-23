@@ -1,10 +1,21 @@
 import os
+import multiprocessing
+import platform
 from typing import Union
+
 import numpy as np
+from rdkit.Avalon import pyAvalonTools
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors, rdmolops
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
-from rdkit.Avalon import pyAvalonTools
+
+
+def Pool(*args):
+    if platform.system() == "Linux":
+        context = multiprocessing.get_context("fork")
+    else:
+        context = multiprocessing.get_context("spawn")
+    return context.Pool(*args)
 
 
 def get_mol(mol: Union[str, Chem.rdchem.Mol]):

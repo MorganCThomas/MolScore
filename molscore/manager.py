@@ -908,10 +908,10 @@ class MolScore:
         self,
         endpoints: list = None,
         thresholds: list = None,
-        chemistry_filters_basic=True,
+        chemistry_filter_basic=True,
         budget=None,
         n_jobs=1,
-        target_smiles=None,
+        reference_smiles=None,
         benchmark=None,
     ):
         """
@@ -919,10 +919,10 @@ class MolScore:
 
         :param endpoints: List of endpoints to compute metrics for e.g., 'amean', 'docking_score' etc.
         :param thresholds: List of thresholds to compute metrics for
-        :param chemistry_filters_basic: Whether to apply basic chemistry filters
+        :param chemistry_filter_basic: Whether to apply basic chemistry filters
         :budget: Budget to compute metrics for
         :n_jobs: Number of jobs to use for parallelisation
-        :target_smiles: List of target smiles to compute metrics for
+        :reference_smiles: List of target smiles to compute metrics for
         """
         if endpoints is None:
             endpoints = [self.configs["scoring"]["method"]]
@@ -934,13 +934,13 @@ class MolScore:
             scores=self.main_df,
             budget=budget,
             n_jobs=n_jobs,
-            target_smiles=target_smiles,
+            reference_smiles=reference_smiles,
             benchmark=benchmark,
         )
         results = SM.get_metrics(
             endpoints=endpoints,
             thresholds=thresholds,
-            chemistry_filters_basic=chemistry_filters_basic,
+            chemistry_filter_basic=chemistry_filter_basic,
         )
         # Change the name of the default score to "Score"
         results = {
@@ -1080,9 +1080,9 @@ class MolScoreBenchmark:
         self,
         endpoints=None,
         thresholds=None,
-        chemistry_filters_basic=True,
+        chemistry_filter_basic=True,
         n_jobs=1,
-        target_smiles=None,
+        reference_smiles=None,
     ):
         """
         For each result, compute metrics and summary of all results
@@ -1097,10 +1097,10 @@ class MolScoreBenchmark:
             metrics = MS.compute_metrics(
                 endpoints=endpoints,
                 thresholds=thresholds,
-                chemistry_filters_basic=chemistry_filters_basic,
+                chemistry_filter_basic=chemistry_filter_basic,
                 budget=self.budget,
                 n_jobs=n_jobs,
-                target_smiles=target_smiles,
+                reference_smiles=reference_smiles,
                 benchmark=self.benchmark,
             )
             metrics.update(
