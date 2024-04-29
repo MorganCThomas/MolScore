@@ -1,15 +1,14 @@
 import argparse
 import gzip
 import json
-import re
 import logging
 import pickle as pkl
+import re
 import zipfile
 from functools import partial
 
 import numpy as np
 from flask import Flask, jsonify, request
-
 from pidgin_utils import Zenodo
 from utils import Fingerprints, Pool
 

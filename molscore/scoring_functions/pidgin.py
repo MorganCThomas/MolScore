@@ -1,12 +1,6 @@
-import gzip
 import json
-import os
 import logging
-import pickle as pkl
-import zipfile
-from functools import partial
-
-import numpy as np
+import os
 
 from molscore import resources
 from molscore.scoring_functions import utils
@@ -84,7 +78,7 @@ class PIDGIN(BaseServerSF):
     ):
         """This docstring is must be populated by calling PIDGIN.set_docstring() first."""
         # Check if .pidgin_data exists
-        if not utils.check_path(os.path.join(os.environ["HOME"], '.pidgin_data')):
+        if not utils.check_path(os.path.join(os.environ["HOME"], ".pidgin_data")):
             logger.warning(
                 f"{os.path.join(os.environ['HOME'], '.pidgin_data')} not found, PIDGINv5 (11GB) will be download which may take several minutes"
             )
