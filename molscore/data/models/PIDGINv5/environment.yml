@@ -1,0 +1,14 @@
+name: pidgin
+channels:
+  - anaconda
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy=1.23.5
+  - rdkit>=2019.03.2
+  - scikit-learn=1.1.3
+  - scipy=1.9.3
+  - pip
+  - pip:
+    - zenodo-client
+    - flask

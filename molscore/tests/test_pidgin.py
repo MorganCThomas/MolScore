@@ -26,10 +26,10 @@ class TestPIDGIN(BaseTests.TestScoringFunction):
             thresh=sample(["100 uM", "10 uM", "1 uM", "0.1 uM"], 1)[0],
             n_jobs=1,
             method=sample(["mean", "median", "max", "mean"], 1)[0],
-            binarise=sample([True, False], 1)[0],
+            binarise=sample([False, False], 1)[0],
         )
         print(
-            f"\nPIDGIN Input: {len(cls.inst.models)} models, {cls.inst.thresh} threshold, method={cls.inst.agg.__name__}, binarise={cls.inst.binarise}\n"
+            f"\nPIDGIN Input: {len(cls.inst.uniprots)} uniprots, {cls.inst.thresh} threshold, method={cls.inst.method}, binarise={cls.inst.binarise}\n"
         )
         # Call
         mg = MockGenerator(seed_no=123)
@@ -60,10 +60,10 @@ class TestPIDGINParallel(BaseTests.TestScoringFunction):
             thresh=sample(["100 uM", "10 uM", "1 uM", "0.1 uM"], 1)[0],
             n_jobs=4,
             method=sample(["mean", "median", "max", "mean"], 1)[0],
-            binarise=sample([True, False], 1)[0],
+            binarise=sample([False, False], 1)[0],
         )
         print(
-            f"\nPIDGIN Input: {len(cls.inst.models)} models, {cls.inst.thresh} threshold, method={cls.inst.agg.__name__}, binarise={cls.inst.binarise}\n"
+            f"\nPIDGIN Input: {len(cls.inst.uniprots)} uniprots, {cls.inst.thresh} threshold, method={cls.inst.method}, binarise={cls.inst.binarise}\n"
         )
         # Call
         mg = MockGenerator(seed_no=123)

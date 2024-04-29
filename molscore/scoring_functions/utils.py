@@ -41,6 +41,20 @@ def check_exe(command):
         return True
 
 
+def check_env(key):
+    if key in os.environ.keys():
+        return True
+    else:
+        return False
+
+
+def check_path(path):
+    if os.path.exists(path):
+        return True
+    else:
+        return False
+
+
 # ----- Multiprocessing related -----
 def Pool(*args):
     if platform.system() == "Linux":
