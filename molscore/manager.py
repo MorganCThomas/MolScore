@@ -2,6 +2,7 @@ import atexit
 import json
 import logging
 import os
+import sys
 import signal
 import subprocess
 import time
@@ -25,6 +26,16 @@ class MolScore:
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
 
+    @staticmethod
+    def load_config(task_config):
+        assert os.path.exists(
+            task_config
+        ), f"Configuration file {task_config} doesn't exist"
+        with open(task_config, "r") as f:
+            configs = f.read().replace("\r", "").replace("\n", "").replace("\t", "")
+        return json.loads(configs)
+
+
     def __init__(
         self,
         model_name: str,
@@ -32,6 +43,9 @@ class MolScore:
         output_dir: str = None,
         add_run_dir: bool = True,
         budget: int = None,
+        termination_threshold: int = None,
+        termination_patience: int = None,
+        termination_exit: bool = False,       
     ):
         """
         :param model_name: Name of generative model, used for file naming and documentation
@@ -39,19 +53,22 @@ class MolScore:
         :param output_dir: Overwrites the output directory specified in the task config file
         :param add_run_dir: Adds a run directory within the output directory
         :param budget: Budget number of molecules to run MolScore task for until molscore.finished is True
+        :param termination_threshold: Threshold for early stopping based on the score
+        :param termination_patience: Number of steps with no improvement, or that a termination_threshold has been reached for
+        :param termination_exit: Exit on termination of objective
         """
         # Load in configuration file (json)
-        assert os.path.exists(
-            task_config
-        ), f"Configuration file {task_config} doesn't exist"
-        with open(task_config, "r") as f:
-            configs = f.read().replace("\r", "").replace("\n", "").replace("\t", "")
-        self.configs = json.loads(configs)
+        self.cfg = self.load_config(task_config)
 
         # Here are attributes used
         self.model_name = model_name
         self.step = 0
         self.budget = budget
+        self.termination_threshold = termination_threshold
+        self.termination_patience = termination_patience
+        reset_termination_criteria = not any([budget, termination_threshold, termination_patience])
+        self.termination_counter = 0
+        self.termination_exit = termination_exit
         self.finished = False
         self.init_time = time.time()
         self.results_df = None
@@ -68,21 +85,21 @@ class MolScore:
             [
                 time.strftime("%Y_%m_%d", time.localtime()),
                 self.model_name,
-                self.configs["task"].replace(" ", "_"),
+                self.cfg["task"].replace(" ", "_"),
             ]
         )
         if output_dir is not None:
             self.save_dir = os.path.abspath(output_dir)
         else:
-            self.save_dir = os.path.abspath(self.configs["output_dir"])
+            self.save_dir = os.path.abspath(self.cfg["output_dir"])
         if add_run_dir:
             self.save_dir = os.path.join(self.save_dir, self.run_name)
         # Check to see if we're loading from previous results
-        if self.configs["load_from_previous"]:
+        if self.cfg["load_from_previous"]:
             assert os.path.exists(
-                self.configs["previous_dir"]
+                self.cfg["previous_dir"]
             ), "Previous directory does not exist"
-            self.save_dir = self.configs["previous_dir"]
+            self.save_dir = self.cfg["previous_dir"]
         else:
             if os.path.exists(self.save_dir):
                 print(
@@ -102,7 +119,7 @@ class MolScore:
         logger.addHandler(self.fh)
         ch = logging.StreamHandler()
         try:
-            if self.configs["logging"]:
+            if self.cfg["logging"]:
                 ch.setLevel(logging.INFO)
             else:
                 ch.setLevel(logging.WARNING)
@@ -117,7 +134,7 @@ class MolScore:
 
         # Setup monitor app
         try:
-            if self.configs["monitor_app"]:
+            if self.cfg["monitor_app"]:
                 self.monitor_app = True
                 self.monitor_app_path = monitor_path
         except KeyError:
@@ -126,85 +143,14 @@ class MolScore:
             # For backwards compatibility, default too false
             pass
 
-        # Write out config
-        with open(
-            os.path.join(self.save_dir, f"{self.run_name}_config.json"), "w"
-        ) as config_f:
-            json.dump(self.configs, config_f, indent=2)
-
-        # Setup scoring functions
-        self.scoring_functions = []
-        for fconfig in self.configs["scoring_functions"]:
-            if fconfig["run"]:
-                for fclass in scoring_functions.all_scoring_functions:
-                    if fclass.__name__ == fconfig["name"]:
-                        self.scoring_functions.append(fclass(**fconfig["parameters"]))
-                if all(
-                    [
-                        fclass.__name__ != fconfig["name"]
-                        for fclass in scoring_functions.all_scoring_functions
-                    ]
-                ):
-                    logger.warning(
-                        f'Not found associated scoring function for {fconfig["name"]}'
-                    )
-            else:
-                pass
-        if len(self.scoring_functions) == 0:  ##
-            logger.warning("No scoring functions assigned")  ##
-        # assert len(self.scoring_functions) > 0, "No scoring functions assigned" ##
-
         # Load modifiers/tranformations
         self.modifier_functions = utils.all_score_modifiers
 
-        # Setup aggregation/mpo methods
-        for func in utils.all_score_methods:
-            if self.configs["scoring"]["method"] == func.__name__:
-                self.mpo_method = func
-        assert any(
-            [
-                self.configs["scoring"]["method"] == func.__name__
-                for func in utils.all_score_methods
-            ]
-        ), "No aggregation methods not found"
-
-        # Setup Diversity filters
-        try:
-            if self.configs["diversity_filter"]["run"]:
-                self.diversity_filter = self.configs["diversity_filter"]["name"]
-                if self.diversity_filter not in [
-                    "Unique",
-                    "Occurrence",
-                ]:  # Then it's a memory-assisted one
-                    for filt in scaffold_memory.all_scaffold_filters:
-                        if self.configs["diversity_filter"]["name"] == filt.__name__:
-                            self.diversity_filter = filt(
-                                **self.configs["diversity_filter"]["parameters"]
-                            )
-                    if all(
-                        [
-                            filt.__name__ != self.configs["diversity_filter"]["name"]
-                            for filt in scaffold_memory.all_scaffold_filters
-                        ]
-                    ):
-                        logger.warning(
-                            f'Not found associated diversity filter for {self.configs["diversity_filter"]["name"]}'
-                        )
-                self.log_parameters(
-                    {
-                        "diversity_filter": self.configs["diversity_filter"]["name"],
-                        "diversity_filter_params": self.configs["diversity_filter"][
-                            "parameters"
-                        ],
-                    }
-                )
-        except KeyError:
-            # Backward compatibility if diversity filter not found, default to not run one...
-            self.diversity_filter = None
-            pass
+        # Set scoring function / transformation / aggregation / diversity filter
+        self._set_objective(reset_diversity_filter=True, reset_termination_criteria=reset_termination_criteria)
 
         # Load from previous
-        if self.configs["load_from_previous"]:
+        if self.cfg["load_from_previous"]:
             logger.info("Loading scores.csv from previous run")
             self.main_df = pd.read_csv(
                 os.path.join(self.save_dir, "scores.csv"),
@@ -246,6 +192,101 @@ class MolScore:
         atexit.register(self.kill_monitor)
         logger.info("MolScore initiated")
 
+    def _set_objective(self, task_config: str = None, reset_diversity_filter: bool = True, reset_termination_criteria: bool = False):
+        """
+        Set or reset the overall configuration for scoring, but not logging.
+        """
+        if task_config:
+            # Load in configuration file (json)
+            self.cfg = self.load_config(task_config)
+
+        # Write config
+        with open(
+            os.path.join(self.save_dir, f"{self.cfg['task']}_config.json"), "w"
+        ) as config_f:
+            json.dump(self.cfg, config_f, indent=2)
+
+        # Set / reset scoring functions
+        self.scoring_functions = []
+        for fconfig in self.cfg["scoring_functions"]:
+            if fconfig["run"]:
+                for fclass in scoring_functions.all_scoring_functions:
+                    if fclass.__name__ == fconfig["name"]:
+                        self.scoring_functions.append(fclass(**fconfig["parameters"]))
+                if all(
+                    [
+                        fclass.__name__ != fconfig["name"]
+                        for fclass in scoring_functions.all_scoring_functions
+                    ]
+                ):
+                    logger.warning(
+                        f'Not found associated scoring function for {fconfig["name"]}'
+                    )
+            else:
+                pass
+        if len(self.scoring_functions) == 0:
+            logger.warning("No scoring functions assigned")
+
+        # Setup aggregation/mpo methods
+        for func in utils.all_score_methods:
+            if self.cfg["scoring"]["method"] == func.__name__:
+                self.mpo_method = func
+        assert any(
+            [
+                self.cfg["scoring"]["method"] == func.__name__
+                for func in utils.all_score_methods
+            ]
+        ), "No aggregation methods not found"
+
+        # Setup Diversity filters
+        if reset_diversity_filter:
+            try:
+                if self.cfg["diversity_filter"]["run"]:
+                    self.diversity_filter = self.cfg["diversity_filter"]["name"]
+                    if self.diversity_filter not in [
+                        "Unique",
+                        "Occurrence",
+                    ]:  # Then it's a memory-assisted one
+                        for filt in scaffold_memory.all_scaffold_filters:
+                            if self.cfg["diversity_filter"]["name"] == filt.__name__:
+                                self.diversity_filter = filt(
+                                    **self.cfg["diversity_filter"]["parameters"]
+                                )
+                        if all(
+                            [
+                                filt.__name__ != self.cfg["diversity_filter"]["name"]
+                                for filt in scaffold_memory.all_scaffold_filters
+                            ]
+                        ):
+                            logger.warning(
+                                f'Not found associated diversity filter for {self.cfg["diversity_filter"]["name"]}'
+                            )
+                    self.log_parameters(
+                        {
+                            "diversity_filter": self.cfg["diversity_filter"]["name"],
+                            "diversity_filter_params": self.cfg["diversity_filter"][
+                                "parameters"
+                            ],
+                        }
+                    )
+            except KeyError:
+                # Backward compatibility if diversity filter not found, default to not run one...
+                self.diversity_filter = None
+                pass
+
+        # Set / reset budget termination criteria
+        if reset_termination_criteria:
+            if self.cfg.get("budget", None):
+                self.budget = self.cfg.get("budget", None)
+            if self.cfg.get("termination_threshold", None):
+                self.termination_threshold = self.cfg.get("termination_threshold", None)
+            if self.cfg.get("termination_patience", None):
+                self.termination_patience = self.cfg.get("termination_patience", None)
+            if self.cfg.get("termination_exit", None):
+                self.termination_exit = self.cfg.get("termination_exit", False)
+            self.termination_counter = 0 
+
+
     def parse_smiles(self, smiles: list, step: int):
         """
         Create batch_df object from initial list of SMILES and calculate validity and
@@ -279,7 +320,7 @@ class MolScore:
             batch_idx.append(i)
 
         self.batch_df["model"] = self.model_name.replace(" ", "_")
-        self.batch_df["task"] = self.configs["task"].replace(" ", "_")
+        self.batch_df["task"] = self.cfg["task"].replace(" ", "_")
         self.batch_df["step"] = step
         self.batch_df["batch_idx"] = batch_idx
         self.batch_df["absolute_time"] = time.time() - self.init_time
@@ -404,7 +445,7 @@ class MolScore:
 
         :return:
         """
-        for metric in self.configs["scoring"]["metrics"]:
+        for metric in self.cfg["scoring"]["metrics"]:
             if metric["name"] in df.columns:
                 df_max = df.loc[:, metric["name"]].max()
                 df_min = df.loc[:, metric["name"]].min()
@@ -436,7 +477,7 @@ class MolScore:
         filter_columns = {"names": []}
         # Iterate through specified metrics and apply modifier
         transformed_columns = {}
-        for metric in self.configs["scoring"]["metrics"]:
+        for metric in self.cfg["scoring"]["metrics"]:
             mod_name = f"{metric['modifier']}_{metric['name']}"
             # NEW filter_columns else mpo_columns
             if metric.get("filter", False):
@@ -475,7 +516,7 @@ class MolScore:
 
         # Compute final score
         if mpo_columns["names"]:
-            df[self.configs["scoring"]["method"]] = df.loc[
+            df[self.cfg["scoring"]["method"]] = df.loc[
                 :, mpo_columns["names"]
             ].apply(
                 lambda x: self.mpo_method(
@@ -487,7 +528,7 @@ class MolScore:
                 raw=True,
             )
         else:
-            df[self.configs["scoring"]["method"]] = 1.0
+            df[self.cfg["scoring"]["method"]] = 1.0
             logger.warning(
                 "No score columns provided for aggregation, returning a full reward of 1.0"
             )
@@ -496,56 +537,56 @@ class MolScore:
         df["filter"] = df.loc[:, filter_columns["names"]].apply(
             lambda x: np.prod(x), axis=1, raw=True
         )
-        df[self.configs["scoring"]["method"]] = (
-            df[self.configs["scoring"]["method"]] * df["filter"]
+        df[self.cfg["scoring"]["method"]] = (
+            df[self.cfg["scoring"]["method"]] * df["filter"]
         )
 
         # Penalize invalid molecules explicitly with a score of 0.0 NOTE now explicit by defining valid_score as a filter in the config
-        # df[self.configs['scoring']['method']] = df[self.configs['scoring']['method']] * df['valid_score']
+        # df[self.cfg['scoring']['method']] = df[self.cfg['scoring']['method']] * df['valid_score']
 
         return df
 
     def run_diversity_filter(self, df):
         if self.diversity_filter == "Unique":
-            df[f"filtered_{self.configs['scoring']['method']}"] = [
+            df[f"filtered_{self.cfg['scoring']['method']}"] = [
                 s if u == "true" else 0.0
-                for u, s in zip(df["unique"], df[self.configs["scoring"]["method"]])
+                for u, s in zip(df["unique"], df[self.cfg["scoring"]["method"]])
             ]
             df["passes_diversity_filter"] = [
                 True if float(a) == float(b) else False
                 for b, a in zip(
-                    df[self.configs["scoring"]["method"]],
-                    df[f"filtered_{self.configs['scoring']['method']}"],
+                    df[self.cfg["scoring"]["method"]],
+                    df[f"filtered_{self.cfg['scoring']['method']}"],
                 )
             ]
             df.fillna(1e-6)
 
         elif self.diversity_filter == "Occurrence":
-            df[f"filtered_{self.configs['scoring']['method']}"] = [
+            df[f"filtered_{self.cfg['scoring']['method']}"] = [
                 s
                 * utils.lin_thresh(
                     x=o,
                     objective="minimize",
                     upper=0,
-                    lower=self.configs["diversity_filter"]["parameters"]["tolerance"],
-                    buffer=self.configs["diversity_filter"]["parameters"]["buffer"],
+                    lower=self.cfg["diversity_filter"]["parameters"]["tolerance"],
+                    buffer=self.cfg["diversity_filter"]["parameters"]["buffer"],
                 )
                 for o, s in zip(
-                    df["occurrences"], df[self.configs["scoring"]["method"]]
+                    df["occurrences"], df[self.cfg["scoring"]["method"]]
                 )
             ]
             df["passes_diversity_filter"] = [
                 True if float(a) == float(b) else False
                 for b, a in zip(
-                    df[self.configs["scoring"]["method"]],
-                    df[f"filtered_{self.configs['scoring']['method']}"],
+                    df[self.cfg["scoring"]["method"]],
+                    df[f"filtered_{self.cfg['scoring']['method']}"],
                 )
             ]
 
         else:  # Memory-assisted
             scores_dict = {
                 "total_score": np.asarray(
-                    df[self.configs["scoring"]["method"]].tolist(), dtype=np.float64
+                    df[self.cfg["scoring"]["method"]].tolist(), dtype=np.float64
                 ),
                 "step": [self.step] * len(df),
             }
@@ -554,9 +595,9 @@ class MolScore:
             )
             df["passes_diversity_filter"] = [
                 True if float(a) == float(b) else False
-                for b, a in zip(df[self.configs["scoring"]["method"]], filtered_scores)
+                for b, a in zip(df[self.cfg["scoring"]["method"]], filtered_scores)
             ]
-            df[f"filtered_{self.configs['scoring']['method']}"] = filtered_scores
+            df[f"filtered_{self.cfg['scoring']['method']}"] = filtered_scores
             df.fillna(1e-6)
         return df
 
@@ -670,6 +711,40 @@ class MolScore:
                 logger.error(f"Monitor may not have opened/closed properly: {e}")
             self.monitor_app = None
 
+    def evaluate_finished(self):
+        """
+        Check if the current task is finished based on budget or termination criteria
+        """
+        task_df = self.main_df.loc[self.main_df.task == self.cfg['task']]
+
+        # Based on budget
+        if self.budget and (len(task_df) >= self.budget):
+            self.finished = True
+            return
+
+        # Based on patience
+        if self.termination_patience and not self.termination_threshold:
+            if self.batch_df[self.cfg["scoring"]["method"]].mean() < task_df[self.cfg["scoring"]["method"]].rolling(window=500).mean().iloc[-1]:
+                self.termination_counter += 1
+        
+        # Based on a threshold
+        if self.termination_threshold:
+            if self.batch_df[self.cfg["scoring"]["method"]].mean() >= self.termination_threshold:
+                if self.termination_patience:
+                    self.termination_counter += 1
+                else:
+                    self.finished = True
+                    return
+        
+        if self.termination_patience:
+            if self.termination_counter >= self.termination_patience:
+                self.finished = True
+                return
+
+        if self.termination_exit and self.finished:
+            sys.exit(1)
+
+
     def score_only(self, smiles: list, step: int = None, flt: bool = False):
         batch_start = time.time()
         if step is not None:
@@ -685,9 +760,9 @@ class MolScore:
         self.results_df = self.compute_score(self.results_df)
         if self.diversity_filter is not None:
             self.results_df = self.run_diversity_filter(self.results_df)
-            score_col = f"filtered_{self.configs['scoring']['method']}"
+            score_col = f"filtered_{self.cfg['scoring']['method']}"
         else:
-            score_col = self.configs["scoring"]["method"]
+            score_col = self.cfg["scoring"]["method"]
 
         scores = [
             float(self.results_df.loc[self.results_df.smiles == smi, score_col])
@@ -841,10 +916,10 @@ class MolScore:
         # Fetch score
         if self.diversity_filter is not None:
             scores = self.batch_df.loc[
-                :, f"filtered_{self.configs['scoring']['method']}"
+                :, f"filtered_{self.cfg['scoring']['method']}"
             ].tolist()
         else:
-            scores = self.batch_df.loc[:, self.configs["scoring"]["method"]].tolist()
+            scores = self.batch_df.loc[:, self.cfg["scoring"]["method"]].tolist()
         if not flt:
             scores = np.array(scores, dtype=np.float32)
         logger.debug(f"    Returning: {len(scores)} scores")
@@ -860,12 +935,11 @@ class MolScore:
                 )
 
         # Clean up class
+        self.evaluate_finished()
         self.batch_df = None
         self.exists_df = None
         self.results_df = None
-        if self.budget and (len(self.main_df) >= self.budget):
-            self.finished = True
-
+        
         return scores
 
     def __call__(
@@ -925,7 +999,7 @@ class MolScore:
         :reference_smiles: List of target smiles to compute metrics for
         """
         if endpoints is None:
-            endpoints = [self.configs["scoring"]["method"]]
+            endpoints = [self.cfg["scoring"]["method"]]
         else:
             assert all([ep in self.main_df.columns for ep in endpoints])
         if thresholds is None:
@@ -944,7 +1018,7 @@ class MolScore:
         )
         # Change the name of the default score to "Score"
         results = {
-            k.replace(self.configs["scoring"]["method"], "Score"): v
+            k.replace(self.cfg["scoring"]["method"], "Score"): v
             for k, v in results.items()
         }
         return results
@@ -1069,6 +1143,7 @@ class MolScoreBenchmark:
                 task_config=config_path,
                 output_dir=self.output_dir,
                 budget=self.budget,
+                termination_exit=False
             )
             self.results.append(MS)
             yield MS
@@ -1128,3 +1203,128 @@ class MolScoreBenchmark:
             pd.DataFrame(results).to_csv(
                 os.path.join(self.output_dir, "results.csv"), index=False
             )
+
+
+class MolScoreCurriculum(MolScore):
+
+    presets = {}
+
+    def __init__(
+            self,
+            model_name: str,
+            output_dir: os.PathLike,
+            model_parameters: dict = {},
+            budget: int = None,
+            termination_threshold: float = None,
+            termination_patience: int = None,
+            benchmark: str = None,
+            custom_benchmark: os.PathLike = None,
+            custom_tasks: list = [],
+            include: list = [],
+            exclude: list = [],
+        ):
+        """
+        Run MolScore in curriculum mode, which will change MolScore tasks based on thresholds / steps reached.
+        WARNING, sorted by config name! E.g., 0_Albuterol.json, 1_QED.json ...
+        :param model_name: Name of model to run
+        :param output_dir: Directory to save results to
+        :param model_parameters: Parameters of the model for record
+        :param budget: Budget number of molecules to run each MolScore task for
+        :param termination_threshold: Threshold to terminate MolScore task
+        :param termination_patience: Number of steps to wait before terminating MolScore task
+        :param benchmark: Name of benchmark to run
+        :param custom_benchmark: Path to custom benchmark directory containing configs
+        :param custom_tasks: List of custom tasks to run
+        :param include: List of tasks to only include
+        :param exclude: List of tasks to exclude
+        """
+        self.model_name = model_name
+        self.model_parameters = model_parameters
+        self.budget = budget
+        self.termination_threshold = termination_threshold
+        self.termination_patience = termination_patience
+        # If any termination criteria is set here, this is propogated to all tasks
+        self.reset_from_config = not any([budget, termination_threshold, termination_patience])
+        self.output_dir = output_dir
+        self.benchmark = benchmark
+        self.custom_benchmark = custom_benchmark
+        self.custom_tasks = custom_tasks
+        self.include = include
+        self.exclude = exclude
+        self.configs = []
+
+        # Process configs and tasks to run
+        if self.benchmark:
+            assert (
+                self.benchmark in self.presets.keys()
+            ), f"Preset {self.benchmark} not found in presets"
+            for config in self.presets[self.benchmark].glob("*.json"):
+                self.configs.append(str(config))
+
+        if self.custom_benchmark:
+            assert os.path.isdir(
+                self.custom_benchmark
+            ), f"Custom benchmark directory {self.custom_benchmark} not found"
+            for config in os.listdir(self.custom_benchmark):
+                if config.endswith(".json"):
+                    self.configs.append(os.path.join(self.custom_benchmark, config))
+
+        if self.custom_tasks:
+            for task in os.listdir(self.custom_tasks):
+                assert os.path.exists(task), f"Custom taks {task} not found"
+                if task.endswith(".json"):
+                    self.configs.append(os.path.join(self.custom_tasks, task))
+
+        if self.include:
+            exclude = []
+            for config in self.configs:
+                name = os.path.basename(config)
+                if (name in self.include) or (name.strip(".json") in self.include):
+                    continue
+                else:
+                    exclude.append(config)
+            for config in exclude:
+                self.configs.remove(config)
+
+        if self.exclude:
+            exclude = []
+            for config in self.configs:
+                name = os.path.basename(config)
+                if (name in self.exclude) or (name.strip(".json") in self.exclude):
+                    exclude.append(config)
+            for config in exclude:
+                self.configs.remove(config)
+
+        # Check some configs are specified
+        if not self.configs:
+            raise ValueError(
+                "No configs found to run, this could be due to include/exclude resulting in zero configs to run"
+            )
+
+        # Order them by alphabetical order
+        self.configs.sort(key=lambda x: int(os.path.basename(x).split("_")[0]))
+
+        super().__init__(
+            model_name=self.model_name,
+            task_config=self.configs.pop(0),
+            output_dir=self.output_dir,
+            budget=self.budget,
+            termination_threshold=self.termination_threshold,
+            termination_patience=self.termination_patience,
+            termination_exit=False,
+        )
+    
+    def score(self, *args, **kwargs):
+        output = super().score(*args, **kwargs)
+        if self.finished:
+            # Move on to the next task if available
+            if self.configs:
+                logger.info(f"Moving on to next task ...")
+                self._set_objective(
+                    task_config=self.configs.pop(0),
+                    reset_termination_criteria=self.reset_from_config)
+                self.finished = False
+        return output
+        
+    def __call__(self, *args, **kwargs):
+        self.score(*args, **kwargs)

@@ -1,0 +1,40 @@
+{
+  "task": "QED",
+  "output_dir": "./molscore_results",
+  "load_from_previous": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 25,
+      "minscore": 0.6,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 2048,
+      "outputmode": "binary"
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc"
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "desc_QED",
+        "weight": 1,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  },
+  "budget": 100
+}
