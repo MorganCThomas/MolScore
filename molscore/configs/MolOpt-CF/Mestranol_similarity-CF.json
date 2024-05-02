@@ -1,0 +1,68 @@
+{
+  "task": "Mestranol_similarity",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Mestranol",
+        "ref_smiles": [
+          "CC12CCC3C(C1CCC2(C#C)O)CCC4=C3C=CC(=C4)OC"
+        ],
+        "fp": "AP",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "ChemistryFilter",
+      "run": true,
+      "parameters": {
+        "ref_smiles": "/workspace1/Priors/ChEMBL_potent/processed_data/ChEMBL28p_all_undersample-8.smi.gz",
+        "n_jobs": 4
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "Mestranol_Sim",
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "maximize",
+          "upper": 0.75,
+          "lower": 0.0,
+          "buffer": 0.75
+        }
+      },
+      {
+        "name": "B&T_CF",
+        "filter": true,
+        "modifier": "raw",
+        "weight": 1.0,
+        "parameters": {}
+      }
+    ]
+  }
+}
