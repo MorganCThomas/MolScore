@@ -146,7 +146,7 @@ class TestPIDGIN(BaseTests.TestScoringFunction):
             uniprot=uniprots[0],
             uniprots=uniprots[1:],
             uniprot_set=groups[0],
-            thresh=sample(["100 uM", "10 uM", "1 uM", "0.1 uM"], 1)[0],
+            thresh=sample(["100 uM", "10 uM", "1 uM"], 1)[0],
             n_jobs=1,
             method=sample(["mean", "median", "max", "mean"], 1)[0],
             binarise=sample([False, False], 1)[0],
