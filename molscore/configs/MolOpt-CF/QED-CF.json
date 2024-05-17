@@ -1,0 +1,54 @@
+{
+  "task": "QED",
+  "output_dir": "./molscore_results",
+  "load_from_previous": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc"
+      }
+    },
+    {
+      "name": "ChemistryFilter",
+      "run": true,
+      "parameters": {
+        "ref_smiles": "/workspace1/Priors/ChEMBL_potent/processed_data/ChEMBL28p_all_undersample-8.smi.gz",
+        "n_jobs": 4
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "desc_QED",
+        "weight": 1,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "B&T_CF",
+        "filter": true,
+        "modifier": "raw",
+        "weight": 1.0,
+        "parameters": {}
+      }
+    ]
+  }
+}

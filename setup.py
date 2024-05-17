@@ -29,7 +29,7 @@ setup(
         "dask-jobqueue", # == 0.8.2",
         "scikit-learn == 1.1.3",
         "torch",
-        "zenodo-client",
+        #"zenodo-client",
         "levenshtein",
         "streamlit-plotly-events == 0.0.6",
         "streamlit == 1.29.0",

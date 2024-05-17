@@ -1,13 +1,10 @@
-import gzip
 import json
 import logging
-import pickle as pkl
-import zipfile
-from functools import partial
+import os
 
-import numpy as np
-
-from molscore.scoring_functions.utils import Fingerprints, Pool, Zenodo
+from molscore import resources
+from molscore.scoring_functions import utils
+from molscore.scoring_functions.base import BaseServerSF
 
 logger = logging.getLogger("pidgin")
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -17,49 +14,41 @@ ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
 
-class PIDGIN:
+class PIDGIN(BaseServerSF):
     """
     Download and run PIDGIN classification models (~11GB) via Zenodo to return the positive predictions, atleast one uniprot must be specified.
     """
 
     return_metrics = ["pred_proba"]
 
-    zenodo = Zenodo(
-        access_token="0"
-    )  # Set access token to zero as it's required zenodo-client API but not Zenodo for downloading public data
-
-    @classmethod
-    def get_pidgin_record_id(cls):
-        # This feature is broken in zenodo-client currently (17/10/23, v0.3.2): returns 'latest' and not actual record id
-        return "7547691"
-
-    # Download list of uniprots
     @classmethod
     def get_uniprot_list(cls):
-        uniprots_path = cls.zenodo.download(
-            record_id=cls.get_pidgin_record_id(), name="uniprots.json"
+        """Load list of uniprots from file in MolScore, this is a copy taken from Zenodo"""
+        uniprots_path = resources.files("molscore.data.models.PIDGINv5").joinpath(
+            "uniprots.json"
         )
         with open(uniprots_path, "rt") as f:
             uniprots = json.load(f)
         uniprots = ["None"] + uniprots
         return uniprots
 
-    # Download uniprot groups
     @classmethod
     def get_uniprot_groups(cls):
+        """Load a list of uniprot groups from file in MolScore, this is a copy taken from Zenodo"""
         groups = {"None": None}
-        groups_path = cls.zenodo.download(
-            record_id=cls.get_pidgin_record_id(), name="uniprots_groups.json"
+        groups_path = resources.files("molscore.data.models.PIDGINv5").joinpath(
+            "uniprots_groups.json"
         )
         with open(groups_path, "rt") as f:
             groups.update(json.load(f))
         return groups
 
-    # Set init docstring here as it's not a string literal
     @classmethod
     def set_docstring(cls):
+        """Set init docstring here as it's not a string literal"""
         init_docstring = f"""
             :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+            :param env_engine: Environment engine [conda, mamba]
             :param uniprot: Uniprot accession for classifier to use [{', '.join(cls.get_uniprot_list())}]
             :param uniprots: List of uniprot accessions for classifier to use
             :param uniprot_set: Set of uniprots based on protein class (level - name - size) [{', '.join(cls.get_uniprot_groups().keys())}]
@@ -75,6 +64,7 @@ class PIDGIN:
     def __init__(
         self,
         prefix: str,
+        env_engine: str = "mamba",
         uniprot: str = None,
         uniprots: list = None,
         uniprot_set: str = None,
@@ -87,6 +77,11 @@ class PIDGIN:
         **kwargs,
     ):
         """This docstring is must be populated by calling PIDGIN.set_docstring() first."""
+        # Check if .pidgin_data exists
+        if not utils.check_path(os.path.join(os.environ["HOME"], ".pidgin_data")):
+            logger.warning(
+                f"{os.path.join(os.environ['HOME'], '.pidgin_data')} not found, PIDGINv5 (11GB) will be download which may take several minutes"
+            )
         # Make sure something is selected
         self.uniprot = uniprot if uniprot != "None" else None
         self.uniprots = uniprots if uniprots is not None else []
@@ -99,18 +94,11 @@ class PIDGIN:
             or (self.uniprot_set is not None)
         ), "Either uniprot, uniprots or uniprot set must be specified"
         # Set other attributes
-        self.prefix = prefix.replace(" ", "_")
         self.thresh = thresh.replace(" ", "").replace(".", "")
         self.n_jobs = n_jobs
-        self.models = []
-        self.model_names = []
-        self.ghost_thresholds = []
-        self.fp = "ECFP4"
-        self.nBits = 2048
-        self.agg = getattr(np, method)
+        self.method = method
         self.binarise = binarise
         # Curate uniprot set
-        self.pidgin_record_id = self.get_pidgin_record_id()
         self.groups = self.get_uniprot_groups()
         if self.uniprot:
             self.uniprots += [self.uniprot]
@@ -124,104 +112,26 @@ class PIDGIN:
         # De-duplicate
         self.uniprots = list(set(self.uniprots))
 
-        # Download PIDGIN
-        logger.warning(
-            "If not downloaded, PIDGIN will be downloaded which is a large file ~ 11GB and may take some several minutes"
-        )
-        pidgin_path = self.zenodo.download(
-            record_id=self.pidgin_record_id, name="trained_models.zip"
-        )
-        with zipfile.ZipFile(pidgin_path, "r") as zip_file:
-            for uni in self.uniprots:
-                try:
-                    # Load .json to get ghost thresh
-                    with zip_file.open(f"{uni}.json") as meta_file:
-                        metadata = json.load(meta_file)
-                        opt_thresh = metadata[thresh]["train"]["params"][
-                            "opt_threshold"
-                        ]
-                        self.ghost_thresholds.append(opt_thresh)
-                    # Load classifier
-                    with zip_file.open(f"{uni}_{self.thresh}.pkl.gz") as model_file:
-                        with gzip.open(model_file, "rb") as f:
-                            clf = pkl.load(f)
-                            self.models.append(clf)
-                            self.model_names.append(f"{uni}@{self.thresh}")
-                except (FileNotFoundError, KeyError):
-                    logger.warning(f"{uni} model at {thresh} not found, omitting")
-                    continue
-
-        # Run some checks
-        assert len(self.models) != 0, "No models were found"
+        # Set server kwargs
+        server_kwargs = {
+            "thresh": self.thresh,
+            "method": self.method,
+            "n_jobs": self.n_jobs,
+            "uniprots": " ".join(self.uniprots),
+        }
         if self.binarise:
-            logger.info("Running with binarise=True so setting method=mean")
-            self.agg = np.mean
-            assert len(self.ghost_thresholds) == len(
-                self.models
-            ), "Mismatch between models and thresholds"
+            server_kwargs["binarise"] = ""
 
-    def score(self, smiles: list, **kwargs):
-        """
-        Calculate scores for an sklearn model given a list of SMILES, if a smiles is abberant or invalid,
-         should return 0.0 for all metrics for that smiles
-
-        :param smiles: List of SMILES strings
-        :param kwargs: Ignored
-        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
-        """
-        results = [{"smiles": smi, f"{self.prefix}_pred_proba": 0.0} for smi in smiles]
-        valid = []
-        fps = []
-        predictions = []
-        aggregated_predictions = []
-        # Calculate fps
-        with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(
-                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
-            )
-            [
-                (valid.append(i), fps.append(fp))
-                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-                if fp is not None
-            ]
-
-        # Return early if there's no results
-        if len(fps) == 0:
-            for r in results:
-                r.update({f"{self.prefix}_{name}": 0.0 for name in self.model_names})
-                r.update({f"{self.prefix}_pred_proba": 0.0})
-            return results
-
-        # Predict
-        for clf in self.models:
-            prediction = clf.predict_proba(np.asarray(fps).reshape(len(fps), -1))[
-                :, 1
-            ]  # Input (smiles, bits)
-            predictions.append(prediction)
-        predictions = np.asarray(predictions).transpose()  # Reshape to (smiles, models)
-
-        # Binarise
-        if self.binarise:
-            thresh = np.asarray(self.ghost_thresholds)
-            predictions = (predictions >= thresh).astype(int)
-
-        # Update results
-        for i, row in zip(valid, predictions):
-            for j, name in enumerate(self.model_names):
-                results[i].update(
-                    {f"{self.prefix}_{name}": float(row[j])}
-                )  # JSON doesn't like numpy types
-
-        # Aggregate
-        aggregated_predictions = self.agg(predictions, axis=1)
-
-        # Update results
-        for i, prob in zip(valid, aggregated_predictions):
-            results[i].update(
-                {f"{self.prefix}_pred_proba": float(prob)}
-            )  # JSON doesn't like numpy types
-
-        return results
-
-    def __call__(self, smiles: list, **kwargs):
-        return self.score(smiles=smiles)
+        super().__init__(
+            prefix=prefix,
+            env_engine=env_engine,
+            env_name="pidgin",
+            env_path=resources.files("molscore.data.models.PIDGINv5").joinpath(
+                "environment.yml"
+            ),
+            server_path=resources.files("molscore.scoring_functions.servers").joinpath(
+                "pidgin_server.py"
+            ),
+            server_grace=600,
+            server_kwargs=server_kwargs,
+        )

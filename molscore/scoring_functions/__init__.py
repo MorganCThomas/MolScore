@@ -50,6 +50,13 @@ except Exception as e:
     logger.warn(f"ApplicabilityDomain: currently unavailable due to the following: {e}")
 
 try:
+    from molscore.scoring_functions.chemistry_filters import ChemistryFilter
+
+    all_scoring_functions.append(ChemistryFilter)
+except Exception as e:
+    logger.warn(f"ChemistryFilter: currently unavailable due to the following: {e}")
+
+try:
     from molscore.scoring_functions.substructure_filters import SubstructureFilters
 
     all_scoring_functions.append(SubstructureFilters)

@@ -58,7 +58,7 @@ class BaseServerSF:
         env_name: str,
         server_path: str,
         env_path: str = None,
-        server_grace: int = 20,
+        server_grace: int = 60,
         server_kwargs: dict = {},
         **kwargs,
     ):
@@ -136,9 +136,6 @@ class BaseServerSF:
         self.server_url = f"http://localhost:{port}"
         logger.info(f"Launching server: {self.server_cmd}")
         try:
-            logger.info(
-                f"Leaving a grace period of {self.server_grace}s for server to launch"
-            )
             self.server_subprocess = subprocess.Popen(
                 self.server_cmd,
                 shell=True,
@@ -146,14 +143,27 @@ class BaseServerSF:
                 stderr=subprocess.PIPE,
                 preexec_fn=os.setsid,
             )
-            time.sleep(
-                self.server_grace
-            )  # Ugly way to wait for server to launch and server function to initialize, load models etc.
+            self._wait_for_server()
         except subprocess.CalledProcessError as e:
             logger.error(
                 f"Failed to launch server, please check {self.server_path} is correct"
             )
             raise e
+
+    def _wait_for_server(self):
+        start_time = time.time()
+        while True:
+            try:
+                response = requests.options(self.server_url)
+                if response.status_code == 200:
+                    return
+            except requests.exceptions.ConnectionError:
+                pass
+            if time.time() - start_time > self.server_grace:
+                raise TimeoutError(
+                    f"Server did not launch within grace period of {self.server_grace} seconds"
+                )
+            time.sleep(1)
 
     def _kill_server(self):
         if self.server_subprocess is not None:

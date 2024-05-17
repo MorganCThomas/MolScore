@@ -75,7 +75,7 @@ Once the configuration file is saved, simply point to this file path and run *de
 If you use this software, please cite it as below.
 
     @article{thomas2023molscore,
-    title={MolScore: A scoring and evaluation framework for de novo drug design},
+    title={MolScore: A scoring, evaluation and benchmarking framework for de novo drug design},
     author={Thomas, Morgan and O'Boyle, Noel M and Bender, Andreas and de Graaf, Chris},
     journal={ChemRxiv},
     year={2023}

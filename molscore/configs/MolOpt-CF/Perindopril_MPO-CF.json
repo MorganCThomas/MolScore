@@ -1,0 +1,82 @@
+{
+  "task": "Perindopril_MPO",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Perindopril",
+        "ref_smiles": [
+          "CCCC(C(=O)OCC)NC(C)C(=O)N1C2CCCCC2CC1C(=O)O"
+        ],
+        "radius": 2,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "ChemistryFilter",
+      "run": true,
+      "parameters": {
+        "ref_smiles": "/workspace1/Priors/ChEMBL_potent/processed_data/ChEMBL28p_all_undersample-8.smi.gz",
+        "n_jobs": 4
+      }
+    }
+  ],
+  "scoring": {
+    "method": "gmean",
+    "metrics": [
+      {
+        "name": "Perindopril_Sim",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "desc_NumAromaticRings",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "range",
+          "mu": 2.0,
+          "sigma": 0.5
+        }
+      },
+      {
+        "name": "B&T_CF",
+        "filter": true,
+        "modifier": "raw",
+        "weight": 1.0,
+        "parameters": {}
+      }
+    ]
+  }
+}

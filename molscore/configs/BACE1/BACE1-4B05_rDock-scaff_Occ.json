@@ -1,0 +1,96 @@
+{
+  "task": "BACE1_rDock-scaff_Occ",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": true,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "rDock",
+      "run": true,
+      "parameters": {
+        "prefix": "BACE1",
+        "preset": "BACE1_4B05",
+        "cavity_kwargs": {
+          "RADIUS": 8.0,
+          "SMALL_SPHERE": 2.0,
+          "LARGE_SPHERE": 5.0,
+          "MAX_CAVITIES": 1,
+          "MIN_VOLUME": 100,
+          "VOL_INCR": 0.0,
+          "GRIDSTEP": 0.5
+        },
+        "ligand_preparation": "GypsumDL",
+        "ligand_preparation_kwargs": {
+          "pH": 4.0,
+          "pHt": 1.0,
+          "max_variants_per_compound": 8,
+          "enforce_tautomer": "[N;H2;!R1]-C=[N+;H1;R1]"
+        },
+        "prep_timeout": 60.0,
+        "dock_protocol": "dock",
+        "dock_timeout": 120.0,
+        "n_runs": 5,
+        "dock_substructure_constraints": "[N;H2]-C1=[N;R1]-C-c2:c:c:c:c:c:2-1",
+        "dock_substructure_max_trans": 0.0,
+        "dock_substructure_max_rot": 0,
+        "dock_substructure_max_rmsd": 2.0,
+        "dock_n_opt_constraints": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "desc_MaxConsecutiveRotatableBonds",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "minimize",
+          "upper": 3.0,
+          "lower": 2.0,
+          "buffer": 1.0
+        }
+      },
+      {
+        "name": "BACE1_SCORE.INTER",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "norm",
+        "parameters": {
+          "objective": "minimize"
+        }
+      },
+      {
+        "name": "desc_HeavyAtomCount",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "minimize",
+          "upper": 0.0,
+          "lower": 30.0,
+          "buffer": 20.0
+        }
+      }
+    ],
+    "method": "prod"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 5,
+      "buffer": 5
+    }
+  }
+}

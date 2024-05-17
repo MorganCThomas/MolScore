@@ -70,6 +70,14 @@ class rDock:
                 "6CM4p_risperidone.sdf"
             ),
         },
+        "BACE1_4B05": {
+            "receptor": resources.files("molscore.data.structures.4B05").joinpath(
+                "4B05p_rec.pdbqt"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.4B05").joinpath(
+                "AZD3839_rdkit.mol"
+            ),
+        },
     }
 
     @staticmethod
@@ -222,7 +230,7 @@ END_SECTION
     ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
-        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2]
+        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2, BACE1_4B05]
         :param receptor: Path to receptor file (.pdb)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb)
         :param ref_xyz: XYZ coordinates of the centre of the docking box
@@ -422,22 +430,26 @@ END_SECTION
         max_rmsd: float,
         logger: logging.Logger,
     ):
-        # TODO return several variants for multiple ref matches? E.g., variant-1_205 i.e.,  +0{count}
+        # NOTE could return several variants for multiple ref matches? E.g., variant-1_205 i.e.,  +0{count}
         # Load query file
         with Chem.SDMolSupplier(query, removeHs=False) as suppl:
             query_mol = suppl[0]
-        # Load SMARTS
+        # Load SMARTS and get atom matches
         patt = Chem.MolFromSmarts(smarts)
-        # Get QUERY match
         query_match = query_mol.GetSubstructMatch(patt)
-        # Get REF match
         ref_match = ref_mol.GetSubstructMatch(patt)
-        # Align query to ref by substructure match
         if query_match:
-            # Do a conf search
-            Chem.EmbedMultipleConfs(query_mol, numConfs=50, ETversion=2)
+            # Do a conf search and align each conf
+            Chem.EmbedMultipleConfs(query_mol, numConfs=20, ETversion=2)
             rmsds = []
             for i in range(query_mol.GetNumConformers()):
+                # Minimize conf
+                try:
+                    ff = Chem.UFFGetMoleculeForceField(query_mol, confId=i)
+                    ff.Minimize()
+                except Exception:
+                    pass
+                # Align to scaff
                 rmsds.append(
                     Chem.AlignMol(
                         query_mol,
@@ -446,25 +458,33 @@ END_SECTION
                         atomMap=list(zip(query_match, ref_match)),
                     )
                 )
+            # Select lowest RMSD
             query_mol = Chem.Mol(
                 query_mol, confId=sorted(enumerate(rmsds), key=lambda x: x[1])[0][0]
             )
-            # Set tethered atoms
+            # Set tethered atoms (rDock indexing starts from 1)...
             query_match = list(query_match)
-            # NOTE rDock can't accept 0 index, but doesn't seem 1-indexed ...
-            if 0 in query_match:
-                query_match.remove(0)
-            query_mol.SetProp("TETHERED ATOMS", ",".join([str(a) for a in query_match]))
+            query_mol.SetProp(
+                "TETHERED ATOMS", ",".join([str(a + 1) for a in query_match])
+            )
             query_mol.SetProp("TETHERED.RMSD", str(min(rmsds)))
             # Save aligned mol if below max_rmsd
-            if (max_rmsd) and (min(rmsds) <= max_rmsd):
+            if max_rmsd:
+                if min(rmsds) <= max_rmsd:
+                    with Chem.SDWriter(query) as writer:
+                        writer.write(query_mol)
+                else:
+                    # Delete file so that it can't be run
+                    os.remove(query)
+            else:
                 with Chem.SDWriter(query) as writer:
                     writer.write(query_mol)
         else:
             # TODO unspecified constrained docking by MCS
             logger.warning(
-                f"No substructure match found for {query}, skipping alignment."
+                f"No substructure match found for {query}, skipping."
             )
+            os.remove(query)
 
     def align_mols(self, varients, varient_files):
         logger.debug("Aligning molecules for tethered docking")

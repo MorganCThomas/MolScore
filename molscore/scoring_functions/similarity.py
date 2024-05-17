@@ -11,6 +11,7 @@ from molscore.scoring_functions.utils import (
     Pool,
     SimilarityMeasures,
     get_mol,
+    timedFunc2,
 )
 
 logger = logging.getLogger("tanimoto")
@@ -38,6 +39,7 @@ class MolecularSimilarity:
         thresh: float = None,
         method: str = "mean",
         n_jobs: int = 1,
+        timeout: int = 60,
         **kwargs,
     ):
         """
@@ -49,6 +51,7 @@ class MolecularSimilarity:
         :param thresh: If provided check if similarity is above threshold, binarising the similarity coefficients
         :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour) [mean, max]
         :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
+        :param timeout: Timeout for the scoring to cease and return a score of 0.0
         :param kwargs:
         """
         self.prefix = prefix.replace(" ", "_")
@@ -59,6 +62,7 @@ class MolecularSimilarity:
         self.method = method
         self.nBits = bits
         self.n_jobs = n_jobs
+        self.timeout = timeout
 
         # If file path provided, load smiles.
         if isinstance(ref_smiles, str):
@@ -127,7 +131,7 @@ class MolecularSimilarity:
 
         return smi, sim
 
-    def __call__(self, smiles: list, **kwargs):
+    def _score(self, smiles: list, **kwargs):
         """
         Calculate scores for Tanimoto given a list of SMILES.
         :param smiles: List of SMILES strings
@@ -148,6 +152,21 @@ class MolecularSimilarity:
                 {"smiles": smi, f"{self.prefix}_Sim": sim}
                 for smi, sim in pool.imap(calculate_sim_p, smiles)
             ]
+        return results
+
+    def __call__(self, smiles: list, **kwargs):
+        """
+        Calculate scores for Tanimoto given a list of SMILES.
+        :param smiles: List of SMILES strings
+        :param kwargs: Ignored
+        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        """
+        tfunc = timedFunc2(self._score, timeout=self.timeout)
+        results = tfunc(smiles)
+        if results is None:
+            logger.warning(f"Timeout of {self.timeout} reached for scoring, returning 0.0")
+            results = [{'smiles': smi, f"{self.prefix}_Sim": 0.0} for smi in smiles]
+        
         return results
 
 
