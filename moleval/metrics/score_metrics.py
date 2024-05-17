@@ -191,7 +191,7 @@ class ScoreMetrics:
 
         cumsum = [0] * len(top_n)
         prev = [0] * len(top_n)
-        called = [0] * len(top_n)
+        called = 0
         indices = [[0] for _ in range(len(top_n))]
         auc_values = [[0] for _ in range(len(top_n))]
         buffer = ChemistryBuffer(buffer_size=max(top_n))
@@ -206,7 +206,7 @@ class ScoreMetrics:
                     n_now = buffer.top_n(n)
                     cumsum[i] += window * ((n_now + prev[i]) / 2)
                     prev[i] = n_now
-                    called[i] = idx
+                    called = idx
                     indices[i].append(window)
                     auc_values[i].append(n_now)
             else:
@@ -217,18 +217,18 @@ class ScoreMetrics:
                     n_now = temp_result.iloc[:n][endpoint].mean()
                     cumsum[i] += window * ((n_now + prev[i]) / 2)
                     prev[i] = n_now
-                    called[i] = idx
+                    called = idx
                     indices[i].append(window)
                     auc_values[i].append(n_now)
         # Final cumsum
         if diverse:
             buffer.update_from_score_metrics(
-                df=tdf.loc[called[i] : tdf.index.max()], endpoint=endpoint
+                df=tdf.loc[called : tdf.index.max()], endpoint=endpoint
             )
             for i, n in enumerate(top_n):
                 n_now = buffer.top_n(n)
                 # Compute AUC
-                cumsum[i] += (tdf.index.max() - called[i]) * ((n_now + prev[i]) / 2)
+                cumsum[i] += (tdf.index.max() - called) * ((n_now + prev[i]) / 2)
                 indices[i].append(tdf.index.max())
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
@@ -241,7 +241,7 @@ class ScoreMetrics:
             for i, n in enumerate(top_n):
                 n_now = temp_result.iloc[:n][endpoint].mean()
                 # Compute AUC
-                cumsum[i] += (tdf.index.max() - called[i]) * ((n_now + prev[i]) / 2)
+                cumsum[i] += (tdf.index.max() - called) * ((n_now + prev[i]) / 2)
                 indices[i].append(tdf.index.max())
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
