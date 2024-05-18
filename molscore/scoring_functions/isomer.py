@@ -51,7 +51,6 @@ class Isomer:
             query_formula = Descriptors.rdMolDescriptors.CalcMolFormula(mol)
             query_elements = self.formula2elements(query_formula)
             elements = set(self.ref_elements)
-            elements.update(query_elements)
             scores = []
             # Add per element scores
             for e in elements:
