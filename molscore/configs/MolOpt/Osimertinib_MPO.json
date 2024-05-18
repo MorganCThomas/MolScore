@@ -17,7 +17,7 @@
           "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": 16384,
         "features": true,
         "counts": true,
         "method": "max",
@@ -33,7 +33,7 @@
           "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"
         ],
         "radius": 3,
-        "bits": 1024,
+        "bits": 16384,
         "features": false,
         "counts": true,
         "method": "max",
