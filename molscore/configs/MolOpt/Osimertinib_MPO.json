@@ -70,7 +70,7 @@
         "parameters": {
           "objective": "minimize",
           "mu": 0.85,
-          "sigma": 2.0
+          "sigma": 0.1
         }
       },
       {
@@ -80,7 +80,7 @@
         "parameters": {
           "objective": "maximize",
           "mu": 100.0,
-          "sigma": 2.0
+          "sigma": 10.0
         }
       },
       {
@@ -90,7 +90,7 @@
         "parameters": {
           "objective": "minimize",
           "mu": 1.0,
-          "sigma": 2.0
+          "sigma": 1.0
         }
       }
     ]

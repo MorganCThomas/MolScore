@@ -53,7 +53,7 @@
         "parameters": {
           "objective": "maximize",
           "mu": 90.0,
-          "sigma": 2.0
+          "sigma": 10.0
         }
       },
       {
@@ -63,7 +63,7 @@
         "parameters": {
           "objective": "minimize",
           "mu": 4.0,
-          "sigma": 2.0
+          "sigma": 1.0
         }
       }
     ]

@@ -87,9 +87,9 @@
         "modifier": "lin_thresh",
         "parameters": {
           "objective": "maximize",
-          "upper": 0.75,
+          "upper": 0.85,
           "lower": 0.0,
-          "buffer": 0.75
+          "buffer": 0.85
         }
       }
     ]
