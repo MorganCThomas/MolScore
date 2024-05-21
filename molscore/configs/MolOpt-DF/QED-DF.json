@@ -1,0 +1,34 @@
+{
+  "task": "QED",
+  "output_dir": "./molscore_results",
+  "load_from_previous": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc"
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "desc_QED",
+        "weight": 1,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}

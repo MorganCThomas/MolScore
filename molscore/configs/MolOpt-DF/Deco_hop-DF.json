@@ -1,0 +1,102 @@
+{
+  "task": "Deco_hop",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "S2",
+        "smarts": [
+          "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]-c12"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    },
+    {
+      "name": "SubstructureFilters",
+      "run": true,
+      "parameters": {
+        "prefix": "S3",
+        "az_filters": false,
+        "custom_filters": [
+          "[#7]-c1ccc2ncsc2c1"
+        ],
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureFilters",
+      "run": true,
+      "parameters": {
+        "prefix": "S4",
+        "az_filters": false,
+        "custom_filters": [
+          "CS([#6])(=O)=O"
+        ],
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "S5",
+        "ref_smiles": [
+          "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
+        ],
+        "fp": "PHCO",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "method": "amean",
+    "metrics": [
+      {
+        "name": "S2_substruct_match",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "S3_substruct_filt",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "S4_substruct_filt",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "S5_Sim",
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "maximize",
+          "upper": 0.75,
+          "lower": 0.0,
+          "buffer": 0.75
+        }
+      }
+    ]
+  }
+}
