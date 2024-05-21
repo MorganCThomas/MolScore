@@ -1,0 +1,76 @@
+{
+  "task": "Fexofenadine_MPO",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Fexofenadine",
+        "ref_smiles": [
+          "CC(C)(C1=CC=C(C=C1)C(CCCN2CCC(CC2)C(C3=CC=CC=C3)(C4=CC=CC=C4)O)O)C(=O)O"
+        ],
+        "fp": "AP",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "method": "gmean",
+    "metrics": [
+      {
+        "name": "Fexofenadine_Sim",
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "maximize",
+          "upper": 0.8,
+          "lower": 0.0,
+          "buffer": 0.8
+        }
+      },
+      {
+        "name": "desc_TPSA",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "maximize",
+          "mu": 90.0,
+          "sigma": 2.0
+        }
+      },
+      {
+        "name": "desc_CLogP",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "minimize",
+          "mu": 4.0,
+          "sigma": 2.0
+        }
+      }
+    ]
+  }
+}

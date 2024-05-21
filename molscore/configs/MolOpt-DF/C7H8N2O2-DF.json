@@ -1,0 +1,36 @@
+{
+  "task": "C7H8N2O2",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "Isomer",
+      "run": true,
+      "parameters": {
+        "prefix": "C7H8N2O2",
+        "molecular_formula": "C7H8N2O2"
+      }
+    }
+  ],
+  "scoring": {
+    "method": "single",
+    "metrics": [
+      {
+        "name": "C7H8N2O2_isomer_score",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ]
+  }
+}
