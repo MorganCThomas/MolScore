@@ -7,8 +7,9 @@ from random import sample
 from molscore.scoring_functions.admet_ai import ADMETAI
 from molscore.scoring_functions.chemprop import ChemPropModel
 from molscore.scoring_functions.legacy_qsar import LegacyQSAR
-from molscore.scoring_functions.rascore_xgb import RAScore_XGB
+from molscore.scoring_functions.molskill import MolSkill
 from molscore.scoring_functions.pidgin import PIDGIN
+from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.tests import BaseTests, MockGenerator, test_files
 
 """Note this fails due to Flask not handling unittesting correctly https://stackoverflow.com/questions/46792087/flask-unit-test-failed-to-establish-a-new-connection"""
@@ -99,9 +100,7 @@ class TestLegacyQSAR(BaseTests.TestScoringFunction):
         # Call
         mg = MockGenerator(seed_no=123)
         cls.input = mg.sample(5)
-        cls.output = cls.inst(
-            smiles=cls.input
-        )
+        cls.output = cls.inst(smiles=cls.input)
         print(f"LegacyQSAR Model Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -122,9 +121,7 @@ class TestRAScore(BaseTests.TestScoringFunction):
         # Call
         mg = MockGenerator(seed_no=123)
         cls.input = mg.sample(5)
-        cls.output = cls.inst(
-            smiles=cls.input
-        )
+        cls.output = cls.inst(smiles=cls.input)
         print(f"RAScore Model Output:\n{json.dumps(cls.output, indent=2)}\n")
 
     @classmethod
@@ -157,11 +154,28 @@ class TestPIDGIN(BaseTests.TestScoringFunction):
         # Call
         mg = MockGenerator(seed_no=123)
         cls.input = mg.sample(5)
-        file_names = [str(i) for i in range(len(cls.input))]
-        cls.output = cls.inst(
-            smiles=cls.input
-        )
+        cls.output = cls.inst(smiles=cls.input)
         print(f"\nPIDGIN Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+
+class TestMolSkill(BaseTests.TestScoringFunction):
+    @classmethod
+    def setUpClass(cls):
+        # Instantiate
+        cls.obj = MolSkill
+        cls.inst = MolSkill(
+            prefix="MolSkill",
+            env_engine="mamba",
+        )
+        # Call
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        cls.output = cls.inst(smiles=cls.input)
+        print(f"MolSkill Model Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst._kill_server()
 
 
 if __name__ == "__main__":

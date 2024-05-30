@@ -18,6 +18,14 @@ try:
 except Exception as e:
     logger.warn(f"Descriptors: currently unavailable due to the following: {e}")
 
+
+try:
+    from molscore.scoring_functions.molskill import MolSkill
+
+    all_scoring_functions.append(MolSkill)
+except Exception as e:
+    logger.warn(f"MolSkill: currently unavailable due to the following: {e}")
+
 try:
     from molscore.scoring_functions.isomer import Isomer
 
