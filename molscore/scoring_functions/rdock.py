@@ -511,6 +511,18 @@ END_SECTION
                 )
         return varients, varient_files
 
+    @staticmethod
+    def _fixup_ph4_sdf(sdf_file):
+        """When using ph4 constraints, rDock doesn't write SDF files properly and misses the final '>' in properties"""
+        with open(sdf_file, 'rt') as f:
+            fixed_lines = []
+            for line in f:
+                if line.startswith(">") and not line.endswith(">\n"):
+                    line = line[:-1] + ">\n"
+                fixed_lines.append(line)
+        with open(sdf_file, 'wt') as f:
+            f.writelines(fixed_lines)
+
     def reformat_ligands(self, varients, varient_files):
         """Reformat prepared ligands to .sd via obabel (RDKit doesn't write charge in a rDock friendly way)"""
         futures = []
@@ -582,6 +594,9 @@ END_SECTION
                 if os.path.exists(out_file):
                     # Try to load it in, and grab the score
                     try:
+                        # NOTE Fixup buggy SDF if using PH4 constraints i.e., rDock sd formatting without ">""
+                        if self.dock_constraints or self.dock_opt_constraints:
+                            self._fixup_ph4_sdf(out_file)
                         rdock_out = Chem.SDMolSupplier(out_file, sanitize=False)
                         for mol_idx in range(len(rdock_out)):
                             mol = rdock_out[mol_idx]
@@ -594,7 +609,6 @@ END_SECTION
                             if best_score[name] is None:
                                 best_score[name] = dscore
                                 best_variants[i] = f"{name}-{variant}"
-                                # TODO TETHERED.RMSD isn't read because of previous error in rDock sd formatting without ">""
                                 docking_result.update(
                                     {
                                         f"{self.prefix}_" + k: v
