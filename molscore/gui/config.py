@@ -530,7 +530,7 @@ if st.checkbox(
     label="Specify budget",
     value=False,
     help="Set a budget number of molecules for optimization.",
-    key=f"budget_optional"
+    key="budget_optional",
 ):
     config["budget"] = st.number_input(
         label="Budget",
@@ -544,7 +544,7 @@ if st.checkbox(
     label="Specify termination threshold",
     value=False,
     help="Set the threshold value for the final score before MolScore.finished=True",
-    key=f"termination_threshold_optional"
+    key="termination_threshold_optional",
 ):
     config["termination_threshold"] = st.number_input(
         label="Termination threshold",
@@ -559,7 +559,7 @@ if st.checkbox(
     label="Specify termination patience",
     value=False,
     help="Set a period to wait after the threshold is reached, or to wait while no improvement is made before MolScore.finished=True",
-    key=f"termination_patience_optional"
+    key="termination_patience_optional",
 ):
     config["termination_patience"] = st.number_input(
         label="Termination patience",
@@ -573,11 +573,11 @@ config["termination_exit"] = st.checkbox(
     label="Exit on termination [WARNING]",
     value=False,
     help="If true, after appropriate termination MolScore will exit the program for you with sys.exit(). Therefore any code after MolScore.finished=True will not be run. THIS IS INCOMPATIBLE WITH CURRICULUM LEARNING.",
-    key=f"termination_exit"
+    key="termination_exit",
 )
 
 with st.expander(label="Check parsing"):
-        st.write(config)
+    st.write(config)
 
 # ----- Scoring functions ------
 st.markdown("#")  # Add spacing

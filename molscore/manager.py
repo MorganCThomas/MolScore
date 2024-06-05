@@ -2,9 +2,9 @@ import atexit
 import json
 import logging
 import os
-import sys
 import signal
 import subprocess
+import sys
 import time
 
 import numpy as np
@@ -35,7 +35,6 @@ class MolScore:
             configs = f.read().replace("\r", "").replace("\n", "").replace("\t", "")
         return json.loads(configs)
 
-
     def __init__(
         self,
         model_name: str,
@@ -46,7 +45,7 @@ class MolScore:
         budget: int = None,
         termination_threshold: int = None,
         termination_patience: int = None,
-        termination_exit: bool = False,       
+        termination_exit: bool = False,
     ):
         """
         :param model_name: Name of generative model, used for file naming and documentation
@@ -68,7 +67,9 @@ class MolScore:
         self.budget = budget
         self.termination_threshold = termination_threshold
         self.termination_patience = termination_patience
-        reset_termination_criteria = not any([budget, termination_threshold, termination_patience])
+        reset_termination_criteria = not any(
+            [budget, termination_threshold, termination_patience]
+        )
         self.termination_counter = 0
         self.termination_exit = termination_exit
         self.finished = False
@@ -151,7 +152,10 @@ class MolScore:
         self.modifier_functions = utils.all_score_modifiers
 
         # Set scoring function / transformation / aggregation / diversity filter
-        self._set_objective(reset_diversity_filter=True, reset_termination_criteria=reset_termination_criteria)
+        self._set_objective(
+            reset_diversity_filter=True,
+            reset_termination_criteria=reset_termination_criteria,
+        )
 
         # Load from previous
         if self.cfg["load_from_previous"]:
@@ -196,7 +200,12 @@ class MolScore:
         atexit.register(self.kill_monitor)
         logger.info("MolScore initiated")
 
-    def _set_objective(self, task_config: str = None, reset_diversity_filter: bool = True, reset_termination_criteria: bool = False):
+    def _set_objective(
+        self,
+        task_config: str = None,
+        reset_diversity_filter: bool = True,
+        reset_termination_criteria: bool = False,
+    ):
         """
         Set or reset the overall configuration for scoring, but not logging.
         """
@@ -295,7 +304,6 @@ class MolScore:
             logger.warning(
                 "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
             )
-
 
     def parse_smiles(self, smiles: list, step: int):
         """
@@ -526,9 +534,7 @@ class MolScore:
 
         # Compute final score
         if mpo_columns["names"]:
-            df[self.cfg["scoring"]["method"]] = df.loc[
-                :, mpo_columns["names"]
-            ].apply(
+            df[self.cfg["scoring"]["method"]] = df.loc[:, mpo_columns["names"]].apply(
                 lambda x: self.mpo_method(
                     x=x,
                     w=np.asarray(mpo_columns["weights"]),
@@ -578,9 +584,7 @@ class MolScore:
                     lower=self.cfg["diversity_filter"]["parameters"]["tolerance"],
                     buffer=self.cfg["diversity_filter"]["parameters"]["buffer"],
                 )
-                for o, s in zip(
-                    df["occurrences"], df[self.cfg["scoring"]["method"]]
-                )
+                for o, s in zip(df["occurrences"], df[self.cfg["scoring"]["method"]])
             ]
             df["passes_diversity_filter"] = [
                 True if float(a) == float(b) else False
@@ -722,7 +726,7 @@ class MolScore:
         """
         Check if the current task is finished based on budget or termination criteria
         """
-        task_df = self.main_df.loc[self.main_df.task == self.cfg['task']]
+        task_df = self.main_df.loc[self.main_df.task == self.cfg["task"]]
 
         # Based on budget
         if self.budget and (len(task_df) >= self.budget):
@@ -731,18 +735,27 @@ class MolScore:
 
         # Based on patience
         if self.termination_patience and not self.termination_threshold:
-            if self.batch_df[self.cfg["scoring"]["method"]].mean() < task_df[self.cfg["scoring"]["method"]].rolling(window=500).mean().iloc[-1]:
+            if (
+                self.batch_df[self.cfg["scoring"]["method"]].mean()
+                < task_df[self.cfg["scoring"]["method"]]
+                .rolling(window=500)
+                .mean()
+                .iloc[-1]
+            ):
                 self.termination_counter += 1
-        
+
         # Based on a threshold
         if self.termination_threshold:
-            if self.batch_df[self.cfg["scoring"]["method"]].mean() >= self.termination_threshold:
+            if (
+                self.batch_df[self.cfg["scoring"]["method"]].mean()
+                >= self.termination_threshold
+            ):
                 if self.termination_patience:
                     self.termination_counter += 1
                 else:
                     self.finished = True
                     return
-        
+
         # Check our patience value
         if self.termination_patience:
             if self.termination_counter >= self.termination_patience:
@@ -751,7 +764,6 @@ class MolScore:
 
         if self.termination_exit and self.finished:
             sys.exit(1)
-
 
     def score_only(self, smiles: list, step: int = None, flt: bool = False):
         batch_start = time.time()
@@ -947,7 +959,7 @@ class MolScore:
         self.batch_df = None
         self.exists_df = None
         self.results_df = None
-        
+
         return scores
 
     def __call__(
@@ -1153,7 +1165,7 @@ class MolScoreBenchmark:
                 task_config=config_path,
                 output_dir=self.output_dir,
                 budget=self.budget,
-                termination_exit=False
+                termination_exit=False,
             )
             self.results.append(MS)
             yield MS
@@ -1216,24 +1228,23 @@ class MolScoreBenchmark:
 
 
 class MolScoreCurriculum(MolScore):
-
     presets = {}
 
     def __init__(
-            self,
-            model_name: str,
-            output_dir: os.PathLike,
-            run_name: str = None,
-            model_parameters: dict = {},
-            budget: int = None,
-            termination_threshold: float = None,
-            termination_patience: int = None,
-            benchmark: str = None,
-            custom_benchmark: os.PathLike = None,
-            custom_tasks: list = [],
-            include: list = [],
-            exclude: list = [],
-        ):
+        self,
+        model_name: str,
+        output_dir: os.PathLike,
+        run_name: str = None,
+        model_parameters: dict = {},
+        budget: int = None,
+        termination_threshold: float = None,
+        termination_patience: int = None,
+        benchmark: str = None,
+        custom_benchmark: os.PathLike = None,
+        custom_tasks: list = [],
+        include: list = [],
+        exclude: list = [],
+    ):
         """
         Run MolScore in curriculum mode, which will change MolScore tasks based on thresholds / steps reached.
         WARNING, sorted by config name! E.g., 0_Albuterol.json, 1_QED.json ...
@@ -1256,7 +1267,9 @@ class MolScoreCurriculum(MolScore):
         self.termination_threshold = termination_threshold
         self.termination_patience = termination_patience
         # If any termination criteria is set here, this is propogated to all tasks
-        self.reset_from_config = not any([budget, termination_threshold, termination_patience])
+        self.reset_from_config = not any(
+            [budget, termination_threshold, termination_patience]
+        )
         self.output_dir = output_dir
         self.benchmark = benchmark
         self.custom_benchmark = custom_benchmark
@@ -1326,19 +1339,20 @@ class MolScoreCurriculum(MolScore):
             termination_patience=self.termination_patience,
             termination_exit=False,
         )
-    
+
     def score(self, *args, **kwargs):
         output = super().score(*args, **kwargs)
         if self.finished:
             # Move on to the next task if available
             if self.configs:
-                logger.info(f"Moving on to next task ...")
+                logger.info("Moving on to next task ...")
                 self._set_objective(
                     task_config=self.configs.pop(0),
-                    reset_termination_criteria=self.reset_from_config)
+                    reset_termination_criteria=self.reset_from_config,
+                )
                 self.finished = False
                 self.termination_counter = 0
         return output
-        
+
     def __call__(self, *args, **kwargs):
         self.score(*args, **kwargs)
