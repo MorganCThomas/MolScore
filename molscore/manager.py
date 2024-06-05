@@ -42,6 +42,7 @@ class MolScore:
         task_config: os.PathLike,
         output_dir: str = None,
         add_run_dir: bool = True,
+        run_name: str = None,
         budget: int = None,
         termination_threshold: int = None,
         termination_patience: int = None,
@@ -52,6 +53,7 @@ class MolScore:
         :param task_config: Path to task config file
         :param output_dir: Overwrites the output directory specified in the task config file
         :param add_run_dir: Adds a run directory within the output directory
+        :param run_name: Override the run name with a custom name, otherwise taken from 'task' in the config
         :param budget: Budget number of molecules to run MolScore task for until molscore.finished is True
         :param termination_threshold: Threshold for early stopping based on the score
         :param termination_patience: Number of steps with no improvement, or that a termination_threshold has been reached for
@@ -81,11 +83,13 @@ class MolScore:
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
 
         # Setup save directory
+        if not run_name:
+            run_name = self.cfg["task"].replace(" ", "_")
         self.run_name = "_".join(
             [
                 time.strftime("%Y_%m_%d", time.localtime()),
                 self.model_name,
-                self.cfg["task"].replace(" ", "_"),
+                run_name,
             ]
         )
         if output_dir is not None:
@@ -284,7 +288,13 @@ class MolScore:
                 self.termination_patience = self.cfg.get("termination_patience", None)
             if self.cfg.get("termination_exit", None):
                 self.termination_exit = self.cfg.get("termination_exit", False)
-            self.termination_counter = 0 
+            self.termination_counter = 0
+
+        # Add warning in case of possible neverending optimization
+        if self.termination_threshold and not self.budget:
+            logger.warning(
+                "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
+            )
 
 
     def parse_smiles(self, smiles: list, step: int):
@@ -541,9 +551,6 @@ class MolScore:
             df[self.cfg["scoring"]["method"]] * df["filter"]
         )
 
-        # Penalize invalid molecules explicitly with a score of 0.0 NOTE now explicit by defining valid_score as a filter in the config
-        # df[self.cfg['scoring']['method']] = df[self.cfg['scoring']['method']] * df['valid_score']
-
         return df
 
     def run_diversity_filter(self, df):
@@ -736,6 +743,7 @@ class MolScore:
                     self.finished = True
                     return
         
+        # Check our patience value
         if self.termination_patience:
             if self.termination_counter >= self.termination_patience:
                 self.finished = True
@@ -1215,6 +1223,7 @@ class MolScoreCurriculum(MolScore):
             self,
             model_name: str,
             output_dir: os.PathLike,
+            run_name: str = None,
             model_parameters: dict = {},
             budget: int = None,
             termination_threshold: float = None,
@@ -1230,6 +1239,7 @@ class MolScoreCurriculum(MolScore):
         WARNING, sorted by config name! E.g., 0_Albuterol.json, 1_QED.json ...
         :param model_name: Name of model to run
         :param output_dir: Directory to save results to
+        :param run_name: Name of Curriculum run if specified
         :param model_parameters: Parameters of the model for record
         :param budget: Budget number of molecules to run each MolScore task for
         :param termination_threshold: Threshold to terminate MolScore task
@@ -1310,6 +1320,7 @@ class MolScoreCurriculum(MolScore):
             model_name=self.model_name,
             task_config=self.configs.pop(0),
             output_dir=self.output_dir,
+            run_name=run_name,
             budget=self.budget,
             termination_threshold=self.termination_threshold,
             termination_patience=self.termination_patience,
@@ -1326,6 +1337,7 @@ class MolScoreCurriculum(MolScore):
                     task_config=self.configs.pop(0),
                     reset_termination_criteria=self.reset_from_config)
                 self.finished = False
+                self.termination_counter = 0
         return output
         
     def __call__(self, *args, **kwargs):

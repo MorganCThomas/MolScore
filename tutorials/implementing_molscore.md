@@ -84,4 +84,53 @@ msb = MolScoreBenchmark(
     budget=10000)
 ```
 
+## Running curriculum learning
+
+Curriculum learning can be viewed as a sequential list of objectives, where you move on to the next objective once some criteria is reached on the current objective (see later).
+
+This is used with a similar API to MolScoreBenchmark, i.e., we specify a directory with a list of configuration files (objectives), but this time, we need to number the files in the order they should be run, or how else would we know? For example,
+
+```bash
+curriculum_dir/1_valid.json
+curriculum_dir/2_qed.json
+curriculum_dir/3_fep.json
+```
+
+Once that is defined, we can implement Curriculum learning,
+
+```python
+from molscore import MolScoreCurriculum
+
+MolScoreCurriculum.presets.keys()
+> dict_keys([]) # Well currently nothing, but a placeholder for some presets / benchmark curriculums
+
+MSC = MolScoreCurriculum(
+        model_name="test",
+        output_dir=output_directory,
+        custom_benchmark=benchmark,
+        budget=None,
+        termination_threshold=None,
+        termination_patience=None,
+    )
+while not MSC.finished:
+    MSC.score(smiles)
+```
+
+Ah, but what are the criteria... well we can utilise 3 parameters to control this in order of precedence, specifically:
+
+- **budget** How many molecules should be run for each objective. 
+  - NOTE: This takes precedence, if it is specified, the objective will be terminated upon budget reached.
+- **termination_threshold** Once we reach this threshold of our overall desirability score / reward, move on to the next objective.
+  - NOTE: This is only evaluated if no budget has been specified, or the budget hasn't been reached yet i.e., whichever comes first.
+  - RECOMMENDATION: It is probably best not to use this alone. With no budget, what if our threshold is never observed? Therefore, you should probably set a very high budget just incase.
+- **termination_patience** How patient are we before moving on to the next objective, this value is the number of iterations (calls to `.score()`) we wait either after reaching a specified termination_threshold.
+  - NOTE: If no termination_threshold is specified, termination_patience will conduct early-stopping based on the specified number of iterations where no improvement in the mean is observed.
+
+Where do we specify our new curriculum learning parameters?
+- Highest level in our JSON configuration file. 
+- `MolScoreCurriculum` and this will override anything specified in the configuration file and apply it to all objectives.
+
+See the example below conducted on batches of 10 randomly sampled SMILES (i.e., no optimization is happening here).
+
+![alt text](https://github.com/MorganCThomas/MolScore/tree/main/molscore/data/images/cl_example.png?raw=True)
 
