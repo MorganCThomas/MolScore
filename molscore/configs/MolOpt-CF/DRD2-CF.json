@@ -1,0 +1,57 @@
+{
+  "task": "DRD2",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "LegacyQSAR",
+      "run": true,
+      "parameters": {
+        "prefix": "DRD2",
+        "env_engine": "mamba",
+        "model": "molopt_DRD2"
+      }
+    },
+    {
+      "name": "ChemistryFilter",
+      "run": true,
+      "parameters": {
+        "ref_smiles": "/workspace1/Priors/ChEMBL_potent/processed_data/ChEMBL28p_all_undersample-8.smi.gz",
+        "n_jobs": 4
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "DRD2_pred_proba",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "B&T_CF",
+        "filter": true,
+        "modifier": "raw",
+        "weight": 1.0,
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  }
+}

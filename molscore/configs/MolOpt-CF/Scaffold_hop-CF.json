@@ -1,0 +1,104 @@
+{
+  "task": "Scaffold_hop",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "SubstructureFilters",
+      "run": true,
+      "parameters": {
+        "prefix": "S2",
+        "az_filters": false,
+        "custom_filters": [
+          "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]-c12"
+        ],
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "S6",
+        "smarts": [
+          "[#6]-[#6]-[#6]-[#8]-[#6]\u223c[#6]\u223c[#6]\u223c[#6]\u223c[#6]-[#7]-c1ccc2ncsc2c1"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    },
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "S5",
+        "ref_smiles": [
+          "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
+        ],
+        "fp": "PHCO",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "mean",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "ChemistryFilter",
+      "run": true,
+      "parameters": {
+        "ref_smiles": "/workspace1/Priors/ChEMBL_potent/processed_data/ChEMBL28p_all_undersample-8.smi.gz",
+        "n_jobs": 4
+      }
+    }
+  ],
+  "scoring": {
+    "method": "amean",
+    "metrics": [
+      {
+        "name": "S2_substruct_filt",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "S6_substruct_match",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "S5_Sim",
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "maximize",
+          "upper": 0.75,
+          "lower": 0.0,
+          "buffer": 0.75
+        }
+      },
+      {
+        "name": "B&T_CF",
+        "filter": true,
+        "modifier": "raw",
+        "weight": 1.0,
+        "parameters": {}
+      }
+    ]
+  }
+}

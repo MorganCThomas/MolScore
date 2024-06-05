@@ -1,0 +1,98 @@
+{
+  "task": "Valsartan_smarts",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "ScaffoldSimilarityECFP",
+    "parameters": {
+      "nbmax": 50,
+      "minscore": 0.5,
+      "minsimilarity": 0.8,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 1024,
+      "outputmode": "linear"
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "SubstructureMatch",
+      "run": true,
+      "parameters": {
+        "prefix": "s2",
+        "smarts": [
+          "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]-c12"
+        ],
+        "n_jobs": 1,
+        "method": "any"
+      }
+    },
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "ChemistryFilter",
+      "run": true,
+      "parameters": {
+        "ref_smiles": "/workspace1/Priors/ChEMBL_potent/processed_data/ChEMBL28p_all_undersample-8.smi.gz",
+        "n_jobs": 4
+      }
+    }
+  ],
+  "scoring": {
+    "method": "gmean",
+    "metrics": [
+      {
+        "name": "s2_substruct_match",
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "desc_CLogP",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "range",
+          "mu": 2.0165,
+          "sigma": 0.2
+        }
+      },
+      {
+        "name": "desc_TPSA",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "range",
+          "mu": 77.04,
+          "sigma": 5.0
+        }
+      },
+      {
+        "name": "desc_Bertz",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "range",
+          "mu": 896.38,
+          "sigma": 30.0
+        }
+      },
+      {
+        "name": "B&T_CF",
+        "filter": true,
+        "modifier": "raw",
+        "weight": 1.0,
+        "parameters": {}
+      }
+    ]
+  }
+}

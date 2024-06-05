@@ -1,0 +1,22 @@
+name: molskill
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.10
+  - pip>=22.1.2
+  - numpy>=1.23.1
+  - pandas>=1.4.2
+  - scipy>=1.8.1
+  - rdkit>=2022.03.3
+  - tqdm>=4.64.0
+  - scikit-learn>=1.0.1
+  - pytorch>=1.11
+  - cudatoolkit>=11.3
+  - requests
+  - pip:
+    - pytorch-lightning==1.6.3
+    - tensorboard>=2.12.0
+    - flask
+    - git+https://github.com/microsoft/molskill.git@main

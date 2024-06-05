@@ -47,7 +47,7 @@ from molscore import MolScoreBenchmark
 MolScoreBenchmark.presets.keys()
 > dict_keys(['GuacaMol', 'GuacaMol_Scaffold', 'MolOpt', '5HT2A_PhysChem', '5HT2A_Selectivity', '5HT2A_Docking', 'LibINVENT_Exp1', 'LinkINVENT_Exp3'])
 
-msb = MolScoreBenchmark(model_name='test', benchmark='GuacaMol', budget=10000)
+msb = MolScoreBenchmark(model_name='test', output_dir='./', benchmark='GuacaMol', budget=10000)
 for task in msb:
     while not task.finished:
         scores = task.score(SMILES)
@@ -59,7 +59,7 @@ Want to run your own benchmark, sure why not!
 Simply write the config files that define each individual objective, put them in a directory, and MolScore will run all configs in that directory. The only difference here supplying the path to `custom_benchmark` instead.
 ```python
 from molscore import MolScoreBenchmark
-msb = MolScoreBenchmark(model_name='test', custom_benchmark='path_to_dir', budget=10000)
+msb = MolScoreBenchmark(model_name='test', output_dir='./', custom_benchmark='path_to_dir', budget=10000)
 ```
 
 ## Controlling objectives in your benchmark

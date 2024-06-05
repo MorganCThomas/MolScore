@@ -100,6 +100,6 @@ class LegacyQSAR(BaseServerSF):
             env_name=env_name,
             env_path=env_path,
             server_path=server_path,
-            server_grace=30,
+            server_grace=60,
             server_kwargs={"model_path": model_path, "fp": fp, "nBits": nBits},
         )

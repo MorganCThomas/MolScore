@@ -1,0 +1,103 @@
+{
+  "task": "Osimertinib_MPO",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "diversity_filter": {
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
+  },
+  "scoring_functions": [
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Osimertinib_FCFC4",
+        "ref_smiles": [
+          "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"
+        ],
+        "radius": 2,
+        "bits": 1024,
+        "features": true,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "TanimotoSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "Osimertinib_ECFC6",
+        "ref_smiles": [
+          "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"
+        ],
+        "radius": 3,
+        "bits": 1024,
+        "features": false,
+        "counts": true,
+        "method": "max",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "RDKitDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "method": "gmean",
+    "metrics": [
+      {
+        "name": "Osimertinib_FCFC4_Sim",
+        "weight": 1.0,
+        "modifier": "lin_thresh",
+        "parameters": {
+          "objective": "maximize",
+          "upper": 0.8,
+          "lower": 0.0,
+          "buffer": 0.8
+        }
+      },
+      {
+        "name": "Osimertinib_ECFC6_Sim",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "minimize",
+          "mu": 0.85,
+          "sigma": 2.0
+        }
+      },
+      {
+        "name": "desc_TPSA",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "maximize",
+          "mu": 100.0,
+          "sigma": 2.0
+        }
+      },
+      {
+        "name": "desc_CLogP",
+        "weight": 1.0,
+        "modifier": "gauss",
+        "parameters": {
+          "objective": "minimize",
+          "mu": 1.0,
+          "sigma": 2.0
+        }
+      }
+    ]
+  }
+}

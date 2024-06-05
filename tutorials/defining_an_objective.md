@@ -14,6 +14,8 @@ Which is just a wrapper of ...
 
 This launches a GUI in your browser that walksthrough the definition of these configuration files. The underlying file structure is described [below](#the-configuration-file).
 
+![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/config_v1_albuterol.png?raw=True)
+
 ## The configuration file
 
 The overall structure of the configuration file is,
