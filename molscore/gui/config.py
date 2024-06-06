@@ -522,6 +522,63 @@ config["monitor_app"] = st.checkbox(
     key="monitor_app",
 )
 
+# ------ Termination criteria ------
+st.markdown("#")  # Add spacing
+st.subheader("Termination criteria")
+# Budget
+if st.checkbox(
+    label="Specify budget",
+    value=False,
+    help="Set a budget number of molecules for optimization.",
+    key="budget_optional",
+):
+    config["budget"] = st.number_input(
+        label="Budget",
+        value=10000,
+        min_value=1,
+        help="The number of molecules to score before MolScore.finished=True",
+        key="budget_value",
+    )
+# Termination threshold
+if st.checkbox(
+    label="Specify termination threshold",
+    value=False,
+    help="Set the threshold value for the final score before MolScore.finished=True",
+    key="termination_threshold_optional",
+):
+    config["termination_threshold"] = st.number_input(
+        label="Termination threshold",
+        value=0.5,
+        min_value=0.0,
+        max_value=1.0,
+        help="The final score threshold reached before MolScore.finished=True.",
+        key="termination_threshold_value",
+    )
+# Termination patience
+if st.checkbox(
+    label="Specify termination patience",
+    value=False,
+    help="Set a period to wait after the threshold is reached, or to wait while no improvement is made before MolScore.finished=True",
+    key="termination_patience_optional",
+):
+    config["termination_patience"] = st.number_input(
+        label="Termination patience",
+        value=5,
+        min_value=1,
+        help="The number of iterations to wait after the threshold, or with no improvement before MolScore.finished=True.",
+        key="termination_patience_value",
+    )
+# Termination exit
+config["termination_exit"] = st.checkbox(
+    label="Exit on termination [WARNING]",
+    value=False,
+    help="If true, after appropriate termination MolScore will exit the program for you with sys.exit(). Therefore any code after MolScore.finished=True will not be run. THIS IS INCOMPATIBLE WITH CURRICULUM LEARNING.",
+    key="termination_exit",
+)
+
+with st.expander(label="Check parsing"):
+    st.write(config)
+
 # ----- Scoring functions ------
 st.markdown("#")  # Add spacing
 st.subheader("Scoring functions")
@@ -835,6 +892,7 @@ col3.button("Load params", on_click=load_previous_params, help="Must load me thi
 
 st.sidebar.header("Navigate")
 st.sidebar.markdown("[Run parameters](#run-parameters)")
+st.sidebar.markdown("[Termination criteria](#termination-criteria)")
 st.sidebar.markdown("[Scoring functions](#scoring-functions)")
 st.sidebar.markdown("[Score transformation](#score-transformation)")
 st.sidebar.markdown("[Score aggregation](#score-aggregation)")

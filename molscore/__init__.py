@@ -9,5 +9,5 @@ if sys.version_info[1] < 9:
 else:
     from importlib import resources
 
-from molscore.manager import MolScore, MolScoreBenchmark
+from molscore.manager import MolScore, MolScoreBenchmark, MolScoreCurriculum
 from molscore.utils import MockGenerator

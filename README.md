@@ -2,7 +2,12 @@
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
 ## Overview
 
-MolScore contains code to score and benchmark *de novo* compounds in the context of generative *de novo* design by generative models via the subpackage `molscore`, as well as, facilitate downstream evaluation via the subpackage `moleval`. An objective is defined via a JSON file which can be shared to propose new benchmark objectives, or to conduct multi-parameter objectives for drug design. Generative models with MolScore integrated can be found [here](https://github.com/MorganCThomas/MolScore_examples). 
+MolScore contains code to score *de novo* compounds in the context of generative *de novo* design by generative models via the subpackage `molscore`, as well as, facilitate downstream evaluation via the subpackage `moleval`. An objective is defined via a JSON file which can be shared to propose new multi-parameter objectives for drug design. MolScore can be used in several ways:
+1. To implement a multi-parameter objective to for prospective drug design.
+2. To benchmark objectives/generative models/optimization using benchmark mode (MolScoreBenchmark).
+3. To implement a sequence of objectives using curriculum mode (MolScoreCurriculum).
+
+Generative models with MolScore already integrated can be found [here](https://github.com/MorganCThomas/MolScore_examples). 
 
 Contributions and/or ideas for added functionality are welcomed!
 
@@ -74,11 +79,13 @@ Once the configuration file is saved, simply point to this file path and run *de
 ## Citation & Publications
 If you use this software, please cite it as below.
 
-    @article{thomas2023molscore,
-    title={MolScore: A scoring, evaluation and benchmarking framework for de novo drug design},
-    author={Thomas, Morgan and O'Boyle, Noel M and Bender, Andreas and de Graaf, Chris},
-    journal={ChemRxiv},
-    year={2023}
+    @article{thomas2024molscore,
+    title={MolScore: a scoring, evaluation and benchmarking framework for generative models in de novo drug design},
+    author={Thomas, Morgan and O’Boyle, Noel M and Bender, Andreas and De Graaf, Chris},
+    journal={Journal of Cheminformatics},
+    volume={16},
+    year={2024},
+    publisher={BMC}
     }
 
 This software was also utilised in the following publications:
