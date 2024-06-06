@@ -47,6 +47,7 @@ class MolScore:
         termination_threshold: int = None,
         termination_patience: int = None,
         termination_exit: bool = False,
+        **kwargs
     ):
         """
         :param model_name: Name of generative model, used for file naming and documentation
@@ -1075,6 +1076,7 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        **kwargs
     ):
         """
         Run MolScore in benchmark mode, which will run MolScore on a set of tasks and benchmarks.
@@ -1245,6 +1247,7 @@ class MolScoreCurriculum(MolScore):
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        **kwargs
     ):
         """
         Run MolScore in curriculum mode, which will change MolScore tasks based on thresholds / steps reached.
