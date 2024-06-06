@@ -132,5 +132,5 @@ Where do we specify our new curriculum learning parameters?
 
 See the example below conducted on batches of 10 randomly sampled SMILES (i.e., no optimization is happening here).
 
-![alt text](https://github.com/MorganCThomas/MolScore/tree/main/molscore/data/images/cl_example.png?raw=True)
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/data/images/cl_example.png?raw=True)
 
