@@ -2,6 +2,7 @@ import atexit
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -1327,7 +1328,12 @@ class MolScoreCurriculum(MolScore):
             )
 
         # Order them by alphabetical order
-        self.configs.sort(key=lambda x: int(os.path.basename(x).split("_")[0]))
+        assert all(
+            [re.search("^([0-9]*)", os.path.basename(c)).group() for c in self.configs]
+        ), "Config files must be prefixed with a number"
+        self.configs.sort(
+            key=lambda x: int(re.search("^([0-9]*)", os.path.basename(x)).group())
+        )
 
         super().__init__(
             model_name=self.model_name,
