@@ -4,10 +4,10 @@ Most scoring functions are implemented with parallelisation over multiple CPUs u
 
 ## Parallelisation of Docking/Ligand preparation via Dask
 
-Some more computationally expensive scoring functions such as molecular docking are parallelised using a [Dask](https://www.dask.org/) to allow distributed parallelisation accross compute nodes (`cluster` parameter). Either supply the number of CPUs to utilize on a single compute node to the scheduler address setup via the [Dask CLI](https://docs.dask.org/en/latest/deploying-cli.html).
+Some more computationally expensive scoring functions such as molecular docking are parallelised using [Dask](https://www.dask.org/) to allow distributed parallelisation accross compute nodes (`cluster` parameter). Either supply the number of CPUs to utilize on a single compute node or provide the scheduler address that is found by setting up via the [Dask CLI](https://docs.dask.org/en/latest/deploying-cli.html).
 
 ### Using a local cluster
-Over a single compute node that you are running MolScore can be specified by simply providing the number of cores/workers to use similar to `n_jobs` to the `cluster` parameter.
+Over a single compute node that you are running MolScore, this can be specified by simply providing the number of cores/workers to use (similar to `n_jobs`) to the `cluster` parameter.
 For example, if we want to run rDock over 10 CPUs.
 
 In the GUI this would look like:
@@ -37,9 +37,9 @@ Now we have the scheduler address, we need to start workers (think CPUs) that ar
     mamba activate molscore
     dask worker <scheduler_address> --nworkers <n_jobs> --nthreads 1
 
-You can `ssh` into different nodes on your network and repeat the `dask worker` command for each node and the number of workers you wish to add to the cluster from each node (ensure the environment and any other dependencies are loaded as you would normally). **Note**: It is recommended to not use more than the number of logical cores available on a particular machine, for example, on a 12-core machine (6 logical cores hyperthreaded) I would not recommend more than 6 workers as it may overload CPU. 
+You can `ssh` into different nodes on your network and repeat the `dask worker` command for each node and the number of workers you wish to add to the cluster from each node (ensure the environment and any other dependencies are loaded as you would normally). For example, if we have 6 compute nodes, each with 6 workers, docking will be parallelised over all 36 workers, simple! **Note**: It is recommended to not use more than the number of logical cores available on a particular machine, for example, on a 12-core machine (6 logical cores hyperthreaded) I would not recommend more than 6 workers as it may overload CPU. 
 
-Once we have a dask cluster running, Then supply in the JSON molscore config files you can add `cluster: <scheduler_address>`.
+Once we have a dask cluster running, then we just supply the scheduler address to MolScore via a configuraiton file. 
 
 In the GUI this would look like:
 
