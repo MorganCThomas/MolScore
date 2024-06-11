@@ -1,4 +1,3 @@
-import argparse
 import logging
 import os
 from functools import partial
@@ -98,6 +97,7 @@ class MolecularSimilarity:
         similarity_measure: str,
         thresh: float,
         method: str,
+        prefix: str,
     ):
         """
         Calculate the Tanimoto coefficient given a SMILES string and list of
@@ -129,7 +129,10 @@ class MolecularSimilarity:
         else:
             sim = 0.0
 
-        return smi, sim
+        result = {"smiles": smi, f"{prefix}_Sim": sim}
+        result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
+
+        return result
 
     def _score(self, smiles: list, **kwargs):
         """
@@ -147,11 +150,9 @@ class MolecularSimilarity:
                 thresh=self.thresh,
                 similarity_measure=self.similarity_measure,
                 method=self.method,
+                prefix=self.prefix,
             )
-            results = [
-                {"smiles": smi, f"{self.prefix}_Sim": sim}
-                for smi, sim in pool.imap(calculate_sim_p, smiles)
-            ]
+            results = [result for result in pool.imap(calculate_sim_p, smiles)]
         return results
 
     def __call__(self, smiles: list, **kwargs):
@@ -164,9 +165,11 @@ class MolecularSimilarity:
         tfunc = timedFunc2(self._score, timeout=self.timeout)
         results = tfunc(smiles)
         if results is None:
-            logger.warning(f"Timeout of {self.timeout} reached for scoring, returning 0.0")
-            results = [{'smiles': smi, f"{self.prefix}_Sim": 0.0} for smi in smiles]
-        
+            logger.warning(
+                f"Timeout of {self.timeout} reached for scoring, returning 0.0"
+            )
+            results = [{"smiles": smi, f"{self.prefix}_Sim": 0.0} for smi in smiles]
+
         return results
 
 
@@ -215,119 +218,3 @@ class TanimotoSimilarity(MolecularSimilarity):
             n_jobs=n_jobs,
             **kwargs,
         )
-
-
-if __name__ == "__main__":
-    # Read in CLI arguments
-    parser = argparse.ArgumentParser(
-        description="Calculate the Maximum or Average Tanimoto similarity for a set of "
-        "molecules to a set of reference molecules",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    subparsers = parser.add_subparsers(title="Running mode", dest="mode")
-    run = subparsers.add_parser(
-        "run", formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    run.add_argument(
-        "--prefix", type=str, default="test", help="Prefix to returned metrics"
-    )
-    run.add_argument("--ref_smiles", help="Path to smiles file (.smi) for ref smiles")
-    run.add_argument(
-        "--query_smiles", help="Path to smiles file (.smi) for query smiles"
-    )
-    run.add_argument(
-        "--fp",
-        default="ECFP4",
-        help="What fingerprint to use",
-        choices=[
-            "ECFP4",
-            "ECFP4c",
-            "FCFP4",
-            "FCFP4c",
-            "ECFP6",
-            "ECFP6c",
-            "FCFP6",
-            "FCFP6c",
-            "Avalon",
-            "MACCSkeys",
-            "hashAP",
-            "hashTT",
-            "RDK5",
-            "RDK6",
-            "RDK7",
-        ],
-    )
-    run.add_argument("--bits", default=1024, help="Morgan fingerprint bit size")
-    run.add_argument(
-        "--similarity_measure",
-        default="Tanimoto",
-        help="What similarity measure to use",
-        choices=[
-            "AllBit",
-            "Asymmetric",
-            "BraunBlanquet",
-            "Cosine",
-            "McConnaughey",
-            "Dice",
-            "Kulczynski",
-            "Russel",
-            "OnBit",
-            "RogotGoldberg",
-            "Sokal",
-            "Tanimoto",
-        ],
-    )
-    run.add_argument(
-        "--method",
-        type=str,
-        choices=["mean", "max"],
-        default="mean",
-        help="Use mean or max similarity to ref smiles",
-    )
-    run.add_argument("--n_jobs", default=1, type=int, help="How many cores to use")
-    test = subparsers.add_parser("test")
-    args = parser.parse_args()
-
-    # Run mode
-    if args.mode == "run":
-        from molscore.tests import MockGenerator
-
-        mg = MockGenerator(seed_no=123)
-
-        if args.ref_smiles is None:
-            args.ref_smiles = mg.sample(10)
-
-        ts = TanimotoSimilarity(
-            prefix=args.prefix,
-            ref_smiles=args.ref_smiles,
-            fp=args.fp,
-            bits=args.bits,
-            similarity_measure=args.similarity_measure,
-            method=args.method,
-            n_jobs=args.n_jobs,
-        )
-
-        if args.query_smiles is None:
-            _ = [print(o) for o in ts(mg.sample(5))]
-        else:
-            with open(args.query_smiles, "r") as f:
-                qsmiles = f.read().splitlines()
-            _ = [print(o) for o in ts(qsmiles)]
-
-    # Test mode
-    elif args.mode == "test":
-        import sys
-        import unittest
-
-        from molscore.tests import test_tanimoto
-
-        # Remove CLI arguments
-        for i in range(len(sys.argv) - 1):
-            sys.argv.pop()
-        # Get and run tests
-        suite = unittest.TestLoader().loadTestsFromModule(test_tanimoto)
-        unittest.TextTestRunner().run(suite)
-
-    # Print usage
-    else:
-        print("Please specify running mode: 'run' or 'test'")
