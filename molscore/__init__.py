@@ -1,5 +1,5 @@
 __version__ = "1.6"
-__all__ = ["MolScore", "MolScoreBenchmark", "MockGenerator"]
+__all__ = ["MolScore", "MolScoreBenchmark", "MolScoreCurriculum", "MockGenerator"]
 
 # Import lib resources depending on python version
 import sys
