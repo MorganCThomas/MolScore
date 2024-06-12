@@ -1,3 +1,4 @@
+import re
 from functools import partial
 
 import numpy as np
@@ -28,7 +29,7 @@ class ScoreMetrics:
         unique=True,
         n_jobs=1,
         benchmark=None,
-    ):  
+    ):
         # Pre-process scores
         self.n_jobs = n_jobs
         self.total = len(scores)
@@ -50,7 +51,9 @@ class ScoreMetrics:
         self._btcf_scores = None
         self._rascorer = None
 
-    def _reinitialize(self, scores, budget: int = None, benchmark: str = None, n_jobs: int = None):
+    def _reinitialize(
+        self, scores, budget: int = None, benchmark: str = None, n_jobs: int = None
+    ):
         # Re-initialize without recomputing reference smiles
         self.total = len(scores)
         if budget:
@@ -62,7 +65,7 @@ class ScoreMetrics:
         if n_jobs:
             self.n_jobs = n_jobs
             self.chemistry_filter = ChemistryFilter(
-            target=self.reference_smiles, n_jobs=self.n_jobs
+                target=self.reference_smiles, n_jobs=self.n_jobs
             )
         self.scores = self._preprocess_scores(
             scores.copy(deep=True), valid=True, unique=True, budget=self.budget
@@ -421,11 +424,51 @@ class ScoreMetrics:
 
         return metrics
 
+    def molexp_score(self):
+        sim_endpoints = [
+            c for c in self.scores.columns if re.search("_Cmpd[0-9]*_Sim", c)
+        ]
+        top_avgs = []
+        top_aucs = []
+        for endpoint in sim_endpoints:
+            # Calculate top AVG
+            top1, top10, top100 = self.top_avg(
+                top_n=[1, 10, 100],
+                endpoint=endpoint,
+                basic_filter=False,
+                target_filter=False,
+            )
+            top_avgs.append([top1, top10, top100])
+            # Calculate top AUC
+            top1, top10, top100 = self.top_auc(
+                top_n=[1, 10, 100],
+                endpoint=endpoint,
+                window=100,
+                extrapolate=True,
+                basic_filter=False,
+                target_filter=False,
+            )
+            top_aucs.append([top1, top10, top100])
+        # Aggregate and take product
+        top_avgs = np.vstack(top_avgs).prod(0)
+        top_aucs = np.vstack(top_aucs).prod(0)
+        metrics = {
+            "Top-1 Avg (Exp)": top_avgs[0],
+            "Top-10 Avg (Exp)": top_avgs[1],
+            "Top-100 Avg (Exp)": top_avgs[2],
+            "Top-1 AUC (Exp)": top_aucs[0],
+            "Top-10 AUC (Exp)": top_aucs[1],
+            "Top-100 AUC (Exp)": top_aucs[2],
+        }
+        return metrics
+
     def add_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
         if self.benchmark == "MolOpt":
             # Right now all Molopt metrics are already computed
             pass
+        if self.benchmark == "MolExp":
+            benchmark_metrics.update(self.molexp_score())
         elif self.benchmark == "GuacaMol":
             # Score
             benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)

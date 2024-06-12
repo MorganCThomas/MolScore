@@ -1051,6 +1051,7 @@ class MolScoreBenchmark:
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
+        "MolExp": resources.files("molscore.configs.MolExp"),
         "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
         "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
         "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),

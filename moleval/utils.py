@@ -27,7 +27,7 @@ from rdkit.ML.Cluster import Butina
 from torch import cuda
 from tqdm.auto import tqdm
 
-from moleval.metrics.metrics_utils import mol_passes_filters, get_mol
+from moleval.metrics.metrics_utils import get_mol, mol_passes_filters
 
 
 def disable_rdkit_log():
@@ -125,7 +125,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-        
+
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=2, nBits=nBits
         )
@@ -198,7 +198,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         fp = rdMolDescriptors.GetMorganFingerprint(
             mol, 2, useCounts=True, useFeatures=True
         )
@@ -213,7 +213,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=3, nBits=nBits
         )
@@ -223,7 +223,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return np.asarray(
             rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius=3, nBits=nBits)
         )
@@ -233,7 +233,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=True)
 
     @classmethod
@@ -241,7 +241,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         fp = rdMolDescriptors.GetMorganFingerprint(mol, 3, useCounts=True)
         nfp = np.zeros((1, nBits), np.int32)
         for idx, v in fp.GetNonzeroElements().items():
@@ -254,7 +254,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetMorganFingerprintAsBitVect(
             mol, radius=3, nBits=nBits, useFeatures=True
         )
@@ -264,7 +264,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return np.asarray(
             rdMolDescriptors.GetMorganFingerprintAsBitVect(
                 mol, radius=3, nBits=nBits, useFeatures=True
@@ -276,7 +276,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetMorganFingerprint(
             mol, radius=3, useCounts=True, useFeatures=True
         )
@@ -286,7 +286,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         fp = rdMolDescriptors.GetMorganFingerprint(
             mol, 3, useCounts=True, useFeatures=True
         )
@@ -302,7 +302,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return pyAvalonTools.GetAvalonFP(mol, nBits=nBits)
 
     @classmethod
@@ -310,7 +310,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetMACCSKeysFingerprint(mol)
 
     # Path-based fingerprints
@@ -319,7 +319,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
 
     @classmethod
@@ -327,7 +327,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(
             mol, nBits=nBits
         )
@@ -337,7 +337,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
 
     @classmethod
@@ -345,7 +345,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
 
     @classmethod
@@ -353,7 +353,7 @@ class Fingerprints:
         mol = get_mol(mol)
         if mol is None:
             return None
-            
+
         return rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
 
 
@@ -640,7 +640,7 @@ def maxmin_picker(
     ]
 
     mmp = SimDivFilters.MaxMinPicker()
-    ids = mmp.LazyBitVectorPick(fps, len(fps), n)
+    ids = mmp.LazyBitVectorPick(fps, len(fps), n, seed=seed)
     subset = [mols[i] for i in ids]
 
     return subset
