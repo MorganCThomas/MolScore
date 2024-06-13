@@ -1,5 +1,5 @@
 {
-  "task": "Antipsychotic",
+  "task": "AP",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -44,6 +44,11 @@
     "method": "single"
   },
   "diversity_filter": {
-    "run": false
+    "run": true,
+    "name": "Occurrence",
+    "parameters": {
+      "tolerance": 1,
+      "buffer": 5
+    }
   }
 }

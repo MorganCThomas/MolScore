@@ -464,10 +464,10 @@ class ScoreMetrics:
 
     def add_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
-        if self.benchmark == "MolOpt":
+        if self.benchmark.startswith("MolOpt"):
             # Right now all Molopt metrics are already computed
             pass
-        if self.benchmark == "MolExp":
+        if self.benchmark.startswith("MolExp"):
             benchmark_metrics.update(self.molexp_score())
         elif self.benchmark == "GuacaMol":
             # Score

@@ -1,5 +1,5 @@
 {
-  "task": "Antipsychotic",
+  "task": "AP",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -44,16 +44,6 @@
     "method": "single"
   },
   "diversity_filter": {
-    "run": true,
-    "name": "CompoundSimilarity",
-    "parameters": {
-      "nbmax": 10,
-      "minscore": 0.6,
-      "minsimilarity": 0.6,
-      "radius": 2,
-      "useFeatures": false,
-      "bits": 2048,
-      "outputmode": "linear"
-    }
+    "run": false
   }
 }
