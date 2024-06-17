@@ -128,6 +128,7 @@ class MolecularSimilarity:
                 sim = 0.0
         else:
             sim = 0.0
+            sim_vec = []
 
         result = {"smiles": smi, f"{prefix}_Sim": sim}
         result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
