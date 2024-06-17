@@ -83,6 +83,7 @@ class MolScore:
         self.monitor_app = None
         self.diversity_filter = None
         self.call2score_warning = True
+        self.metrics = None
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
 
         # Setup save directory
@@ -1009,6 +1010,7 @@ class MolScore:
         n_jobs=1,
         reference_smiles=None,
         benchmark=None,
+        recalculate=False,
     ):
         """
         Compute a suite of metrics
@@ -1018,32 +1020,37 @@ class MolScore:
         :param chemistry_filter_basic: Whether to apply basic chemistry filters
         :budget: Budget to compute metrics for
         :n_jobs: Number of jobs to use for parallelisation
-        :reference_smiles: List of target smiles to compute metrics for
+        :reference_smiles: List of target smiles to compute metrics in reference to
+        :recalculate: Whether to recompute metrics
         """
-        if endpoints is None:
-            endpoints = [self.cfg["scoring"]["method"]]
+        if self.metrics and not recalculate:
+            return self.metrics
         else:
-            assert all([ep in self.main_df.columns for ep in endpoints])
-        if thresholds is None:
-            thresholds = [0.0]
-        SM = ScoreMetrics(
-            scores=self.main_df,
-            budget=budget,
-            n_jobs=n_jobs,
-            reference_smiles=reference_smiles,
-            benchmark=benchmark,
-        )
-        results = SM.get_metrics(
-            endpoints=endpoints,
-            thresholds=thresholds,
-            chemistry_filter_basic=chemistry_filter_basic,
-        )
-        # Change the name of the default score to "Score"
-        results = {
-            k.replace(self.cfg["scoring"]["method"], "Score"): v
-            for k, v in results.items()
-        }
-        return results
+            if endpoints is None:
+                endpoints = [self.cfg["scoring"]["method"]]
+            else:
+                assert all([ep in self.main_df.columns for ep in endpoints])
+            if thresholds is None:
+                thresholds = [0.0]
+            SM = ScoreMetrics(
+                scores=self.main_df,
+                budget=budget,
+                n_jobs=n_jobs,
+                reference_smiles=reference_smiles,
+                benchmark=benchmark,
+            )
+            results = SM.get_metrics(
+                endpoints=endpoints,
+                thresholds=thresholds,
+                chemistry_filter_basic=chemistry_filter_basic,
+            )
+            # Change the name of the default score to "Score"
+            results = {
+                k.replace(self.cfg["scoring"]["method"], "Score"): v
+                for k, v in results.items()
+            }
+            self.metrics = results
+            return self.metrics
 
 
 class MolScoreBenchmark:
