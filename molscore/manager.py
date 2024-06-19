@@ -1202,7 +1202,7 @@ class MolScoreBenchmark:
         # Compute results
         for MS in self.results:
             if MS.main_df is None:
-                print(f"Skipping summary of {MS.configs['task']} as no results found")
+                print(f"Skipping summary of {MS.cfg['task']} as no results found")
                 continue
             metrics = MS.compute_metrics(
                 endpoints=endpoints,
