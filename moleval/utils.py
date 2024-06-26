@@ -25,7 +25,7 @@ from rdkit.Chem import (
 from rdkit.Chem.MolStandardize import Standardizer
 from rdkit.ML.Cluster import Butina
 from torch import cuda
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from moleval.metrics.metrics_utils import get_mol, mol_passes_filters
 

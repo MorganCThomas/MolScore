@@ -24,15 +24,16 @@ setup(
         "pandas",
         "matplotlib",
         "seaborn",
+        "tqdm",
         "rdkit >= 2019.03.2, < 2024", # 2024 changes MolStandardize import
         "dask", # == 2023.6.0",
         "dask-jobqueue", # == 0.8.2",
-        "scikit-learn == 1.1.3",
+        #"scikit-learn == 1.1.3",
         "torch",
         #"zenodo-client",
         "levenshtein",
         "streamlit-plotly-events == 0.0.6",
-        "streamlit == 1.29.0",
+        "streamlit >= 1.11.0",
         "molbloom",
         "func_timeout",
         "flask"

@@ -1,4 +1,4 @@
-__version__ = "1.7"
+__version__ = "1.7.2"
 __all__ = ["MolScore", "MolScoreBenchmark", "MolScoreCurriculum", "MockGenerator"]
 
 # Import lib resources depending on python version

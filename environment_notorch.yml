@@ -13,9 +13,10 @@ dependencies:
   - smina=2017.11.9
   - openbabel
   - dask
-  - scikit-learn=1.1.3
+  #- scikit-learn=1.1.3
   - pip
   - pip:
+    - tqdm
     - zenodo-client
     - levenshtein
     - streamlit-plotly-events
