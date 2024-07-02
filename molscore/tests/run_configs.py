@@ -33,11 +33,8 @@ if __name__ == "__main__":
         print("No config files or directories of config files provided")
     else:
         for arg in sys.argv[1:]:
-            if not os.path.exists(arg):
-                print(f"{arg} does not exist")
+            if os.path.isdir(arg):
+                configs.extend(glob(os.path.join(arg, "*.json")))
             else:
-                if os.path.isdir(arg):
-                    configs.extend(glob(os.path.join(arg, "*.json")))
-                else:
-                    configs.append(arg)
+                configs.append(arg)
     main(configs)

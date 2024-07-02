@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,22 @@ class MolScore:
     """
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
+    presets = {
+        "Misc": resources.files("molscore.configs"),
+        "GuacaMol": resources.files("molscore.configs.GuacaMol"),
+        "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
+        "MolOpt": resources.files("molscore.configs.MolOpt"),
+        "MolExp": resources.files("molscore.configs.MolExp"),
+        "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
+        "5HT2A_Selectivity": resources.files(
+            "molscore.configs.5HT2A.PIDGIN_Selectivity"
+        ),
+        "5HT2A_Docking": resources.files(
+            "molscore.configs.5HT2A.Docking_Selectivity_rDock"
+        ),
+        "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
+        "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
+    }
 
     @staticmethod
     def load_config(task_config):
@@ -39,7 +56,7 @@ class MolScore:
     def __init__(
         self,
         model_name: str,
-        task_config: os.PathLike,
+        task_config: Union[str, os.PathLike],
         output_dir: str = None,
         add_run_dir: bool = True,
         run_name: str = None,
@@ -51,7 +68,7 @@ class MolScore:
     ):
         """
         :param model_name: Name of generative model, used for file naming and documentation
-        :param task_config: Path to task config file
+        :param task_config: Path to task config file, or a preset name e.g., GuacaMol:Albuterol_similarity
         :param output_dir: Overwrites the output directory specified in the task config file
         :param add_run_dir: Adds a run directory within the output directory
         :param run_name: Override the run name with a custom name, otherwise taken from 'task' in the config
@@ -61,7 +78,15 @@ class MolScore:
         :param termination_exit: Exit on termination of objective
         """
         # Load in configuration file (json)
-        self.cfg = self.load_config(task_config)
+        if task_config.endswith(".json"):
+            self.cfg = self.load_config(task_config)
+        else:
+            assert ":" in task_config, "Preset task must be in format 'category:task'"
+            cat, task = task_config.split(":", maxsplit=1)
+            assert cat in self.presets.keys(), f"Preset category {cat} not found"
+            task_config = self.presets[cat] / f"{task}.json"
+            assert task_config.exists(), f"Preset task {task} not found in {cat}"
+            self.cfg = self.load_config(task_config)
 
         # Here are attributes used
         self.model_name = model_name
