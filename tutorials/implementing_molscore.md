@@ -26,6 +26,36 @@ while not ms.finished:
     scores = ms.score(SMILES)
 ```
 
+Moreover, single tasks can be run by name if they already exist as a preset in MolScore configs (such as [Benchmark tasks](#running-a-preset-benchmark)). For this, you must specify the group/category and name of the config file omitting the .json. suffix. If the .json suffix is specified, a path to a file is assumed. See example below,
+```python
+from molscore import MolScore
+ms = MolScore(model_name='test', task_config='GuacaMol:Albuterol_similarity', budget=10000)
+while not ms.finished:
+    scores = ms.score(SMILES)
+```
+
+A list of available configuration files can found here by running the following code snippet,
+```python
+from molscore import MolScore
+named_tasks = {k:[p.name.strip(".json") for p in v.glob("*.json")] for k, v in MolScore.presets.items()}
+print(named_tasks)
+```
+The output will look something like this ...
+```json
+{"Misc": ["QED", "valid", "valid_unique"],
+ "GuacaMol": ["C11H24",
+  "C9H10N2O2PF2Cl",
+  "Fexofenadine_MPO",
+  "Mestranol_similarity",
+  "Ranolazine_MPO",
+  "Albuterol_similarity",
+  ...,
+ ],
+ ...,
+}
+```
+
+
 ## Running a preset benchmark
 
 A benchmark mode is also available, that can be used to iterate over objectives and automatically computes some metrics upon finishing. The following pre-defined benchmarks come packaged with MolScore including:
