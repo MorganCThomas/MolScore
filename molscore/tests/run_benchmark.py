@@ -30,6 +30,7 @@ if __name__ == "__main__":
             "GuacaMol",
             "MolOpt",
             "MolExp",
+            "MolExp_baseline",
             "MolOpt-CF",
             "MolOpt-DF",
             "5HT2A_PhysChem",
