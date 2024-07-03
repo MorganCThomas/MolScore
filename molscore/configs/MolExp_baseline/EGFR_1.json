@@ -1,5 +1,5 @@
 {
-  "task": "EGFR",
+  "task": "EGFR_1",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
