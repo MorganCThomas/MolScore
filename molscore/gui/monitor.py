@@ -134,7 +134,7 @@ def main():
         rename_map = {}
         for run in SS.main_df.run.unique():
             new_name = st.sidebar.text_input(
-                label=f"{run}", key=f"{run}_rename", help="Rename this to custom name"
+                value=f"{run}", label=f"{run}", key=f"{run}_rename", help="Rename this to custom name"
             )
             rename_map[run] = new_name
         if st.sidebar.button("Rename", help="Rename runs to specified names"):
