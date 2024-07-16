@@ -1,0 +1,45 @@
+{
+  "task": "A2A_1",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "LevenshteinSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "A2A",
+        "ref_smiles": [
+          "CCCN1c2c([nH]c(n2)c3ccc(cc3)OCC(=O)NCCN)C(=O)N(C1=O)CCC"
+        ],
+        "method": "max",
+        "n_jobs": 1,
+        "timeout": 60
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "A2A_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": false
+  }
+}

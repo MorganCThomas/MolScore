@@ -1,0 +1,47 @@
+{
+  "task": "BACE1",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "LevenshteinSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "BACE1",
+        "ref_smiles": [
+          "NC1=NC(c2cccc(-c3cncnc3)c2)(c2ccnc(C(F)F)c2)c2cccc(F)c21",
+          "NC1=NC2(c3cc(NC(=O)c4ccc(F)cn4)ccc3F)COCC2CS1",
+          "CC#Cc1cncc(-c2ccc3c(c2)C2(N=C(C)C(N)=N2)C2(CCC(OC)CC2)C3)c1"
+        ],
+        "method": "max",
+        "n_jobs": 1,
+        "timeout": 60
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "BACE1_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": false
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "task": "EGFR",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "LevenshteinSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "EGFR",
+        "ref_smiles": [
+          "COc1cc2ncnc(Nc3ccc(F)c(Cl)c3)c2cc1NC(=O)C=CCN1CCCCC1",
+          "C=CC(=O)N1CCC(Oc2nc(Nc3ccc(N4CCC(N5CCN(C)CC5)CC4)cc3)c(C(N)=O)nc2CC)C1",
+          "Cc1cc(C(=O)Nc2nc3cccc(Cl)c3n2C2CCCCN(C(=O)C=CCN(C)C)C2)ccn1",
+          "C=CC(=O)Nc1cc(Nc2nccc(-n3cc(CN(C)C)c(-c4ccccc4)n3)n2)c(OC)cc1N1CCOCC1"
+        ],
+        "method": "max",
+        "n_jobs": 1,
+        "timeout": 60
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "EGFR_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": false
+  }
+}
