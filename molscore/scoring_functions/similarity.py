@@ -4,11 +4,13 @@ from functools import partial
 from typing import Union
 
 import numpy as np
+from Levenshtein import distance as levenshtein
 
 from molscore.scoring_functions.utils import (
     Fingerprints,
     Pool,
     SimilarityMeasures,
+    canonize_smiles,
     get_mol,
     timedFunc2,
 )
@@ -171,6 +173,115 @@ class MolecularSimilarity:
             )
             results = [{"smiles": smi, f"{self.prefix}_Sim": 0.0} for smi in smiles]
 
+        return results
+
+
+class LevenshteinSimilarity(MolecularSimilarity):
+    """
+    Score structures based on the normalized Levenshtein similarity of provided SMILES string(s) to reference structure
+    """
+
+    return_metrics = ["Sim"]
+
+    def __init__(
+        self,
+        prefix: str,
+        ref_smiles: Union[list, str, os.PathLike],
+        thresh: float = None,
+        method: str = "mean",
+        n_jobs: int = 1,
+        timeout: int = 60,
+        **kwargs,
+    ):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param ref_smiles: List of SMILES or path to SMILES file with no header (.smi)
+        :param thresh: If provided check if similarity is above threshold, binarising the similarity coefficients
+        :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour) [mean, max]
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
+        :param timeout: Timeout for the scoring to cease and return a score of 0.0
+        :param kwargs:
+        """
+
+        self.prefix = prefix.replace(" ", "_")
+        assert method in ["max", "mean"]
+        self.thresh = thresh
+        self.method = method
+        self.n_jobs = n_jobs
+        self.timeout = timeout
+
+        # If file path provided, load smiles.
+        if isinstance(ref_smiles, str):
+            with open(ref_smiles, "r") as f:
+                self.ref_smiles = f.read().splitlines()
+        else:
+            assert isinstance(ref_smiles, list) and (
+                len(ref_smiles) > 0
+            ), "None list or empty list provided"
+            self.ref_smiles = ref_smiles
+
+        # Canonicalize ref smiles
+        self.ref_smiles = [canonize_smiles(smi) for smi in self.ref_smiles]
+        if any([smi is None for smi in self.ref_smiles]):
+            raise ValueError("One or more reference smiles could not be canonicalized")
+
+    @staticmethod
+    def calculate_sim(
+        smi: str,
+        ref_smiles: list,
+        thresh: float,
+        method: str,
+        prefix: str,
+    ):
+        """
+        Calculate the Tanimoto coefficient given a SMILES string and list of
+         reference fps
+        :param smi: SMILES string
+        :param ref_smiles: list of reference smiles
+        :param thresh: If provided check if similarity is above threshold binarising the similarity coefficients
+        :param method: 'mean' or 'max'
+        :return: (SMILES, Normalized Levenshtein similarity)
+        """
+        sim_vec = []
+        if smi:
+            for ref in ref_smiles:
+                sim = 1 - (levenshtein(smi, ref) / max(len(smi), len(ref)))
+                sim_vec.append(sim)
+
+            if thresh:
+                sim_vec = [sim >= thresh for sim in sim_vec]
+
+            if method == "mean":
+                sim = float(np.mean(sim_vec))
+            elif method == "max":
+                sim = float(np.max(sim_vec))
+            else:
+                raise ValueError(f"Method {method} not recognised")
+        else:
+            sim = 0.0
+            sim_vec = []
+
+        result = {"smiles": smi, f"{prefix}_Sim": sim}
+        result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
+
+        return result
+
+    def _score(self, smiles: list, **kwargs):
+        """
+        Calculate scores for Tanimoto given a list of SMILES.
+        :param smiles: List of SMILES strings
+        :param kwargs: Ignored
+        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        """
+        with Pool(self.n_jobs) as pool:
+            calculate_sim_p = partial(
+                self.calculate_sim,
+                ref_smiles=self.ref_smiles,
+                thresh=self.thresh,
+                method=self.method,
+                prefix=self.prefix,
+            )
+            results = [result for result in pool.imap(calculate_sim_p, smiles)]
         return results
 
 
