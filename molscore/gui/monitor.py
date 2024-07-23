@@ -22,6 +22,8 @@ if "pymol" not in SS:
     SS.pymol = None
 if "exclude_params" not in SS:
     SS.exclude_params = ["run", "dock_path"]
+if "rename_map" not in SS:
+    SS.rename_map = {}
 
 # ----- Setup page -----
 st.set_page_config(
@@ -133,7 +135,7 @@ def main():
 
         # Option to rename runs
         st.sidebar.header("Rename runs:")
-        rename_map = {}
+        #rename_map = {}
         for run in SS.main_df.run.unique():
             col1, col2 = st.sidebar.columns([0.9, 0.1])
             new_name = col1.text_input(
@@ -142,14 +144,14 @@ def main():
                 key=f"{run}_rename",
                 help="Rename this to custom name",
             )
-            rename_map[run] = new_name
+            SS.rename_map[run] = new_name
             col2.write("")
             col2.write("")
             if col2.button("X", key=f"{run}_delete", help="Delete run"):
                 utils.delete_run(SS=SS, run=run)
                 st.rerun()
         if st.sidebar.button("Rename", help="Rename runs to specified names"):
-            utils.rename_runs(SS=SS, rename_map=rename_map)
+            utils.rename_runs(SS=SS)
             st.rerun()
 
         # ----- Main page -----
