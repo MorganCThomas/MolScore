@@ -245,7 +245,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
         sim_vec = []
         if smi:
             for ref in ref_smiles:
-                sim = 1 - (levenshtein(smi, ref) / max(len(smi), len(ref)))
+                sim = max(0, 1 - (levenshtein(smi, ref) / len(ref)))
                 sim_vec.append(sim)
 
             if thresh:
