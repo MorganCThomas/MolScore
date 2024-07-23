@@ -80,6 +80,16 @@ def rename_runs(SS, rename_map):
         SS.main_df.loc[SS.main_df.run == k, "run"] = v
 
 
+def delete_run(SS, run):
+    input_dir = SS.main_df.loc[SS.main_df.run == run, "input_dir"].unique()[0]
+    SS.main_df = SS.main_df.loc[SS.main_df.run != run]
+    # Remove input_dir
+    SS.input_dirs.remove(input_dir)
+    # Correct for empty
+    if len(SS.main_df) == 0:
+        SS.main_df = None
+
+
 def check_dock_paths(input_path):
     subdirectories = [x for x in os.walk(os.path.abspath(input_path))][0][1]
     dock_paths = []
@@ -324,25 +334,34 @@ def plotly_plot(
     y, main_df, size=(1000, 500), x="step", trendline="median", trendline_only=False
 ):
     if y == "valid":
+        if x == "index":
+            x = "idx"
+            main_df = main_df.copy()
+            main_df.idx = (main_df.idx // 100) * 100
         tdf = (
-            main_df.groupby(["run", "step"])[y]
+            main_df.groupby(["run", x])[y]
             .agg(lambda x: (x == "true").mean())
             .reset_index()
         )
         fig = px.line(
             data_frame=tdf,
-            x="step",
+            x=x,
             y=y,
             range_y=(0, 1),
             color="run",
             template="plotly_white",
         )
         fig.update_layout(xaxis_title=x, yaxis_title=y)
+
     elif (y == "unique") or (y == "passes_diversity_filter"):
-        tdf = main_df.groupby(["run", "step"])[y].mean().reset_index()
+        if x == "index":
+            x = "idx"
+            main_df = main_df.copy()
+            main_df.idx = (main_df.idx // 100) * 100
+        tdf = main_df.groupby(["run", x])[y].mean().reset_index()
         fig = px.line(
             data_frame=tdf,
-            x="step",
+            x=x,
             y=y,
             range_y=(0, 1),
             color="run",
