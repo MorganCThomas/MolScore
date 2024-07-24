@@ -43,10 +43,11 @@ except Exception as e:
 try:
     from molscore.scoring_functions.similarity import (
         MolecularSimilarity,
+        LevenshteinSimilarity,
         TanimotoSimilarity,
     )
 
-    all_scoring_functions.extend([MolecularSimilarity, TanimotoSimilarity])
+    all_scoring_functions.extend([MolecularSimilarity, TanimotoSimilarity, LevenshteinSimilarity])
 except Exception as e:
     logger.warning(f"MolecularSimilarity: currently unavailable due to the following: {e}")
 

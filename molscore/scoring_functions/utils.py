@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Callable, Sequence, Union
 
 import numpy as np
-import pystow
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
 from dask.distributed import Client, LocalCluster

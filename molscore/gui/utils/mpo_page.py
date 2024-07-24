@@ -6,12 +6,12 @@ import pandas as pd
 # import amean, gmean, prod, wsum, wprod
 import plotly.express as px
 import streamlit as st
-from sklearn.preprocessing import MinMaxScaler
 from streamlit_plotly_events import plotly_events
 
 from molscore.gui.utils import utils
 from molscore.utils import (
     aggregation_functions,
+    transformation_functions,
 )
 
 
@@ -71,9 +71,10 @@ def plotly_mpo_events(df, x_variables, step=None, k=None):
 
 
 def maxminnorm(series, invert):
-    series = series * (-1 if invert else 1)
-    data = series.to_numpy().reshape(-1, 1)
-    data_norm = MinMaxScaler().fit_transform(data)
+    data = series.to_numpy()
+    if invert:
+        data = data * -1
+    data_norm = transformation_functions.norm(x=data, objective="maximize", max=max(data), min=min(data))
     series_norm = pd.Series(data=data_norm.flatten(), name=series.name)
     return series_norm
 

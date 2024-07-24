@@ -27,8 +27,12 @@ def load(input_dir: os.PathLike, latest_idx: int = 0):
     """
     it_path = os.path.join(input_dir, "iterations")
     scores_path = os.path.join(input_dir, "scores.csv")
-    df = pd.DataFrame()
-    if os.path.exists(it_path):
+
+    if os.path.exists(scores_path):
+        df = pd.read_csv(scores_path, index_col=0, dtype={"valid": object})
+    
+    elif os.path.exists(it_path):
+        df = pd.DataFrame()
         it_files = sorted(glob(os.path.join(it_path, "*.csv")))
         if len(it_files) > latest_idx:
             for f in it_files[latest_idx:]:
@@ -36,8 +40,7 @@ def load(input_dir: os.PathLike, latest_idx: int = 0):
                     [df, pd.read_csv(f, index_col=0, dtype={"valid": object})], axis=0
                 )
             latest_idx = len(it_files)
-    elif os.path.exists(scores_path):
-        df = pd.read_csv(scores_path, index_col=0, dtype={"valid": object})
+
     else:
         raise FileNotFoundError(
             f"Could not find iterations directory or scores.csv for {os.path.basename(input_dir)}"
@@ -57,27 +60,39 @@ def update(SS):
     for i, (curr_dir, curr_idx) in enumerate(zip(SS.input_dirs, SS.input_latest)):
         # Load new iterations
         df, new_idx = load(input_dir=curr_dir, latest_idx=curr_idx)
-        # Add it new df
-        if df is not None:
-            # Update latest idx
-            SS.input_latest[i] = new_idx
-            # First update mol index
-            df.reset_index(inplace=True)
-            df.rename(
-                columns={"index": "idx"}, inplace=True
-            )  # Index should carry between iteration as index col is read in
-            # Add to main_df
-            SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
-            # Sort
-            SS.main_df.sort_values(by=["run", "idx"])
+        # Update latest idx
+        SS.input_latest[i] = new_idx
+        # First update mol index
+        df.reset_index(inplace=True)
+        df.rename(
+            columns={"index": "idx"}, inplace=True
+        )  # Index should carry between iteration as index col is read in
+        # Rename run 
+        run_name = df.run.unique()[0]
+        df.loc[df.run == run_name, "run"] = SS.rename_map[run_name]
+        # Add to main_df
+        SS.main_df = pd.concat([SS.main_df, df], axis=0, ignore_index=True)
+        # Sort
+        SS.main_df.sort_values(by=["run", "idx"])
 
 
-def rename_runs(SS, rename_map):
-    assert len(set(list(rename_map.values()))) == len(
-        set(list(rename_map.values()))
+def rename_runs(SS):
+    assert len(set(list(SS.rename_map.values()))) == len(
+        set(list(SS.rename_map.values()))
     ), "New names must be unique"
-    for k, v in rename_map.items():
+    for k, v in SS.rename_map.items():
         SS.main_df.loc[SS.main_df.run == k, "run"] = v
+
+
+def delete_run(SS, run):
+    input_dir = SS.main_df.loc[SS.main_df.run == run, "input_dir"].unique()[0]
+    SS.main_df = SS.main_df.loc[SS.main_df.run != run]
+    # Remove input_dir and latest
+    SS.input_latest.pop(SS.input_dirs.index(input_dir))
+    SS.input_dirs.remove(input_dir)
+    # Correct for empty
+    if len(SS.main_df) == 0:
+        SS.main_df = None
 
 
 def check_dock_paths(input_path):
@@ -324,25 +339,34 @@ def plotly_plot(
     y, main_df, size=(1000, 500), x="step", trendline="median", trendline_only=False
 ):
     if y == "valid":
+        if x == "index":
+            x = "idx"
+            main_df = main_df.copy()
+            main_df.idx = (main_df.idx // 100) * 100
         tdf = (
-            main_df.groupby(["run", "step"])[y]
+            main_df.groupby(["run", x])[y]
             .agg(lambda x: (x == "true").mean())
             .reset_index()
         )
         fig = px.line(
             data_frame=tdf,
-            x="step",
+            x=x,
             y=y,
             range_y=(0, 1),
             color="run",
             template="plotly_white",
         )
         fig.update_layout(xaxis_title=x, yaxis_title=y)
+
     elif (y == "unique") or (y == "passes_diversity_filter"):
-        tdf = main_df.groupby(["run", "step"])[y].mean().reset_index()
+        if x == "index":
+            x = "idx"
+            main_df = main_df.copy()
+            main_df.idx = (main_df.idx // 100) * 100
+        tdf = main_df.groupby(["run", x])[y].mean().reset_index()
         fig = px.line(
             data_frame=tdf,
-            x="step",
+            x=x,
             y=y,
             range_y=(0, 1),
             color="run",

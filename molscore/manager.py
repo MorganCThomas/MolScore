@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,22 @@ class MolScore:
     """
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
+    presets = {
+        "Misc": resources.files("molscore.configs"),
+        "GuacaMol": resources.files("molscore.configs.GuacaMol"),
+        "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
+        "MolOpt": resources.files("molscore.configs.MolOpt"),
+        "MolExp": resources.files("molscore.configs.MolExp"),
+        "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
+        "5HT2A_Selectivity": resources.files(
+            "molscore.configs.5HT2A.PIDGIN_Selectivity"
+        ),
+        "5HT2A_Docking": resources.files(
+            "molscore.configs.5HT2A.Docking_Selectivity_rDock"
+        ),
+        "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
+        "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
+    }
 
     @staticmethod
     def load_config(task_config):
@@ -39,7 +56,7 @@ class MolScore:
     def __init__(
         self,
         model_name: str,
-        task_config: os.PathLike,
+        task_config: Union[str, os.PathLike],
         output_dir: str = None,
         add_run_dir: bool = True,
         run_name: str = None,
@@ -51,7 +68,7 @@ class MolScore:
     ):
         """
         :param model_name: Name of generative model, used for file naming and documentation
-        :param task_config: Path to task config file
+        :param task_config: Path to task config file, or a preset name e.g., GuacaMol:Albuterol_similarity
         :param output_dir: Overwrites the output directory specified in the task config file
         :param add_run_dir: Adds a run directory within the output directory
         :param run_name: Override the run name with a custom name, otherwise taken from 'task' in the config
@@ -61,7 +78,15 @@ class MolScore:
         :param termination_exit: Exit on termination of objective
         """
         # Load in configuration file (json)
-        self.cfg = self.load_config(task_config)
+        if task_config.endswith(".json"):
+            self.cfg = self.load_config(task_config)
+        else:
+            assert ":" in task_config, "Preset task must be in format 'category:task'"
+            cat, task = task_config.split(":", maxsplit=1)
+            assert cat in self.presets.keys(), f"Preset category {cat} not found"
+            task_config = self.presets[cat] / f"{task}.json"
+            assert task_config.exists(), f"Preset task {task} not found in {cat}"
+            self.cfg = self.load_config(task_config)
 
         # Here are attributes used
         self.model_name = model_name
@@ -83,6 +108,7 @@ class MolScore:
         self.monitor_app = None
         self.diversity_filter = None
         self.call2score_warning = True
+        self.metrics = None
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
 
         # Setup save directory
@@ -1009,6 +1035,7 @@ class MolScore:
         n_jobs=1,
         reference_smiles=None,
         benchmark=None,
+        recalculate=False,
     ):
         """
         Compute a suite of metrics
@@ -1018,32 +1045,37 @@ class MolScore:
         :param chemistry_filter_basic: Whether to apply basic chemistry filters
         :budget: Budget to compute metrics for
         :n_jobs: Number of jobs to use for parallelisation
-        :reference_smiles: List of target smiles to compute metrics for
+        :reference_smiles: List of target smiles to compute metrics in reference to
+        :recalculate: Whether to recompute metrics
         """
-        if endpoints is None:
-            endpoints = [self.cfg["scoring"]["method"]]
+        if self.metrics and not recalculate:
+            return self.metrics
         else:
-            assert all([ep in self.main_df.columns for ep in endpoints])
-        if thresholds is None:
-            thresholds = [0.0]
-        SM = ScoreMetrics(
-            scores=self.main_df,
-            budget=budget,
-            n_jobs=n_jobs,
-            reference_smiles=reference_smiles,
-            benchmark=benchmark,
-        )
-        results = SM.get_metrics(
-            endpoints=endpoints,
-            thresholds=thresholds,
-            chemistry_filter_basic=chemistry_filter_basic,
-        )
-        # Change the name of the default score to "Score"
-        results = {
-            k.replace(self.cfg["scoring"]["method"], "Score"): v
-            for k, v in results.items()
-        }
-        return results
+            if endpoints is None:
+                endpoints = [self.cfg["scoring"]["method"]]
+            else:
+                assert all([ep in self.main_df.columns for ep in endpoints])
+            if thresholds is None:
+                thresholds = [0.0]
+            SM = ScoreMetrics(
+                scores=self.main_df,
+                budget=budget,
+                n_jobs=n_jobs,
+                reference_smiles=reference_smiles,
+                benchmark=benchmark,
+            )
+            results = SM.get_metrics(
+                endpoints=endpoints,
+                thresholds=thresholds,
+                chemistry_filter_basic=chemistry_filter_basic,
+            )
+            # Change the name of the default score to "Score"
+            results = {
+                k.replace(self.cfg["scoring"]["method"], "Score"): v
+                for k, v in results.items()
+            }
+            self.metrics = results
+            return self.metrics
 
 
 class MolScoreBenchmark:
@@ -1051,6 +1083,11 @@ class MolScoreBenchmark:
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
+        "MolExp": resources.files("molscore.configs.MolExp"),
+        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
+        "MolExp-DF_baseline": resources.files("molscore.configs.MolExp-DF_baseline"),
+        "MolExp-DF": resources.files("molscore.configs.MolExp-DF"),
+        "MolExp-DF2": resources.files("molscore.configs.MolExp-DF2"),
         "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
         "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
         "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
@@ -1192,7 +1229,7 @@ class MolScoreBenchmark:
         # Compute results
         for MS in self.results:
             if MS.main_df is None:
-                print(f"Skipping summary of {MS.configs['task']} as no results found")
+                print(f"Skipping summary of {MS.cfg['task']} as no results found")
                 continue
             metrics = MS.compute_metrics(
                 endpoints=endpoints,

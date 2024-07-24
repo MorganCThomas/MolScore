@@ -630,16 +630,26 @@ class SubstructureFilters:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        with Pool(self.n_jobs) as pool:
-            match_substructure_p = partial(
+        match_substructure_p = partial(
                 self.match_substructure, smarts_filters=self.smarts
             )
+        if self.n_jobs <= 1:
             results = [
                 {
                     "smiles": smi,
                     f"{self.prefix}_substruct_filt": match,
                     f"{self.prefix}_substruct": subs,
                 }
-                for smi, match, subs in pool.imap(match_substructure_p, smiles)
+                for smi, match, subs in map(match_substructure_p, smiles)
             ]
+        else:
+            with Pool(self.n_jobs) as pool:
+                results = [
+                    {
+                        "smiles": smi,
+                        f"{self.prefix}_substruct_filt": match,
+                        f"{self.prefix}_substruct": subs,
+                    }
+                    for smi, match, subs in pool.imap(match_substructure_p, smiles)
+                ]
         return results

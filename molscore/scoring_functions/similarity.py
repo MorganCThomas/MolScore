@@ -1,15 +1,16 @@
-import argparse
 import logging
 import os
 from functools import partial
 from typing import Union
 
 import numpy as np
+from Levenshtein import distance as levenshtein
 
 from molscore.scoring_functions.utils import (
     Fingerprints,
     Pool,
     SimilarityMeasures,
+    canonize_smiles,
     get_mol,
     timedFunc2,
 )
@@ -98,6 +99,7 @@ class MolecularSimilarity:
         similarity_measure: str,
         thresh: float,
         method: str,
+        prefix: str,
     ):
         """
         Calculate the Tanimoto coefficient given a SMILES string and list of
@@ -128,8 +130,12 @@ class MolecularSimilarity:
                 sim = 0.0
         else:
             sim = 0.0
+            sim_vec = []
 
-        return smi, sim
+        result = {"smiles": smi, f"{prefix}_Sim": sim}
+        result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
+
+        return result
 
     def _score(self, smiles: list, **kwargs):
         """
@@ -138,8 +144,7 @@ class MolecularSimilarity:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        with Pool(self.n_jobs) as pool:
-            calculate_sim_p = partial(
+        calculate_sim_p = partial(
                 self.calculate_sim,
                 ref_fps=self.ref_fps,
                 fp=self.fp,
@@ -147,11 +152,13 @@ class MolecularSimilarity:
                 thresh=self.thresh,
                 similarity_measure=self.similarity_measure,
                 method=self.method,
+                prefix=self.prefix,
             )
-            results = [
-                {"smiles": smi, f"{self.prefix}_Sim": sim}
-                for smi, sim in pool.imap(calculate_sim_p, smiles)
-            ]
+        if self.n_jobs != 1:
+            with Pool(self.n_jobs) as pool:
+                results = [result for result in pool.imap(calculate_sim_p, smiles)]
+        else:
+            results = [calculate_sim_p(smi) for smi in smiles]
         return results
 
     def __call__(self, smiles: list, **kwargs):
@@ -164,9 +171,123 @@ class MolecularSimilarity:
         tfunc = timedFunc2(self._score, timeout=self.timeout)
         results = tfunc(smiles)
         if results is None:
-            logger.warning(f"Timeout of {self.timeout} reached for scoring, returning 0.0")
-            results = [{'smiles': smi, f"{self.prefix}_Sim": 0.0} for smi in smiles]
-        
+            logger.warning(
+                f"Timeout of {self.timeout} reached for scoring, returning 0.0"
+            )
+            results = [{"smiles": smi, f"{self.prefix}_Sim": 0.0} for smi in smiles]
+
+        return results
+
+
+class LevenshteinSimilarity(MolecularSimilarity):
+    """
+    Score structures based on the normalized Levenshtein similarity of provided SMILES string(s) to reference structure
+    """
+
+    return_metrics = ["Sim"]
+
+    def __init__(
+        self,
+        prefix: str,
+        ref_smiles: Union[list, str, os.PathLike],
+        thresh: float = None,
+        method: str = "mean",
+        n_jobs: int = 1,
+        timeout: int = 60,
+        **kwargs,
+    ):
+        """
+        :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param ref_smiles: List of SMILES or path to SMILES file with no header (.smi)
+        :param thresh: If provided check if similarity is above threshold, binarising the similarity coefficients
+        :param method: 'mean' or 'max' ('max' is equiv. singler nearest neighbour) [mean, max]
+        :param n_jobs: Number of python.multiprocessing jobs for multiprocessing
+        :param timeout: Timeout for the scoring to cease and return a score of 0.0
+        :param kwargs:
+        """
+
+        self.prefix = prefix.replace(" ", "_")
+        assert method in ["max", "mean"]
+        self.thresh = thresh
+        self.method = method
+        self.n_jobs = n_jobs
+        self.timeout = timeout
+
+        # If file path provided, load smiles.
+        if isinstance(ref_smiles, str):
+            with open(ref_smiles, "r") as f:
+                self.ref_smiles = f.read().splitlines()
+        else:
+            assert isinstance(ref_smiles, list) and (
+                len(ref_smiles) > 0
+            ), "None list or empty list provided"
+            self.ref_smiles = ref_smiles
+
+        # Canonicalize ref smiles
+        self.ref_smiles = [canonize_smiles(smi) for smi in self.ref_smiles]
+        if any([smi is None for smi in self.ref_smiles]):
+            raise ValueError("One or more reference smiles could not be canonicalized")
+
+    @staticmethod
+    def calculate_sim(
+        smi: str,
+        ref_smiles: list,
+        thresh: float,
+        method: str,
+        prefix: str,
+    ):
+        """
+        Calculate the Tanimoto coefficient given a SMILES string and list of
+         reference fps
+        :param smi: SMILES string
+        :param ref_smiles: list of reference smiles
+        :param thresh: If provided check if similarity is above threshold binarising the similarity coefficients
+        :param method: 'mean' or 'max'
+        :return: (SMILES, Normalized Levenshtein similarity)
+        """
+        sim_vec = []
+        if smi:
+            for ref in ref_smiles:
+                sim = 1 - (levenshtein(smi, ref) / max(len(smi), len(ref)))
+                sim_vec.append(sim)
+
+            if thresh:
+                sim_vec = [sim >= thresh for sim in sim_vec]
+
+            if method == "mean":
+                sim = float(np.mean(sim_vec))
+            elif method == "max":
+                sim = float(np.max(sim_vec))
+            else:
+                raise ValueError(f"Method {method} not recognised")
+        else:
+            sim = 0.0
+            sim_vec = []
+
+        result = {"smiles": smi, f"{prefix}_Sim": sim}
+        result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
+
+        return result
+
+    def _score(self, smiles: list, **kwargs):
+        """
+        Calculate scores for Tanimoto given a list of SMILES.
+        :param smiles: List of SMILES strings
+        :param kwargs: Ignored
+        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        """
+        calculate_sim_p = partial(
+                    self.calculate_sim,
+                    ref_smiles=self.ref_smiles,
+                    thresh=self.thresh,
+                    method=self.method,
+                    prefix=self.prefix,
+                )
+        if self.n_jobs != 1:
+            with Pool(self.n_jobs) as pool:
+                results = [result for result in pool.imap(calculate_sim_p, smiles)]
+        else:
+            results = [calculate_sim_p(smi) for smi in smiles]
         return results
 
 
@@ -215,119 +336,3 @@ class TanimotoSimilarity(MolecularSimilarity):
             n_jobs=n_jobs,
             **kwargs,
         )
-
-
-if __name__ == "__main__":
-    # Read in CLI arguments
-    parser = argparse.ArgumentParser(
-        description="Calculate the Maximum or Average Tanimoto similarity for a set of "
-        "molecules to a set of reference molecules",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    subparsers = parser.add_subparsers(title="Running mode", dest="mode")
-    run = subparsers.add_parser(
-        "run", formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    run.add_argument(
-        "--prefix", type=str, default="test", help="Prefix to returned metrics"
-    )
-    run.add_argument("--ref_smiles", help="Path to smiles file (.smi) for ref smiles")
-    run.add_argument(
-        "--query_smiles", help="Path to smiles file (.smi) for query smiles"
-    )
-    run.add_argument(
-        "--fp",
-        default="ECFP4",
-        help="What fingerprint to use",
-        choices=[
-            "ECFP4",
-            "ECFP4c",
-            "FCFP4",
-            "FCFP4c",
-            "ECFP6",
-            "ECFP6c",
-            "FCFP6",
-            "FCFP6c",
-            "Avalon",
-            "MACCSkeys",
-            "hashAP",
-            "hashTT",
-            "RDK5",
-            "RDK6",
-            "RDK7",
-        ],
-    )
-    run.add_argument("--bits", default=1024, help="Morgan fingerprint bit size")
-    run.add_argument(
-        "--similarity_measure",
-        default="Tanimoto",
-        help="What similarity measure to use",
-        choices=[
-            "AllBit",
-            "Asymmetric",
-            "BraunBlanquet",
-            "Cosine",
-            "McConnaughey",
-            "Dice",
-            "Kulczynski",
-            "Russel",
-            "OnBit",
-            "RogotGoldberg",
-            "Sokal",
-            "Tanimoto",
-        ],
-    )
-    run.add_argument(
-        "--method",
-        type=str,
-        choices=["mean", "max"],
-        default="mean",
-        help="Use mean or max similarity to ref smiles",
-    )
-    run.add_argument("--n_jobs", default=1, type=int, help="How many cores to use")
-    test = subparsers.add_parser("test")
-    args = parser.parse_args()
-
-    # Run mode
-    if args.mode == "run":
-        from molscore.tests import MockGenerator
-
-        mg = MockGenerator(seed_no=123)
-
-        if args.ref_smiles is None:
-            args.ref_smiles = mg.sample(10)
-
-        ts = TanimotoSimilarity(
-            prefix=args.prefix,
-            ref_smiles=args.ref_smiles,
-            fp=args.fp,
-            bits=args.bits,
-            similarity_measure=args.similarity_measure,
-            method=args.method,
-            n_jobs=args.n_jobs,
-        )
-
-        if args.query_smiles is None:
-            _ = [print(o) for o in ts(mg.sample(5))]
-        else:
-            with open(args.query_smiles, "r") as f:
-                qsmiles = f.read().splitlines()
-            _ = [print(o) for o in ts(qsmiles)]
-
-    # Test mode
-    elif args.mode == "test":
-        import sys
-        import unittest
-
-        from molscore.tests import test_tanimoto
-
-        # Remove CLI arguments
-        for i in range(len(sys.argv) - 1):
-            sys.argv.pop()
-        # Get and run tests
-        suite = unittest.TestLoader().loadTestsFromModule(test_tanimoto)
-        unittest.TextTestRunner().run(suite)
-
-    # Print usage
-    else:
-        print("Please specify running mode: 'run' or 'test'")

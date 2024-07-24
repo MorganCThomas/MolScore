@@ -3,6 +3,7 @@ import unittest
 
 from molscore.scoring_functions.similarity import (
     MolecularSimilarity,
+    LevenshteinSimilarity,
     TanimotoSimilarity,
 )
 from molscore.tests import BaseTests, MockGenerator
@@ -273,6 +274,28 @@ class TestSimilarityECFP4ThreshMaxParallel(BaseTests.TestScoringFunction):
         cls.input = mg.sample(5)
         cls.output = cls.inst(smiles=cls.input)
         print(f"Similarity Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+
+# ---- Test Levenshtein Similarity ----
+
+
+class TestLevenshteinSimilarity(BaseTests.TestScoringFunction):
+    @classmethod
+    def setUpClass(cls):
+        mg = MockGenerator(seed_no=123)
+        # Instantiate
+        cls.obj = LevenshteinSimilarity
+        cls.inst = LevenshteinSimilarity(
+            prefix="test",
+            ref_smiles=mg.sample(10),
+            n_jobs=1,
+        )
+        print("\nLevenshtein Similarity Input")
+        # Call
+        cls.input = mg.sample(5)
+        cls.output = cls.inst(smiles=cls.input)
+        print(f"Levenshtein Similarity Output:\n{json.dumps(cls.output, indent=2)}\n")
+
 
 
 if __name__ == "__main__":

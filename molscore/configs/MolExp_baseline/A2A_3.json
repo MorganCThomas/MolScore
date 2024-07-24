@@ -1,0 +1,48 @@
+{
+  "task": "A2A_3",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "scoring_functions": [
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "MolecularSimilarity",
+      "run": true,
+      "parameters": {
+        "prefix": "A2A",
+        "ref_smiles": [
+          "Cc1cc(cc(n1)Cl)c2c(nc(nn2)N)c3ccc(cc3)F"
+        ],
+        "fp": "ECFP4",
+        "bits": 1024,
+        "similarity_measure": "Tanimoto",
+        "method": "max",
+        "n_jobs": 1,
+        "timeout": 60
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "A2A_Sim",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": false
+  }
+}

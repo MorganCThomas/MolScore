@@ -29,6 +29,8 @@ if __name__ == "__main__":
         choices=[
             "GuacaMol",
             "MolOpt",
+            "MolExp",
+            "MolExp_baseline",
             "MolOpt-CF",
             "MolOpt-DF",
             "5HT2A_PhysChem",
