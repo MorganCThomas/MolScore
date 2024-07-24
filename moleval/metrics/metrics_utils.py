@@ -50,7 +50,11 @@ def mapper(n_jobs):
             context = multiprocessing.get_context("fork")
         else:
             context = multiprocess.get_context("spawn")
-        pool = context.Pool(n_jobs)
+
+        if "MOLEVAL_NJOBS" in os.environ.keys():
+            pool =  context.Pool(int(os.environ["MOLEVAL_NJOBS"]))
+        else:
+            pool = context.Pool(n_jobs)
 
         def _mapper(*args, **kwargs):
             try:
