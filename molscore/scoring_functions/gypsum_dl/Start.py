@@ -25,9 +25,9 @@ import os
 from datetime import datetime
 from collections import OrderedDict
 
-import molscore.utils.gypsum_dl.Utils as Utils
-from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
-from molscore.utils.gypsum_dl.Parallelizer import flatten_list
+import molscore.scoring_functions.gypsum_dl.Utils as Utils
+from molscore.scoring_functions.gypsum_dl.Parallelizer import Parallelizer
+from molscore.scoring_functions.gypsum_dl.Parallelizer import flatten_list
 
 try:
     from rdkit.Chem import AllChem
@@ -45,12 +45,12 @@ try:
 except:
     Utils.exception("You need to install scipy and its dependencies.")
 
-from molscore.utils.gypsum_dl.MolContainer import MolContainer
-from molscore.utils.gypsum_dl.Steps.SMILES.PrepareSmiles import prepare_smiles
-from molscore.utils.gypsum_dl.Steps.ThreeD.PrepareThreeD import prepare_3d
-from molscore.utils.gypsum_dl.Steps.IO.ProcessOutput import proccess_output
-from molscore.utils.gypsum_dl.Steps.IO.LoadFiles import load_smiles_file
-from molscore.utils.gypsum_dl.Steps.IO.LoadFiles import load_sdf_file
+from molscore.scoring_functions.gypsum_dl.MolContainer import MolContainer
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.PrepareSmiles import prepare_smiles
+from molscore.scoring_functions.gypsum_dl.Steps.ThreeD.PrepareThreeD import prepare_3d
+from molscore.scoring_functions.gypsum_dl.Steps.IO.ProcessOutput import proccess_output
+from molscore.scoring_functions.gypsum_dl.Steps.IO.LoadFiles import load_smiles_file
+from molscore.scoring_functions.gypsum_dl.Steps.IO.LoadFiles import load_sdf_file
 
 # see http://www.rdkit.org/docs/GettingStartedInPython.html#working-with-3d-molecules
 def prepare_molecules(args):

@@ -19,16 +19,16 @@ tautomeric, chiral forms, etc.
 
 import __future__
 
-from molscore.utils.gypsum_dl import Utils
-from molscore.utils.gypsum_dl.Steps.SMILES.DeSaltOrigSmiles import desalt_orig_smi
-from molscore.utils.gypsum_dl.Steps.SMILES.AddHydrogens import add_hydrogens
-from molscore.utils.gypsum_dl.Steps.SMILES.MakeTautomers import make_tauts
-from molscore.utils.gypsum_dl.Steps.SMILES.DurrantLabFilter import (
+from molscore.scoring_functions.gypsum_dl import Utils
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.DeSaltOrigSmiles import desalt_orig_smi
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.AddHydrogens import add_hydrogens
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.MakeTautomers import make_tauts
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.DurrantLabFilter import (
     durrant_lab_filters,
     durrant_lab_contains_bad_substr,
 )
-from molscore.utils.gypsum_dl.Steps.SMILES.EnumerateChiralMols import enumerate_chiral_molecules
-from molscore.utils.gypsum_dl.Steps.SMILES.EnumerateDoubleBonds import enumerate_double_bonds
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.EnumerateChiralMols import enumerate_chiral_molecules
+from molscore.scoring_functions.gypsum_dl.Steps.SMILES.EnumerateDoubleBonds import enumerate_double_bonds
 
 
 def prepare_smiles(contnrs, params):

@@ -19,11 +19,11 @@ molecules.
 
 from rdkit import Chem
 
-import molscore.utils.gypsum_dl.Parallelizer as Parallelizer
-import molscore.utils.gypsum_dl.Utils as Utils
-import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
-import molscore.utils.gypsum_dl.MyMol as MyMol
-import molscore.utils.gypsum_dl.MolContainer as MolCont
+import molscore.scoring_functions.gypsum_dl.Parallelizer as Parallelizer
+import molscore.scoring_functions.gypsum_dl.Utils as Utils
+import molscore.scoring_functions.gypsum_dl.ChemUtils as ChemUtils
+import molscore.scoring_functions.gypsum_dl.MyMol as MyMol
+import molscore.scoring_functions.gypsum_dl.MolContainer as MolCont
 
 from gypsum_dl.Steps.SMILES.dimorphite_dl.dimorphite_dl import Protonate
 

@@ -20,11 +20,11 @@ import __future__
 
 import random
 
-import molscore.utils.gypsum_dl.Parallelizer as Parallelizer
-import molscore.utils.gypsum_dl.Utils as Utils
-import molscore.utils.gypsum_dl.ChemUtils as ChemUtils
-import molscore.utils.gypsum_dl.MyMol as MyMol
-import molscore.utils.gypsum_dl.MolObjectHandling as MOH
+import molscore.scoring_functions.gypsum_dl.Parallelizer as Parallelizer
+import molscore.scoring_functions.gypsum_dl.Utils as Utils
+import molscore.scoring_functions.gypsum_dl.ChemUtils as ChemUtils
+import molscore.scoring_functions.gypsum_dl.MyMol as MyMol
+import molscore.scoring_functions.gypsum_dl.MolObjectHandling as MOH
 
 try:
     from rdkit import Chem
@@ -32,7 +32,7 @@ except:
     Utils.exception("You need to install rdkit and its dependencies.")
 
 try:
-    from molscore.utils.gypsum_dl.molvs import tautomer
+    from molscore.scoring_functions.gypsum_dl.molvs import tautomer
 except:
     Utils.exception("You need to install molvs and its dependencies.")
 

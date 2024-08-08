@@ -17,7 +17,7 @@ A module for loading in files.
 """
 
 import __future__
-from molscore.utils.gypsum_dl import Utils
+from molscore.scoring_functions.gypsum_dl import Utils
 
 try:
     from rdkit import Chem

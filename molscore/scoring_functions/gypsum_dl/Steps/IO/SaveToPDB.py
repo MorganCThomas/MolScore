@@ -23,7 +23,7 @@ import sys
 import os
 from os.path import basename
 
-from molscore.utils.gypsum_dl import Utils
+from molscore.scoring_functions.gypsum_dl import Utils
 import rdkit
 import rdkit.Chem as Chem
 

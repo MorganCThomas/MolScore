@@ -25,6 +25,6 @@
 #gypsum_top_dir = os.path.dirname(gypsum_gypsum_dir)
 #sys.path.extend([current_dir, Steps, gypsum_gypsum_dir, gypsum_top_dir])
 
-import molscore.utils.gypsum_dl.Steps.SMILES
-import molscore.utils.gypsum_dl.Steps.ThreeD
-import molscore.utils.gypsum_dl.Steps.IO
+import molscore.scoring_functions.gypsum_dl.Steps.SMILES
+import molscore.scoring_functions.gypsum_dl.Steps.ThreeD
+import molscore.scoring_functions.gypsum_dl.Steps.IO

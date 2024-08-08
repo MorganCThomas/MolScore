@@ -18,11 +18,11 @@ Runs the 3D preparation process.
 
 import __future__
 
-from molscore.utils.gypsum_dl.Steps.ThreeD.Convert2DTo3D import convert_2d_to_3d
-from molscore.utils.gypsum_dl.Steps.ThreeD.GenerateAlternate3DNonaromaticRingConfs import (
+from molscore.scoring_functions.gypsum_dl.Steps.ThreeD.Convert2DTo3D import convert_2d_to_3d
+from molscore.scoring_functions.gypsum_dl.Steps.ThreeD.GenerateAlternate3DNonaromaticRingConfs import (
     generate_alternate_3d_nonaromatic_ring_confs,
 )
-from molscore.utils.gypsum_dl.Steps.ThreeD.Minimize3D import minimize_3d
+from molscore.scoring_functions.gypsum_dl.Steps.ThreeD.Minimize3D import minimize_3d
 
 
 def prepare_3d(contnrs, params):
