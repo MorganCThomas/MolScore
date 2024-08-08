@@ -9,9 +9,9 @@ from rdkit.Chem.EnumerateStereoisomers import (
 )
 
 from molscore.scoring_functions.utils import get_mol, timedFunc2, timedSubprocess
-from molscore.utils.gypsum_dl.MolContainer import MolContainer
-from molscore.utils.gypsum_dl.Parallelizer import Parallelizer
-from molscore.utils.gypsum_dl.Start import add_mol_id_props, prepare_3d, prepare_smiles
+from molscore.scoring_functions.gypsum_dl.MolContainer import MolContainer
+from molscore.scoring_functions.gypsum_dl.Parallelizer import Parallelizer
+from molscore.scoring_functions.gypsum_dl.Start import add_mol_id_props, prepare_3d, prepare_smiles
 
 # Protonation states: LigPrep / Epik / Moka / GypsumDL (Substruct Dist) / OBabel? / OpenEye?
 # Tautomers: LigPrep / Epik / Moka / GypsumDL (MolVS)

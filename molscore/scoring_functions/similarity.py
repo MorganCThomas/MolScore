@@ -144,8 +144,7 @@ class MolecularSimilarity:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        with Pool(self.n_jobs) as pool:
-            calculate_sim_p = partial(
+        calculate_sim_p = partial(
                 self.calculate_sim,
                 ref_fps=self.ref_fps,
                 fp=self.fp,
@@ -155,7 +154,11 @@ class MolecularSimilarity:
                 method=self.method,
                 prefix=self.prefix,
             )
-            results = [result for result in pool.imap(calculate_sim_p, smiles)]
+        if self.n_jobs != 1:
+            with Pool(self.n_jobs) as pool:
+                results = [result for result in pool.imap(calculate_sim_p, smiles)]
+        else:
+            results = [calculate_sim_p(smi) for smi in smiles]
         return results
 
     def __call__(self, smiles: list, **kwargs):
@@ -273,15 +276,18 @@ class LevenshteinSimilarity(MolecularSimilarity):
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        with Pool(self.n_jobs) as pool:
-            calculate_sim_p = partial(
-                self.calculate_sim,
-                ref_smiles=self.ref_smiles,
-                thresh=self.thresh,
-                method=self.method,
-                prefix=self.prefix,
-            )
-            results = [result for result in pool.imap(calculate_sim_p, smiles)]
+        calculate_sim_p = partial(
+                    self.calculate_sim,
+                    ref_smiles=self.ref_smiles,
+                    thresh=self.thresh,
+                    method=self.method,
+                    prefix=self.prefix,
+                )
+        if self.n_jobs != 1:
+            with Pool(self.n_jobs) as pool:
+                results = [result for result in pool.imap(calculate_sim_p, smiles)]
+        else:
+            results = [calculate_sim_p(smi) for smi in smiles]
         return results
 
 

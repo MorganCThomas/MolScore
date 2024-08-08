@@ -242,7 +242,7 @@ class TestSimilarityECFP4ThreshMeanParallel(BaseTests.TestScoringFunction):
         cls.obj = MolecularSimilarity
         cls.inst = MolecularSimilarity(
             prefix="test",
-            ref_smiles=mg.sample(1000),
+            ref_smiles=mg.sample(100),
             fp="ECFP4",
             thresh=0.35,
             method="mean",
@@ -263,7 +263,7 @@ class TestSimilarityECFP4ThreshMaxParallel(BaseTests.TestScoringFunction):
         cls.obj = MolecularSimilarity
         cls.inst = MolecularSimilarity(
             prefix="test",
-            ref_smiles=mg.sample(1000),
+            ref_smiles=mg.sample(100),
             fp="ECFP4",
             thresh=0.35,
             method="max",

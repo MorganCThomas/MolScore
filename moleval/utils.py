@@ -22,12 +22,12 @@ from rdkit.Chem import (
     rdMolDescriptors,
     rdmolops,
 )
-from rdkit.Chem.MolStandardize import Standardizer
 from rdkit.ML.Cluster import Butina
 from torch import cuda
 from tqdm import tqdm
 
 from moleval.metrics.metrics_utils import get_mol, mol_passes_filters
+from moleval.molvs import Standardizer
 
 
 def disable_rdkit_log():
