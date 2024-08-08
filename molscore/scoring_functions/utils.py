@@ -57,7 +57,12 @@ def Pool(*args):
         context = multiprocessing.get_context("fork")
     else:
         context = multiprocessing.get_context("spawn")
-    return context.Pool(*args)
+
+    # Extract from environment as default, overriding configs
+    if "MOLSCORE_NJOBS" in os.environ.keys():
+        return context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
+    else:
+        return context.Pool(*args)
 
 
 def test_func():
