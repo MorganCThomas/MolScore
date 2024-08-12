@@ -27,6 +27,7 @@ class MolScore:
     """
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
+
     presets = {
         "Misc": resources.files("molscore.configs"),
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
@@ -64,6 +65,7 @@ class MolScore:
         termination_threshold: int = None,
         termination_patience: int = None,
         termination_exit: bool = False,
+        score_invalids: bool = False,
         **kwargs,
     ):
         """
@@ -99,6 +101,7 @@ class MolScore:
         )
         self.termination_counter = 0
         self.termination_exit = termination_exit
+        self.score_invalids = score_invalids
         self.finished = False
         self.init_time = time.time()
         self.results_df = None
@@ -877,24 +880,38 @@ class MolScore:
         )
 
         # Subset only unique and valid smiles
-        if recalculate:
-            smiles_to_process = self.batch_df.loc[
-                self.batch_df.valid.isin(["true", "sanitized"]), "smiles"
-            ].tolist()
-            smiles_to_process_index = self.batch_df.loc[
-                self.batch_df.valid.isin(["true", "sanitized"]), "batch_idx"
-            ].tolist()
+        if self.score_invalids:
+            if recalculate:
+                smiles_to_process = self.batch_df.loc[:, "smiles"].tolist()
+                smiles_to_process_index = self.batch_df.loc[:, "batch_idx"].tolist()
+            else:
+                smiles_to_process = self.batch_df.loc[
+                    (self.batch_df.unique == "true"),
+                    "smiles",
+                ].tolist()
+                smiles_to_process_index = self.batch_df.loc[
+                    (self.batch_df.unique == "true"),
+                    "batch_idx",
+                ].tolist()
         else:
-            smiles_to_process = self.batch_df.loc[
-                (self.batch_df.valid.isin(["true", "sanitized"]))
-                & (self.batch_df.unique == "true"),
-                "smiles",
-            ].tolist()
-            smiles_to_process_index = self.batch_df.loc[
-                (self.batch_df.valid.isin(["true", "sanitized"]))
-                & (self.batch_df.unique == "true"),
-                "batch_idx",
-            ].tolist()
+            if recalculate:
+                smiles_to_process = self.batch_df.loc[
+                    self.batch_df.valid.isin(["true", "sanitized"]), "smiles"
+                ].tolist()
+                smiles_to_process_index = self.batch_df.loc[
+                    self.batch_df.valid.isin(["true", "sanitized"]), "batch_idx"
+                ].tolist()
+            else:
+                smiles_to_process = self.batch_df.loc[
+                    (self.batch_df.valid.isin(["true", "sanitized"]))
+                    & (self.batch_df.unique == "true"),
+                    "smiles",
+                ].tolist()
+                smiles_to_process_index = self.batch_df.loc[
+                    (self.batch_df.valid.isin(["true", "sanitized"]))
+                    & (self.batch_df.unique == "true"),
+                    "batch_idx",
+                ].tolist()
         if len(smiles_to_process) == 0:
             # If no smiles to process then instead submit 10 (scoring function should handle invalid)
             logger.info("    No smiles to score so submitting first 10 SMILES")
@@ -1115,6 +1132,7 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        score_invalids=False,
         **kwargs,
     ):
         """
@@ -1141,6 +1159,7 @@ class MolScoreBenchmark:
         self.budget = budget
         self.configs = []
         self.results = []
+        self.score_invalids = score_invalids
         self.next = 0
         atexit.register(self._summarize)
 
@@ -1208,6 +1227,7 @@ class MolScoreBenchmark:
                 output_dir=self.output_dir,
                 budget=self.budget,
                 termination_exit=False,
+                score_invalids=self.score_invalids,
             )
             self.results.append(MS)
             yield MS

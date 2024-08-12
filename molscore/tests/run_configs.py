@@ -17,6 +17,7 @@ def main(configs: list):
             model_name="test",
             task_config=config,
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
+            score_invalids=False,
         )
         # Score 5 smiles 5 times
         for i in tqdm(range(5)):
