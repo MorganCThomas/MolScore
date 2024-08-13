@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+import warnings
 from typing import Union
 
 import numpy as np
@@ -27,6 +28,7 @@ class MolScore:
     """
     Central manager class that, when called, takes in a list of SMILES and returns respective scores.
     """
+
     presets = {
         "Misc": resources.files("molscore.configs"),
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
@@ -64,6 +66,8 @@ class MolScore:
         termination_threshold: int = None,
         termination_patience: int = None,
         termination_exit: bool = False,
+        replay_size: int = None,
+        replay_purge: bool = True,
         **kwargs,
     ):
         """
@@ -76,6 +80,8 @@ class MolScore:
         :param termination_threshold: Threshold for early stopping based on the score
         :param termination_patience: Number of steps with no improvement, or that a termination_threshold has been reached for
         :param termination_exit: Exit on termination of objective
+        :param replay_size: Maximum size of the replay buffer
+        :param replay_purge: Whether to purge the replay buffer, i.e., only allow molecules that pass the diversity filter
         """
         # Load in configuration file (json)
         if task_config.endswith(".json"):
@@ -99,6 +105,9 @@ class MolScore:
         )
         self.termination_counter = 0
         self.termination_exit = termination_exit
+        self.replay_size = replay_size
+        self.replay_purge = replay_purge
+        self.replay_df = pd.DataFrame()
         self.finished = False
         self.init_time = time.time()
         self.results_df = None
@@ -222,6 +231,14 @@ class MolScore:
                         ),
                     ].to_dict("records"),
                 )
+            # Load in replay buffer
+            if os.path.exists(os.path.join(self.save_dir, "replay_buffer.csv")):
+                logger.info("Loading replay_buffer.csv from previous run")
+                self.replay_df = pd.read_csv(
+                    os.path.join(self.save_dir, "replay_buffer.csv"),
+                    index_col=0,
+                    dtype={"Unnamed: 0": "int64", "valid": object, "unique": object},
+                )
 
         # Registor write_scores and kill_monitor at close
         atexit.register(self.write_scores)
@@ -233,6 +250,7 @@ class MolScore:
         task_config: str = None,
         reset_diversity_filter: bool = True,
         reset_termination_criteria: bool = False,
+        reset_replay_buffer: bool = False,
     ):
         """
         Set or reset the overall configuration for scoring, but not logging.
@@ -326,6 +344,10 @@ class MolScore:
             if self.cfg.get("termination_exit", None):
                 self.termination_exit = self.cfg.get("termination_exit", False)
             self.termination_counter = 0
+
+        # Reset replay buffer
+        if reset_replay_buffer:
+            self.replay_df = pd.DataFrame()
 
         # Add warning in case of possible neverending optimization
         if self.termination_threshold and not self.budget:
@@ -669,6 +691,8 @@ class MolScore:
             self.diversity_filter.savetocsv(
                 os.path.join(self.save_dir, "scaffold_memory.csv")
             )
+        if not self.replay_df.empty:
+            self.replay_df.to_csv(os.path.join(self.save_dir, "replay_buffer.csv"))
 
         self.fh.close()
 
@@ -682,6 +706,10 @@ class MolScore:
             ):
                 self.diversity_filter.savetocsv(
                     os.path.join(self.save_dir, f"scaffold_memory_{step}.csv")
+                )
+            if not self.replay_df.empty:
+                self.replay_df.to_csv(
+                    os.path.join(self.save_dir, f"replay_buffer_{step}.csv")
                 )
             self.batch_df.to_csv(os.path.join(self.save_dir, f"batch_df_{step}.csv"))
             self.exists_df.to_csv(os.path.join(self.save_dir, f"exists_df_{step}.csv"))
@@ -792,6 +820,27 @@ class MolScore:
 
         if self.termination_exit and self.finished:
             sys.exit(1)
+
+    def update_replay_buffer(self, df):
+        df = df.copy()
+        # Purge df
+        if self.replay_purge:
+            if self.diversity_filter:
+                df = df.loc[df.passes_diversity_filter, :]
+            else:
+                logger.warn(
+                    "Cannot purge replay buffer without a running diversity filter"
+                )
+        # Concat
+        self.replay_df = pd.concat([self.replay_df, df], axis=0)
+        # Drop_duplicates
+        self.replay_df.drop_duplicates(subset="smiles", inplace=True)
+        # Sort
+        self.replay_df.sort_values(
+            by=self.cfg["scoring"]["method"], ascending=False, inplace=True
+        )
+        # Prune
+        self.replay_df = self.replay_df.iloc[: self.replay_size, :]
 
     def score_only(self, smiles: list, step: int = None, flt: bool = False):
         batch_start = time.time()
@@ -946,9 +995,7 @@ class MolScore:
         if isinstance(self.main_df, pd.core.frame.DataFrame):
             # update indexing based on most recent index
             self.batch_df.index = self.batch_df.index + self.main_df.index[-1] + 1
-            self.main_df = pd.concat(
-                [self.main_df, self.batch_df], axis=0
-            )  # self.main_df.append(self.batch_df)
+            self.main_df = pd.concat([self.main_df, self.batch_df], axis=0)
         else:
             self.main_df = self.batch_df.copy()
 
@@ -956,6 +1003,13 @@ class MolScore:
         self.batch_df.to_csv(
             os.path.join(self.save_dir, "iterations", f"{self.step:06d}_scores.csv")
         )
+
+        # Update replay buffer
+        if self.replay_size:
+            import pdb
+
+            pdb.set_trace()
+            self.update_replay_buffer(self.batch_df)
 
         # Start dash_utils monitor to track iteration files once first one is written!
         if self.monitor_app is True:
@@ -981,6 +1035,8 @@ class MolScore:
                 self.diversity_filter.savetocsv(
                     os.path.join(self.save_dir, "scaffold_memory.csv")
                 )
+            if not self.replay_df.empty:
+                self.replay_df.to_csv(os.path.join(self.save_dir, "replay_buffer.csv"))
 
         # Clean up class
         self.evaluate_finished()
@@ -1012,9 +1068,6 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return
         :return: Scores (either float list or np.array)
         """
-        # if self.call2score_warning:
-        #    logger.warning(f'Calling MolScore directly will be removed in the future, please use .score() instead.')
-        #    self.call2score_warning = False
         return self.score(
             smiles=smiles,
             step=step,
@@ -1024,7 +1077,24 @@ class MolScore:
             additional_formats=additional_formats,
         )
 
-    # Additional methods only run if called directly
+    # ----- Additional methods only run if called directly -----
+    def replay(self, n, augment: bool = False) -> Union[list, list]:
+        """
+        Sample n molecules from the replay buffer
+        :param n: Number of molecules to sample
+        :param augment: Whether to augment the replay buffer by randomizing the smiles
+        :return: List of SMILES and scores
+        """
+        if n > len(self.replay_df):
+            n = len(self.replay_df)
+        # Sample n from buffer
+        sample_df = self.replay_df.sample(n=n)
+        smiles = sample_df.smiles.tolist()
+        scores = sample_df[self.cfg["scoring"]["method"]].tolist()
+        # Augment
+        if augment:
+            smiles = utils.augment_smiles(smiles)
+        return smiles, scores
 
     def compute_metrics(
         self,
@@ -1106,6 +1176,8 @@ class MolScoreBenchmark:
         model_name: str,
         output_dir: os.PathLike,
         budget: int,
+        replay_size: int = None,
+        replay_purge: bool = True,
         add_benchmark_dir: bool = True,
         model_parameters: dict = {},
         benchmark: str = None,
@@ -1120,6 +1192,8 @@ class MolScoreBenchmark:
         :param model_name: Name of model to run
         :param output_dir: Directory to save results to
         :param budget: Budget number of molecules to run MolScore task for
+        :param replay_size: Size of replay buffer to store top scoring molecules
+        :param replay_purge: Whether to purge replay buffer based on diversity filter
         :param add_benchmark_dir: Whether to add benchmark directory to output directory
         :param model_parameters: Parameters of the model for record
         :param benchmark: Name of benchmark to run
@@ -1137,6 +1211,8 @@ class MolScoreBenchmark:
         self.include = include
         self.exclude = exclude
         self.budget = budget
+        self.replay_size = replay_size
+        self.replay_purge = replay_purge
         self.configs = []
         self.results = []
         self.next = 0
@@ -1206,6 +1282,8 @@ class MolScoreBenchmark:
                 output_dir=self.output_dir,
                 budget=self.budget,
                 termination_exit=False,
+                replay_size=self.replay_size,
+                replay_purge=self.replay_purge,
             )
             self.results.append(MS)
             yield MS
@@ -1279,6 +1357,9 @@ class MolScoreCurriculum(MolScore):
         budget: int = None,
         termination_threshold: float = None,
         termination_patience: int = None,
+        replay_size: int = None,
+        replay_purge: bool = True,
+        reset_replay_buffer: bool = False,
         benchmark: str = None,
         custom_benchmark: os.PathLike = None,
         custom_tasks: list = [],
@@ -1296,6 +1377,9 @@ class MolScoreCurriculum(MolScore):
         :param budget: Budget number of molecules to run each MolScore task for
         :param termination_threshold: Threshold to terminate MolScore task
         :param termination_patience: Number of steps to wait before terminating MolScore task
+        :param replay_size: Size of replay buffer to store top scoring molecules
+        :param replay_purge: Whether to purge replay buffer based on diversity filter
+        :param reset_replay_buffer: Whether to reset replay buffer between tasks
         :param benchmark: Name of benchmark to run
         :param custom_benchmark: Path to custom benchmark directory containing configs
         :param custom_tasks: List of custom tasks to run
@@ -1307,6 +1391,9 @@ class MolScoreCurriculum(MolScore):
         self.budget = budget
         self.termination_threshold = termination_threshold
         self.termination_patience = termination_patience
+        self.replay_size = replay_size
+        self.replay_purge = replay_purge
+        self.reset_replay_buffer = reset_replay_buffer
         # If any termination criteria is set here, this is propogated to all tasks
         self.reset_from_config = not any(
             [budget, termination_threshold, termination_patience]
@@ -1384,6 +1471,8 @@ class MolScoreCurriculum(MolScore):
             termination_threshold=self.termination_threshold,
             termination_patience=self.termination_patience,
             termination_exit=False,
+            replay_size=self.replay_size,
+            replay_purge=self.replay_purge,
         )
 
     def score(self, *args, **kwargs):
@@ -1395,6 +1484,7 @@ class MolScoreCurriculum(MolScore):
                 self._set_objective(
                     task_config=self.configs.pop(0),
                     reset_termination_criteria=self.reset_from_config,
+                    reset_replay_buffer=self.reset_replay_buffer,
                 )
                 self.finished = False
                 self.termination_counter = 0
