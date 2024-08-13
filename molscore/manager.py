@@ -1006,9 +1006,6 @@ class MolScore:
 
         # Update replay buffer
         if self.replay_size:
-            import pdb
-
-            pdb.set_trace()
             self.update_replay_buffer(self.batch_df)
 
         # Start dash_utils monitor to track iteration files once first one is written!

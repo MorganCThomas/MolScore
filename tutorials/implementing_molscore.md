@@ -199,12 +199,7 @@ Then, at any time, you can use the `replay` method to sample `n` molecules from 
 ```python
 smiles, scores = ms.replay(n=20, augment=False)
 ```
-**Note**: Passing `augment=True` will provide a randomized version of the smiles for [data augmentation](https://arxiv.org/abs/2210.12458).
+**Note**: Passing `augment=True` will provide a randomized version of the smiles for [data augmentation](https://arxiv.org/abs/2210.12458), the underlying function can be found in `from molscore.utils import augment_smiles`.
 
 **How does this work with MolScoreBenchmark?** Well this simple creates a buffer for every task.  
 **How does this work with MolScoreCurriculum?** This creates a shared buffer accross tasks that will be updated, to reset the buffer between tasks set `reset_replay_buffer=True` during instantion.
-
-
-
-
-
