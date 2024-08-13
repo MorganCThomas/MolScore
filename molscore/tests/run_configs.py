@@ -18,6 +18,7 @@ def main(configs: list):
             task_config=config,
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
             score_invalids=False,
+            replay_size=0,
         )
         # Score 5 smiles 5 times
         for i in tqdm(range(5)):
