@@ -1,4 +1,4 @@
-__all__ = ["MockGenerator", "all_score_modifiers", "all_score_methods"]
+__all__ = ["MockGenerator", "all_score_modifiers", "all_score_methods", "augment_smiles"]
 
 from molscore.utils.aggregation_functions import (
     DynamicProd,
@@ -20,6 +20,7 @@ from molscore.utils.transformation_functions import (
     sigmoid,
     step,
 )
+from molscore.utils.chem_utils import augment_smiles
 
 all_score_modifiers = [raw, norm, step, gauss, lin_thresh, sigmoid]
 

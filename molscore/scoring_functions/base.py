@@ -173,7 +173,7 @@ class BaseServerSF:
 
     def send_smiles_to_server(self, smiles):
         payload = {"smiles": smiles}
-        logger.debug(f"Sending payload to server: {payload}")
+        #logger.debug(f"Sending payload to server: {payload}")
         try:
             response = requests.post(self.server_url + "/", json=payload)
         except requests.exceptions.ConnectionError as e:
@@ -193,7 +193,7 @@ class BaseServerSF:
                 {f"{self.prefix}_{k}" if k != "smiles" else k: v for k, v in r.items()}
                 for r in results
             ]
-            logger.debug(f"Result from server: {results}")
+            #logger.debug(f"Result from server: {results}")
         else:
             results = [{"smiles": smi} for smi in smiles]
             _ = [
