@@ -4,17 +4,28 @@ Once MolScore has been integrated into a generative model (see [here](implementi
 
 ## The configuration GUI
 
-As MolScore now contains several options and parameters, the number of configurations is large and dependent on the scoring function being run. To help with the process of writing the config, a GUI is available that reads the docstrings and provides documentation and defaults. This can be run with via the following command.
+As MolScore now contains several options and parameters, the number of configurations is large and dependent on the scoring function being run. To help with the process of writing the config, a GUI is available that reads the docstrings and provides documentation and defaults. This can be run with via the following command (which is just a wrapper of `streamlit run molscore/gui/config.py`).
 
     molscore_config
-
-Which is just a wrapper of ...
-
-    streamlit run molscore/gui/config.py
 
 This launches a GUI in your browser that walksthrough the definition of these configuration files. The underlying file structure is described [below](#the-configuration-file).
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/config_v1_albuterol.png?raw=True)
+
+## Using MolScore GUI remotely
+If you use MolScore on a remote server you can use SSH to listen to the remote port that the GUI is running on, and view it locally.
+
+On your local machine, run the following command to setup your local port to listen to your remote port.
+
+    ssh -L <local_port>:<local_host>:<remote_port> <remote_host>
+
+For example, Streamlit GUIs typically run on port 8501, therefore I use use the following command. Remember to replace your remote host name.
+
+    ssh -4 -NL 8501:localhost:8501 remote_host
+
+-4 Forces connections using IPv4 addresses only  
+-N Redirects stdin from /dev/null, which prevents reading from stdin  
+-L Redirects data from the specified local port  
 
 ## The configuration file
 
@@ -69,6 +80,20 @@ For example, see the following config file to calculate the QED.
     }
 }
 ```
+
+## A note on transformation functions
+
+MolScore provides transformation functions to transform the measured metrics $x$ to an output $x'\in [0,1]$. If you use the GUI, a list of the available metrics from the scoring functions will be automatically populated. If a metric is already between 0 and 1, or you don't wish to transform it, you can simply set `"modified": "raw"`. Otherwise, the following functions are available and parameters annotated in the image below (apologies for the handwriting).
+
+Note there should be *no capitilization* of modifier values or parameter keys, and the following modifier names should be used in the JSON:
+- Normalize -> norm
+- Step threshold -> step
+- Linear threshold -> lin_thresh
+- Gaussian -> gauss
+
+![alt text](https://github.com/MorganCThomas/MolScore/blob/main/molscore/data/images/transformation_functions.png?raw=True)
+
+## Osimertinib MPO example
 
 Now lets move to another example that include multiple parameters and transformation functions, so we will re-implement Osimertinib_MPO from the GuacaMol benchmark.
 
