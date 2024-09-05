@@ -17,7 +17,7 @@
           "CC1=C(C(=CC=C1)C)NC(=O)CN2CCN(CC2)CC(COC3=CC=CC=C3OC)O"
         ],
         "fp": "AP",
-        "bits": 1024,
+        "bits": 16384,
         "similarity_measure": "Tanimoto",
         "method": "mean",
         "n_jobs": 1
