@@ -24,6 +24,12 @@ from moleval.metrics.metrics_utils import compute_fragments, average_agg_tanimot
     compute_scaffolds, fingerprints, numpy_fps_to_bitvectors, sphere_exclusion,\
     get_mol, canonic_smiles, mol_passes_filters, analogues_tanimoto, compute_functional_groups, compute_ring_systems
 
+try:
+    from moleval.metrics import PoseCheck
+    _posecheck_available = True
+except Exception:
+    _posecheck_available = False
+
 
 class GetMetrics(object):
     """
@@ -83,7 +89,7 @@ class GetMetrics(object):
     """
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
                  test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
-                 target=None, ptarget=None, run_fcd=True, normalize=True, cumulative=False):
+                 target=None, ptarget=None, target_structure=None, run_fcd=True, normalize=True, cumulative=False):
         """
         Prepare to calculate metrics by declaring reference datasets and running pre-statistics
         """
@@ -115,6 +121,8 @@ class GetMetrics(object):
         self.ptest_scaffolds = ptest_scaffolds
         self.ptrain = ptrain
         self.ptarget = ptarget
+        # Posecheck target structure
+        self.target_structure = target_structure
         # Later defined
         self.kwargs = None
         self.kwargs_fcd = None
@@ -151,7 +159,15 @@ class GetMetrics(object):
             self.target_sw = SillyWalks(reference_mols=self.target, n_jobs=self.n_jobs)
             if not self.ptarget: self.ptarget = self.target_int.get('FCD')
 
-    def calculate(self, gen, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
+        # Initialize posecheck
+        if self.target_structure:
+            if _posecheck_available:
+                self.posecheck = PoseCheck()
+                self.posecheck.load_protein_from_pdb(self.target_structure)
+            else:
+                warnings.warn("PoseCheck: currently unavailable due to import error")
+
+    def calculate(self, gen, gen_mols=None, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
         """
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles
@@ -166,7 +182,7 @@ class GetMetrics(object):
         metrics['#'] = len(gen)
 
         if verbose: print("Calculating Validity & Uniqueness")
-        gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, prev_gen=self.prev_gen, n_jobs=self.n_jobs)
+        gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, prev_gen=self.prev_gen, n_jobs=self.n_jobs, gen_mols=gen_mols)
 
         # ----- Intrinsic properties -----
 
@@ -174,7 +190,7 @@ class GetMetrics(object):
         if calc_valid and self.normalize: metrics['Validity'] = fraction_valid
         metrics['# valid'] = n_valid
 
-        # ReportuUniqueness
+        # Report Uniqueness
         if calc_unique and self.normalize: metrics['Uniqueness'] = fraction_unique
         metrics['# valid & unique'] = len(gen)
 
@@ -233,6 +249,14 @@ class GetMetrics(object):
 
         # Calculate purchasability
         metrics['Purchasable_ZINC20'] = np.mean(mapper(self.pool)(buy, gen)) if self.normalize else np.sum(mapper(self.pool)(buy, gen))
+
+        # ---- PoseCheck metrics ----
+        if self.target_structure and _posecheck_available:
+            if verbose: print("Calculating PoseCheck metrics")
+            self.posecheck.load_ligands(gen)
+            metrics['PC_Clashes'] = np.mean(self.posecheck.calculate_clashes())
+            metrics['PC_StrainEnergy'] = np.mean(self.posecheck.calculate_strain_energy())
+            metrics['PC_Interactions'] = np.mean(self.posecheck.calculate_interactions())
 
         # ---- Extrinsic properties ----
 
@@ -538,13 +562,16 @@ def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
     else:
         return np.sum(f_)
     
-def preprocess_gen(gen, prev_gen=[], canonize=True, n_jobs=1):
+def preprocess_gen(gen, prev_gen=[], canonize=True, n_jobs=1, gen_mols=None):
     """
     Convert to valid, unique and return mols in one function (save compute redundancy)
     :return: (gen, mols, n_valid, fraction_valid, fraction_unique)
     """
     # Convert to mols
-    mols = mapper(n_jobs)(get_mol, gen)
+    if gen_mols:
+        mols = gen_mols
+    else:
+        mols = mapper(n_jobs)(get_mol, gen)
     fraction_invalid = 1 - mols.count(None) / len(mols)
     n_valid = len(mols) - mols.count(None)
     # Remove invalid
