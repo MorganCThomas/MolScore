@@ -1168,6 +1168,7 @@ class MolScoreBenchmark:
         "MolOpt": resources.files("molscore.configs.MolOpt"),
         "MolExp": resources.files("molscore.configs.MolExp"),
         "MolExpL": resources.files("molscore.configs.MolExpL"),
+        "MolExpL": resources.files("molscore.configs.MolExpL-DF"),
         "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
         "MolExpL_baseline": resources.files("molscore.configs.MolExpL_baseline"),
         "MolExp-DF_baseline": resources.files("molscore.configs.MolExp-DF_baseline"),
