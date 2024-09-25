@@ -357,13 +357,14 @@ class MolScore:
                 "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
             )
 
-    def parse_smiles(self, smiles: list, step: int):
+    def parse_smiles(self, smiles: list, step: int, canonicalize: bool = True):
         """
         Create batch_df object from initial list of SMILES and calculate validity and
         intra-batch uniqueness
 
         :param smiles: List of smiles taken from generative model
         :param step: current generative model step
+        :param canonicalize: Whether to canonicalize smiles before scoring
         """
         # Initialize df for batch
         self.batch_df = pd.DataFrame(index=range(len(smiles)))
@@ -375,14 +376,20 @@ class MolScore:
         for i, smi in enumerate(smiles):
             try:
                 can_smi = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
-                parsed_smiles.append(can_smi)
+                if canonicalize:
+                    parsed_smiles.append(can_smi)
+                else:
+                    parsed_smiles.append(smi)
                 valid.append("true")
             except TypeError:
                 try:
                     mol = Chem.MolFromSmiles(smi)
                     Chem.SanitizeMol(mol)  # Try to catch invalid molecules and sanitize
                     can_smi = Chem.MolToSmiles(mol)
-                    parsed_smiles.append(can_smi)
+                    if canonicalize:
+                        parsed_smiles.append(can_smi)
+                    else:
+                        parsed_smiles.append(smi)
                     valid.append("sanitized")
                 except Exception:
                     parsed_smiles.append(smi)
@@ -884,6 +891,7 @@ class MolScore:
         smiles: list,
         step: int = None,
         flt: bool = False,
+        canonicalize: bool = True,
         recalculate: bool = False,
         score_only: bool = False,
         additional_formats=None,
@@ -896,6 +904,7 @@ class MolScore:
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
+        :param canonicalize: Whether to canonicalize smiles before scoring
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
@@ -915,7 +924,7 @@ class MolScore:
         logger.info(f"    Received: {len(smiles)} SMILES")
 
         # Parse smiles and initiate batch df
-        self.parse_smiles(smiles=smiles, step=self.step)
+        self.parse_smiles(smiles=smiles, step=self.step, canonicalize=canonicalize)
         logger.debug(f"    Pre-processed: {len(self.batch_df)} SMILES")
         logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
 
@@ -1064,6 +1073,7 @@ class MolScore:
         smiles: list,
         step: int = None,
         flt: bool = False,
+        canonicalize: bool = True,
         recalculate: bool = False,
         score_only: bool = False,
         additional_formats=None,
@@ -1075,6 +1085,7 @@ class MolScore:
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
+        :param canonicalize: Whether to canonicalize smiles before scoring
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
@@ -1085,6 +1096,7 @@ class MolScore:
             smiles=smiles,
             step=step,
             flt=flt,
+            canonicalize=canonicalize,
             recalculate=recalculate,
             score_only=score_only,
             additional_formats=additional_formats,
