@@ -7,10 +7,10 @@ from . import smiles_grammar
 
 def get_smiles_tokenizer(cfg):
     long_tokens = [a for a in cfg._lexical_index.keys() if len(a) > 1]
-    # there are currently 6 double letter entities in the grammar
+    # there are currently 6 double letter entities in the grammar (7 with a new metal)
     # these are their replacement, with no particular meaning
     # they need to be ascii and not part of the SMILES symbol vocabulary
-    replacements = ['!', '?', '.', ',', ';', '$']
+    replacements = ['!', '?', '.', ',', ';', '$', '_'] #(one symbol added)
     assert len(long_tokens) == len(replacements)
     for token in replacements:
         assert token not in cfg._lexical_index
@@ -34,7 +34,11 @@ def encode(smiles):
     tokenize = get_smiles_tokenizer(GCFG)
     tokens = tokenize(smiles)
     parser = nltk.ChartParser(GCFG)
-    parse_tree = parser.parse(tokens).__next__()
+    try:
+        parse_tree = parser.parse(tokens).__next__()
+    except StopIteration:
+        print(f'Failed to parse {smiles}')
+        return None
     productions_seq = parse_tree.productions()
     productions = GCFG.productions()
     prod_map = {}

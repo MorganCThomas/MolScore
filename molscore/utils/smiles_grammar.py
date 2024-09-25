@@ -18,6 +18,9 @@ aliphatic_organic -> 'Cl'
 aliphatic_organic -> 'Br'
 aliphatic_organic -> 'Si'
 aliphatic_organic -> 'Se'
+
+aliphatic_organic -> 'Ru'  
+
 aromatic_organic -> 'b'
 aromatic_organic -> 'c'
 aromatic_organic -> 'n'
