@@ -7,7 +7,6 @@ import signal
 import subprocess
 import sys
 import time
-import warnings
 from typing import Union
 
 import numpy as np
@@ -109,7 +108,7 @@ class MolScore:
         self.score_invalids = score_invalids
         self.replay_size = replay_size
         self.replay_purge = replay_purge
-        self.replay_df = pd.DataFrame()
+        self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.finished = False
         self.init_time = time.time()
         self.results_df = None
@@ -236,10 +235,8 @@ class MolScore:
             # Load in replay buffer
             if os.path.exists(os.path.join(self.save_dir, "replay_buffer.csv")):
                 logger.info("Loading replay_buffer.csv from previous run")
-                self.replay_df = pd.read_csv(
-                    os.path.join(self.save_dir, "replay_buffer.csv"),
-                    index_col=0,
-                    dtype={"Unnamed: 0": "int64", "valid": object, "unique": object},
+                self.replay_buffer.load(
+                    os.path.join(self.save_dir, "replay_buffer.csv")
                 )
 
         # Registor write_scores and kill_monitor at close
@@ -349,7 +346,7 @@ class MolScore:
 
         # Reset replay buffer
         if reset_replay_buffer:
-            self.replay_df = pd.DataFrame()
+            self.replay_buffer.reset()
 
         # Add warning in case of possible neverending optimization
         if self.termination_threshold and not self.budget:
@@ -700,8 +697,8 @@ class MolScore:
             self.diversity_filter.savetocsv(
                 os.path.join(self.save_dir, "scaffold_memory.csv")
             )
-        if not self.replay_df.empty:
-            self.replay_df.to_csv(os.path.join(self.save_dir, "replay_buffer.csv"))
+        if len(self.replay_buffer) > 0:
+            self.replay_buffer.save(os.path.join(self.save_dir, "replay_buffer.csv"))
 
         self.fh.close()
 
@@ -716,8 +713,8 @@ class MolScore:
                 self.diversity_filter.savetocsv(
                     os.path.join(self.save_dir, f"scaffold_memory_{step}.csv")
                 )
-            if not self.replay_df.empty:
-                self.replay_df.to_csv(
+            if len(self.replay_buffer) > 0:
+                self.replay_buffer.save(
                     os.path.join(self.save_dir, f"replay_buffer_{step}.csv")
                 )
             self.batch_df.to_csv(os.path.join(self.save_dir, f"batch_df_{step}.csv"))
@@ -829,27 +826,6 @@ class MolScore:
 
         if self.termination_exit and self.finished:
             sys.exit(1)
-
-    def update_replay_buffer(self, df):
-        df = df.copy()
-        # Purge df
-        if self.replay_purge:
-            if self.diversity_filter:
-                df = df.loc[df.passes_diversity_filter, :]
-            else:
-                logger.warn(
-                    "Cannot purge replay buffer without a running diversity filter"
-                )
-        # Concat
-        self.replay_df = pd.concat([self.replay_df, df], axis=0)
-        # Drop_duplicates
-        self.replay_df.drop_duplicates(subset="smiles", inplace=True)
-        # Sort
-        self.replay_df.sort_values(
-            by=self.cfg["scoring"]["method"], ascending=False, inplace=True
-        )
-        # Prune
-        self.replay_df = self.replay_df.iloc[: self.replay_size, :]
 
     def score_only(self, smiles: list, step: int = None, flt: bool = False):
         batch_start = time.time()
@@ -1031,7 +1007,11 @@ class MolScore:
 
         # Update replay buffer
         if self.replay_size:
-            self.update_replay_buffer(self.batch_df)
+            self.replay_buffer.update(
+                self.batch_df,
+                endpoint=self.cfg["scoring"]["method"],
+                using_DF=bool(self.diversity_filter),
+            )
 
         # Start dash_utils monitor to track iteration files once first one is written!
         if self.monitor_app is True:
@@ -1057,8 +1037,10 @@ class MolScore:
                 self.diversity_filter.savetocsv(
                     os.path.join(self.save_dir, "scaffold_memory.csv")
                 )
-            if not self.replay_df.empty:
-                self.replay_df.to_csv(os.path.join(self.save_dir, "replay_buffer.csv"))
+            if len(self.replay_buffer) > 0:
+                self.replay_buffer.save(
+                    os.path.join(self.save_dir, "replay_buffer.csv")
+                )
 
         # Clean up class
         self.evaluate_finished()
@@ -1110,16 +1092,9 @@ class MolScore:
         :param augment: Whether to augment the replay buffer by randomizing the smiles
         :return: List of SMILES and scores
         """
-        if n > len(self.replay_df):
-            n = len(self.replay_df)
-        # Sample n from buffer
-        sample_df = self.replay_df.sample(n=n)
-        smiles = sample_df.smiles.tolist()
-        scores = sample_df[self.cfg["scoring"]["method"]].tolist()
-        # Augment
-        if augment:
-            smiles = utils.augment_smiles(smiles)
-        return smiles, scores
+        return self.replay_buffer.sample(
+            n=n, endpoint=self.cfg["scoring"]["method"], augment=augment
+        )
 
     def compute_metrics(
         self,
