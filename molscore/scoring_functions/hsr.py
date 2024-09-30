@@ -7,6 +7,8 @@ import numpy as np
 from functools import partial
 from molscore.scoring_functions.utils import Pool
 
+from ccdc import conformer
+from ccdc.molecule import Molecule
 
 from hsr import pre_processing as pp
 from hsr import  pca_transform as pca
@@ -63,7 +65,7 @@ class HSR:
         
         :param prefix: Prefix to identify scoring function instance
         :param ref_molecule: reference molecule file path
-        :param generator: generator of 3D coordinates, ('obabel' is the only one supported for now)
+        :param generator: generator of 3D coordinates, ('obabel' is the only one supported for now, 'ccdc' will be added soon)
         :param n_jobs: number of parralel jobs (number of molecules to score in parallel)
         #TODO: add parameteres to tweak the similairty measure
         """
@@ -90,6 +92,13 @@ class HSR:
                 mol.make3D()
                 mol.localopt()
                 mols_3D.append(mol)
+        # elif self.generator == "ccdc":
+        #     conformer_generator = conformer.ConformerGenerator()
+        #     for smile in smiles:
+        #         mol = Molecule.from_string(smile)
+        #         conf = conformer_generator.generate(mol, hydrogens=False)
+        #         mol_3d = conf.hits[0].molecule
+        #         mols_3D.append(mol_3d)
             
         return mols_3D
     
@@ -100,18 +109,20 @@ class HSR:
 
         # Generate 3D coordinates
         try:
-            molecule = self.get_mols_3D([smi])[0]
             
-            # Serialize molecule to SDF (to use in multiprocessing)
-            mol_sdf = molecule.write("sdf")
-            result.update({f'3d_mol': mol_sdf})
+            if type(smi)==str: #The molecule is a SMILES string
+                molecule = self.get_mols_3D([smi])[0]
+                # Serialize molecule to SDF (to use in multiprocessing)
+                # TODO: Thi step assume a obmol, it should be generalized to be agnostic to the molecule object
+                mol_sdf = molecule.write("sdf")
+                result.update({f'3d_mol': mol_sdf})
+            elif type(smi).__name__=="Mol": #The molecule is a rdkit molecule
+                mol_fp = fp.generate_fingerprint_from_molecule(molecule, PROTON_FEATURES, scaling='matrix')
+
         
             #Check what object the molecule is:
-            # check if it is an rdkit molecule
-            if type(molecule).__name__ == "Mol":
-                mol_fp = fp.generate_fingerprint_from_molecule(molecule, PROTON_FEATURES, scaling='matrix')
             # check if it is a obabel molecule
-            elif type(molecule).__name__ == "OBMol":
+            if type(molecule).__name__ == "OBMol":
                 mol_array = get_array_from_obmol(molecule)
                 mol_fp = fp.generate_fingerprint_from_data(mol_array, scaling='matrix')
             # check if it is a pybel molecule
@@ -159,14 +170,21 @@ class HSR:
         os.makedirs(directory, exist_ok=True)
         # Prepare function for parallelization
         
-        pfunc = partial(
-            self.score_smi,
-            #TODO: add more parameters
-            )
+        # pfunc = partial(
+        #     self.score_smi,
+        #     #TODO: add more parameters
+        #     )
         
-        # Score individual smiles
-        with Pool(self.n_jobs) as pool:
-            results = [r for r in pool.imap(pfunc, smiles)]
+        # # Score individual smiles
+        # with Pool(self.n_jobs) as pool:
+        #     results = [r for r in pool.imap(pfunc, smiles)]
+            
+        # for loop (for debugging)
+        results = []
+        for smi in smiles:
+            result = self.score_smi(smi)
+            results.append(result)
+            
         # Save mols
         for r, name in zip(results, file_names):
             file_path = os.path.join(directory, name + ".sdf")

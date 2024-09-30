@@ -5,6 +5,8 @@ gram = """smiles -> chain
 atom -> bracket_atom
 atom -> aliphatic_organic
 atom -> aromatic_organic
+atom -> aliphatic_inorganic 
+
 aliphatic_organic -> 'B'
 aliphatic_organic -> 'C'
 aliphatic_organic -> 'F'
@@ -19,7 +21,7 @@ aliphatic_organic -> 'Br'
 aliphatic_organic -> 'Si'
 aliphatic_organic -> 'Se'
 
-aliphatic_organic -> 'Ru'  
+aliphatic_inorganic -> 'Ru'  
 
 aromatic_organic -> 'b'
 aromatic_organic -> 'c'
