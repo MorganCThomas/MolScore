@@ -1,0 +1,3 @@
+[submodule "MolScore_examples"]
+	path = MolScore_examples
+	url = git@github.com:marcellocostamagna/MolScore_examples.git

@@ -221,3 +221,10 @@ try:
     all_scoring_functions.append(POSTServer)
 except Exception as e:
     logger.warning(f"POSTServer: currently unavailable due to the following: {e}")
+
+try:
+    from molscore.scoring_functions.hsr import HSR
+
+    all_scoring_functions.append(HSR)
+except Exception as e:
+    logger.warning(f"HSR: currently unavailable due to the following: {e}")
