@@ -870,7 +870,8 @@ class MolScore:
         canonicalize: bool = True,
         recalculate: bool = False,
         score_only: bool = False,
-        additional_formats=None,
+        additional_formats: dict = None,
+        additional_keys: dict = None,
         **kwargs,
     ):
         """
@@ -885,6 +886,8 @@ class MolScore:
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
         :param score_only: Whether to log molecule data or simply score and return
+        :param additional_formats: Additional formats to be passed to scoring functions
+        :param additional_keys: Additional keys to store in the scores.csv file as new columns
         :return: Scores (either float list or np.array)
         """
         if score_only:
@@ -903,6 +906,15 @@ class MolScore:
         self.parse_smiles(smiles=smiles, step=self.step, canonicalize=canonicalize)
         logger.debug(f"    Pre-processed: {len(self.batch_df)} SMILES")
         logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
+
+        # Add additional keys to batch_df
+        if additional_keys is not None:
+            for k, v in additional_keys.items():
+                if k in self.batch_df.columns:
+                    logger.warning(
+                        f"    Overwriting existing column {k} with additional key"
+                    )
+                self.batch_df[k] = v
 
         # If a main df exists check if some molecules have already been sampled
         if isinstance(self.main_df, pd.core.frame.DataFrame):
@@ -1058,7 +1070,8 @@ class MolScore:
         canonicalize: bool = True,
         recalculate: bool = False,
         score_only: bool = False,
-        additional_formats=None,
+        additional_formats: dict = None,
+        additional_keys: dict = None,
     ):
         """
         Calling MolScore will result in the primary function of scoring smiles and logging data in
@@ -1072,6 +1085,8 @@ class MolScore:
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
         :param score_only: Whether to log molecule data or simply score and return
+        :param additional_formats: Additional formats to be passed to scoring functions
+        :param additional_keys: Additional keys to store in the scores.csv file as new columns
         :return: Scores (either float list or np.array)
         """
         return self.score(
@@ -1082,6 +1097,7 @@ class MolScore:
             recalculate=recalculate,
             score_only=score_only,
             additional_formats=additional_formats,
+            additional_keys=additional_keys,
         )
 
     # ----- Additional methods only run if called directly -----
