@@ -120,6 +120,7 @@ class MolScore:
         self.call2score_warning = True
         self.metrics = None
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
+        self.temp_parameters = {} # Temp parameters to write out each iteration in scores.csv for comparative purposes
 
         # Setup save directory
         if not run_name:
@@ -907,7 +908,15 @@ class MolScore:
         logger.debug(f"    Pre-processed: {len(self.batch_df)} SMILES")
         logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
 
-        # Add additional keys to batch_df
+        # Add temp parameters or additional keys to batch_df
+        if self.temp_parameters:
+            for k, v in self.temp_parameters.items():
+                if k in self.batch_df.columns:
+                    logger.warning(
+                        f"    Overwriting existing column {k} with temp parameter"
+                    )
+                self.batch_df[k] = v
+            self.temp_parameters = {}
         if additional_keys is not None:
             for k, v in additional_keys.items():
                 if k in self.batch_df.columns:
