@@ -9,6 +9,7 @@ from typing import Union
 import numpy as np
 from rdkit import Chem
 
+from molscore import resources
 from molscore.scoring_functions._ligand_preparation import ligand_preparation_protocols
 from molscore.scoring_functions.descriptors import MolecularDescriptors
 from molscore.scoring_functions.utils import (
@@ -16,6 +17,7 @@ from molscore.scoring_functions.utils import (
     check_openbabel,
     read_mol,
     timedSubprocess,
+    check_env,
 )
 
 logger = logging.getLogger("vina")
@@ -40,30 +42,69 @@ class VinaDock:
         "NegativeCharge",
         "best_variant",
     ]
+    presets = {
+        "5HT2A": {
+            "receptor": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_rec.pdb"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_risperidone.sdf"
+            ),
+        },
+        "5HT2A-3x32": {
+            "receptor": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_rec.pdb"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.6A93").joinpath(
+                "6A93p_risperidone.sdf"
+            ),
+            "dock_constraints": resources.files(
+                "molscore.data.structures.6A93"
+            ).joinpath("6A93p_3x32Cat.restr"),
+        },
+        "DRD2": {
+            "receptor": resources.files("molscore.data.structures.6CM4").joinpath(
+                "6CM4p_rec.pdb"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.6CM4").joinpath(
+                "6CM4p_risperidone.sdf"
+            ),
+        },
+        "BACE1_4B05": {
+            "receptor": resources.files("molscore.data.structures.4B05").joinpath(
+                "4B05p_rec.pdbqt"
+            ),
+            "ref_ligand": resources.files("molscore.data.structures.4B05").joinpath(
+                "AZD3839_rdkit.mol"
+            ),
+        },
+    }
 
     @staticmethod
     def check_installation():
-        if "vina" not in os.environ.keys():
+        if not check_env("vina"):
             raise RuntimeError(
-                "Can't find vina in PATH, please export the vina executable as 'vina'"
-            )
+                "Vina not found in PATH, please export the path to the vina executable as 'vina'"
+                )
 
     def __init__(
         self,
         prefix: str,
-        receptor: Union[str, os.PathLike],
-        ref_ligand: Union[str, os.PathLike],
+        preset: str = None,
+        receptor: Union[str, os.PathLike] = None,
+        ref_ligand: Union[str, os.PathLike] = None,
         cpus: int = 1,
         cluster: Union[str, int] = None,
         file_preparation: str = "obabel",
         ligand_preparation: str = "GypsumDL",
-        prep_timeout: float = 30.0,
+        prep_timeout: float = 60.0,
         dock_scoring: str = "vina",
         dock_timeout: float = 120.0,
         **kwargs,
     ):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
+        :param preset: Pre-populate file paths for receptors, reference ligand and/or constraints etc. [5HT2A, 5HT2A-3x32, DRD2, BACE1_4B05]
         :param receptor: Path to receptor file (.pdb, .pdbqt)
         :param ref_ligand: Path to ligand file for autobox generation (.sdf, .pdb, .mol2)
         :param cpus: Number of Vina CPUs to use per simulation
@@ -74,6 +115,8 @@ class VinaDock:
         :param dock_scoring: Docking scoring function to use [vina, vinardo]
         :param dock_timeout: Timeout (seconds) before killing an individual docking simulation
         """
+        self.subprocess = timedSubprocess()
+
         # Check requirements
         check_openbabel()
         self.check_installation()
@@ -96,7 +139,17 @@ class VinaDock:
                 "prepare_ligand4.py",
             )
 
-        self.subprocess = timedSubprocess()
+        # Check if preset is provided
+        assert preset or (
+            receptor and ref_ligand
+        ), "Either preset or receptor and ref_ligand must be provided"
+        if preset:
+            assert (
+                preset in self.presets.keys()
+            ), f"preset must be one of {self.presets.keys()}"
+            receptor = str(self.presets[preset]["receptor"])
+            ref_ligand = str(self.presets[preset]["ref_ligand"])
+
         # If receptor is pdb, convert
         if not receptor.endswith(".pdbqt"):
             pdbqt_receptor = receptor.rsplit(".")[0] + ".pdbqt"
