@@ -152,7 +152,7 @@ class VinaDock:
 
         # If receptor is pdb, convert
         if not receptor.endswith(".pdbqt"):
-            pdbqt_receptor = receptor.rsplit(".")[0] + ".pdbqt"
+            pdbqt_receptor = receptor.rsplit(".", 1)[0] + ".pdbqt"
             if self.prep_env == "obabel":
                 out, err = self.subprocess.run(
                     " ".join([self.prep_env, receptor, "-O", pdbqt_receptor])
@@ -187,7 +187,7 @@ class VinaDock:
 
         # If ligand is not pdbqt, convert
         if not ref_ligand.endswith(".pdbqt"):
-            pdbqt_ligand = ref_ligand.rsplit(".")[0] + ".pdbqt"
+            pdbqt_ligand = ref_ligand.rsplit(".", 1)[0] + ".pdbqt"
             if self.prep_env == "obabel":
                 out, err = self.subprocess.run(
                     " ".join([self.prep_env, ref_ligand, "-O", pdbqt_ligand])
@@ -201,11 +201,11 @@ class VinaDock:
                                 "obabel",
                                 ref_ligand,
                                 "-O",
-                                ref_ligand.rsplit(".")[0] + ".pdb",
+                                ref_ligand.rsplit(".", 1)[0] + ".pdb",
                             ]
                         )
                     )
-                    ref_ligand = ref_ligand.rsplit(".")[0] + ".pdb"
+                    ref_ligand = ref_ligand.rsplit(".", 1)[0] + ".pdb"
                 out, err = self.subprocess.run(
                     " ".join(
                         [
