@@ -12,7 +12,7 @@ setup(
             'data/models/**/*',
             'data/structures/**/*',
             'configs/**/*',
-            'utils/gypsum_dl/**/*'],
+            'scoring_functions/gypsum_dl/**/*'],
         'moleval': [
             'tests/data/**',
             'metrics/mcf.csv',
