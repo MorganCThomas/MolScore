@@ -587,7 +587,7 @@ class MolScore:
 
             transformed_columns[mod_name] = (
                 df.loc[:, metric["name"]]
-                .apply(lambda x: (print(f"x: {x}") or modifier(x, **metric["parameters"]))) 
+                .apply(lambda x: modifier(x, **metric["parameters"])) 
                 .rename(mod_name)
             )
         df = pd.concat([df] + list(transformed_columns.values()), axis=1)
@@ -877,14 +877,14 @@ class MolScore:
             score_col = self.cfg["scoring"]["method"]
 
         # TODO: Remove the str conversion of smiles
-        smiles = [str(smi) if not isinstance(smi, str) else smi for smi in smiles]
+        # smiles = [str(smi) if not isinstance(smi, str) else smi for smi in smiles]
         
         scores = [
-            # float(self.results_df.loc[self.results_df.smiles == smi, score_col][0])
-            # for smi in smiles
+            float(self.results_df.loc[self.results_df.smiles == smi, score_col])
+            for smi in smiles
             # # TODO: see above
             
-            float(self.results_df.iloc[i][score_col]) for i in range(len(self.results_df.smiles))
+            # float(self.results_df.iloc[i][score_col]) for i in range(len(self.results_df.smiles))
         ]
         if not flt:
             scores = np.array(scores, dtype=np.float32)
@@ -1086,6 +1086,13 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return
         :return: Scores (either float list or np.array)
         """
+        
+        # TODO: Can we make HERE the distinction between the different formats of molecules?
+        # Between 2D and 3D, by making a score function tailored for 3D which accepts different formats of 
+        # molecules (it does not assume the use of SMILES)
+        
+        
+        
         return self.score(
             smiles=smiles,
             step=step,

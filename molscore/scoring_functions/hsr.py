@@ -199,7 +199,7 @@ class HSR:
         except Exception as e:
             result.update({f'{self.prefix}_HSR_score': 0.0})
             logger.error(f"Error calculating HSR similarity for {mol}: {e}")
-        print(f"HSR score: {sim_score}")
+        # print(f"HSR score: {sim_score}")
         if np.isnan(sim_score):
             sim_score = 0.0 
         result.update({f'{self.prefix}_HSR_score': sim_score})
