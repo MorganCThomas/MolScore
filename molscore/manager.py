@@ -384,7 +384,9 @@ class MolScore:
                     valid.append("sanitized")
                 except Exception:
                     parsed_smiles.append(smi)
-                    valid.append("false")
+                    # valid.append("false")
+                    # Check for debugging
+                    valid.append('true')
             batch_idx.append(i)
 
         self.batch_df["model"] = self.model_name.replace(" ", "_")
@@ -448,7 +450,9 @@ class MolScore:
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
         :return: self.results (a list of dictionaries with smiles and resulting scores)
         """
-        self.results_df = pd.DataFrame(smiles, columns=["smiles"])
+        # self.results_df = pd.DataFrame(smiles, columns=["smiles"])
+        
+        #TODO: Need for a better handling of different format of molecules
         for function in self.scoring_functions:
             results = function(
                 smiles=smiles,
@@ -458,10 +462,21 @@ class MolScore:
             )
             results_df = pd.DataFrame(results)
 
-            self.results_df = self.results_df.merge(
-                results_df, on="smiles", how="outer", sort=False
-            )
-
+            # self.results_df = self.results_df.merge(
+            #     results_df, on="smiles", how="outer", sort=False
+            # )
+            
+            if self.results_df is None:
+                self.results_df = results_df
+            else:
+                self.results_df = pd.concat([self.results_df, results_df], axis=1)
+              
+        # TODO: remove this and use identifiers and mol objects in conjunction with smiles  
+        # Iterate through the 'smiles' column and convert non-strings to strings
+        self.results_df['smiles'] = self.results_df['smiles'].apply(
+            lambda x: str(x) if not isinstance(x, str) else x
+        )
+            
         # Drop any duplicates in results
         self.results_df = self.results_df.drop_duplicates(subset="smiles")
         return self
@@ -572,7 +587,7 @@ class MolScore:
 
             transformed_columns[mod_name] = (
                 df.loc[:, metric["name"]]
-                .apply(lambda x: modifier(x, **metric["parameters"]))
+                .apply(lambda x: modifier(x, **metric["parameters"])) 
                 .rename(mod_name)
             )
         df = pd.concat([df] + list(transformed_columns.values()), axis=1)
@@ -861,9 +876,15 @@ class MolScore:
         else:
             score_col = self.cfg["scoring"]["method"]
 
+        # TODO: Remove the str conversion of smiles
+        # smiles = [str(smi) if not isinstance(smi, str) else smi for smi in smiles]
+        
         scores = [
             float(self.results_df.loc[self.results_df.smiles == smi, score_col])
             for smi in smiles
+            # # TODO: see above
+            
+            # float(self.results_df.iloc[i][score_col]) for i in range(len(self.results_df.smiles))
         ]
         if not flt:
             scores = np.array(scores, dtype=np.float32)
@@ -1065,6 +1086,13 @@ class MolScore:
         :param score_only: Whether to log molecule data or simply score and return
         :return: Scores (either float list or np.array)
         """
+        
+        # TODO: Can we make HERE the distinction between the different formats of molecules?
+        # Between 2D and 3D, by making a score function tailored for 3D which accepts different formats of 
+        # molecules (it does not assume the use of SMILES)
+        
+        
+        
         return self.score(
             smiles=smiles,
             step=step,
