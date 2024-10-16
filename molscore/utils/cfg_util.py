@@ -7,10 +7,21 @@ from . import smiles_grammar
 
 def get_smiles_tokenizer(cfg):
     long_tokens = [a for a in cfg._lexical_index.keys() if len(a) > 1]
-    # there are currently 6 double letter entities in the grammar (7 with a new metal)
+    # There are currently 76 double letter entities in the grammar
     # these are their replacement, with no particular meaning
     # they need to be ascii and not part of the SMILES symbol vocabulary
-    replacements = ['!', '?', '.', ',', ';', '$', '_'] #(one symbol added)
+    
+    replacements = [
+    '!', '?', '$', '&', '*', '~', '_', ';', '.', ',',
+    '`', '|', '<', '>', '{', '}', '§', '^', 'a', 'A',
+    'z', 'Z', 'm', 'M', 'd', 'D', 'e', 'E', 'g', 'G',
+    'j', 'J', 'l', 'L', 'q', 'Q', 'r', 'R', 't', 'T',
+    'x', 'X', '"', '´', '˚', 'å', 'Å', 'ø', 'Ø', '¨',
+    'ä', 'Ä', 'ö', 'Ö', 'ü', 'Ü', 'á', 'Á', 'é', 'É',
+    'í', 'Í', 'ó', 'Ó', 'ú', 'Ú', 'à', 'À', 'è', 'È',
+    'ì', 'Ì', 'ò', 'Ò', 'ù', 'Ù', 
+    ]
+
     assert len(long_tokens) == len(replacements)
     for token in replacements:
         assert token not in cfg._lexical_index
@@ -61,7 +72,6 @@ def prods_to_eq(prods):
         return ''.join(seq)
     except Exception:
         return ''
-
 
 def decode(rule):
     productions = smiles_grammar.GCFG.productions()
