@@ -29,6 +29,8 @@ from tqdm import tqdm
 from moleval.metrics.metrics_utils import get_mol, mol_passes_filters
 from moleval.molvs import Standardizer
 
+# ----- RDKit logging
+
 
 def disable_rdkit_log():
     rdBase.DisableLog("rdApp.*")
@@ -41,28 +43,45 @@ def enable_rdkit_log():
     rdBase.EnableLog("rdApp.*")
 
 
+# ----- Cuda
+
+
 def cuda_available():
     return cuda.is_available()
 
 
-def Pool(n_jobs):
+# ----- Multiprocessing
+
+
+def check_env_jobs(default=1):
+    if "MOLSCORE_NJOBS" in os.environ.keys():
+        return int(os.environ["MOLSCORE_NJOBS"])
+    else:
+        return default
+
+
+def get_multiprocessing_context():
     if platform.system() == "Linux":
         context = multiprocessing.get_context("fork")
     else:
         context = multiprocessing.get_context("spawn")
+    return context
 
+
+def Pool(n_jobs):
+    context = get_multiprocessing_context()
     # Extract from environment as default, overriding configs
-    if "MOLSCORE_NJOBS" in os.environ.keys():
-        return context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
+    n_jobs = check_env_jobs(n_jobs)
+    if isinstance(n_jobs, int):
+        return context.Pool(n_jobs)
+    elif isinstance(n_jobs, float):
+        n_jobs = int(context.cpu_count() * n_jobs)
+        assert (
+            0 < n_jobs <= context.cpu_count()
+        ), f"n_jobs must be between 0 and {context.cpu_count()}"
+        return context.Pool(n_jobs)
     else:
-        if isinstance(n_jobs, int):
-            return context.Pool(n_jobs)
-        elif isinstance(n_jobs, float):
-            n_jobs = int(context.cpu_count() * n_jobs)
-            assert 0 < n_jobs <= context.cpu_count(), f"n_jobs must be between 0 and {context.cpu_count()}"
-            return context.Pool(n_jobs)
-        else:
-            raise ValueError("n_jobs must be an integer or float")
+        raise ValueError("n_jobs must be an integer or float")
 
 
 def mapper(function, input: list, n_jobs: int = 1, progress_bar: bool = True):
@@ -80,6 +99,9 @@ def mapper(function, input: list, n_jobs: int = 1, progress_bar: bool = True):
         else:
             output = [out for out in pool.imap(function, input)]
     return output
+
+
+# ----- Chemistry utils
 
 
 class Fingerprints:
