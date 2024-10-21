@@ -20,7 +20,8 @@ from molscore.utils.transformation_functions import (
     sigmoid,
     step,
 )
-from molscore.utils.chem_utils import augment_smiles
+from molscore.utils.chem_utils import augment_smiles, canonicalize_smiles
+from molscore.utils.replay_buffer import ReplayBuffer
 
 all_score_modifiers = [raw, norm, step, gauss, lin_thresh, sigmoid]
 
