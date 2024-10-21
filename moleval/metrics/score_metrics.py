@@ -522,6 +522,7 @@ class ScoreMetrics:
             # Calculate top AUC
             top1, top10, top100 = self.top_auc(
                 scores=tdf,
+                budget=self.budget,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
                 window=100,
