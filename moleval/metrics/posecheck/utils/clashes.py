@@ -2,12 +2,11 @@ from typing import List, Union
 
 import numpy as np
 import rdkit.Chem as Chem
-from rdkit import Chem
 
 from .chem import has_radicals
 
 
-def count_clashes(prot: Chem.Mol, lig: Chem.Mol, tollerance: float = 0.5) -> int:
+def count_clashes(lig: Chem.Mol, prot: Chem.Mol, tollerance: float = 0.5) -> int:
     """
     Counts the number of clashes between atoms in a protein and a ligand.
 
@@ -102,7 +101,7 @@ def count_clashes_list(
 
             # Append clash information to the clashes list
             clashes.append({"mol": lig, "clashes": lig_clashes, "target": target})
-        except Exception as e:
+        except Exception:
             # Handle errors by appending a dictionary with NaN clashes
             clashes.append({"mol": lig, "clashes": np.nan, "target": target})
 

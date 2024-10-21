@@ -2,11 +2,30 @@ from copy import deepcopy
 
 import numpy as np
 import rdkit.Chem as Chem
-from datamol.conformers._conformers import _get_ff
-from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem, rdForceFieldHelpers
 
 from .chem import has_radicals
+
+
+def _get_ff(mol: Chem.Mol, forcefield: str, conf_id: int = -1):
+    """Gets molecular forcefield for input mol according to name
+    Args:
+        mol: input molecule
+        forcefield: forcefield name. One of "UFF", "MMFF94s", "MMFF94s_noEstat"]
+        conf_id: conformer id. -1 is used by default
+    """
+    assert forcefield in [
+        "UFF",
+        "MMFF94s",
+        "MMFF94s_noEstat",
+    ], f"Forcefield {forcefield} is not supported"
+    if forcefield == "UFF":
+        return rdForceFieldHelpers.UFFGetMoleculeForceField(mol, confId=conf_id)
+
+    mp = rdForceFieldHelpers.MMFFGetMoleculeProperties(mol, "MMFF94s")
+    if forcefield == "MMFF94s_noEstat":
+        mp.SetMMFFEleTerm(False)
+    return rdForceFieldHelpers.MMFFGetMoleculeForceField(mol, mp, confId=conf_id)
 
 
 def calculate_energy(
@@ -98,7 +117,7 @@ def get_strain_energy(mol: Chem.Mol) -> float:
 
     try:
         return calculate_energy(mol) - calculate_energy(relax_mol(mol))
-    except:
+    except Exception:
         return np.nan
 
 

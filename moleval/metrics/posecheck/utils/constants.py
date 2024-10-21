@@ -1,5 +1,6 @@
 import os
 import warnings
+
 from moleval import resources
 from molscore.scoring_functions.utils import check_exe
 
@@ -22,11 +23,13 @@ ROUND_DIGITS = 2
 # PATHS
 # REDUCE_PATH = os.path.join(PROJECT_DIR, "bin/reduce")
 if not check_exe("reduce"):
-    warnings.warn("reduce not found and posecheck may not work properly: Install with \"conda install -c bioconda reduce\"")
+    warnings.warn(
+        'reduce not found and posecheck may not work properly: Install with "conda install -c bioconda reduce"'
+    )
     REDUCE_PATH = None
 else:
     REDUCE_PATH = "reduce"
-SPLIT_PATH = None # os.path.join(PROJECT_DIR, "data/crossdocked_split_by_name.pkl")
+SPLIT_PATH = None  # os.path.join(PROJECT_DIR, "data/crossdocked_split_by_name.pkl")
 
 # Docking params
 DOCKING_METHOD = "smina"

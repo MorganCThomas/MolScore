@@ -1,18 +1,43 @@
 import os
 import pickle
 import subprocess
-from functools import lru_cache
 from typing import List, Union
 
-import datamol as dm
 import MDAnalysis as mda
 import openbabel as ob
 import prolif as plf
 import rdkit.Chem as Chem
-from rdkit import Chem
 
 from .chem import remove_radicals
 from .constants import REDUCE_PATH, SPLIT_PATH
+
+
+def read_sdf(sdf_path: str) -> List[Chem.Mol]:
+    """Read an SDF file and return a list of RDKit molecules.
+
+    Args:
+        sdf_path (str): The path to the SDF file.
+
+    Returns:
+        List[Chem.Mol]: The list of RDKit molecules.
+    """
+    with Chem.SDMolSupplier(sdf_path) as suppl:
+        mols = list(suppl)
+    return mols
+
+
+def to_sdf(mols: List[Chem.Mol], sdf_path: str):
+    """Write a list of RDKit molecules to an SDF file.
+
+    Args:
+        mols (List[Chem.Mol]): The list of RDKit molecules.
+        sdf_path (str): The path to the SDF file.
+    """
+    with Chem.SDWriter(sdf_path) as w:
+        for mol in mols:
+            w.write(mol)
+        w.flush()
+        w.close()
 
 
 def load_splits_crossdocked(
@@ -38,16 +63,22 @@ def get_ids_to_pockets(
     return pdb_names
 
 
-def load_protein_prolif(protein_path: str):
+def load_protein_prolif(protein_path: str, rdkit: bool = False):
     """Load protein from PDB file using MDAnalysis
     and convert to plf.Molecule. Assumes hydrogens are present."""
-    prot = mda.Universe(protein_path)
-    prot = plf.Molecule.from_mda(prot, NoImplicit=False)
+    if rdkit:
+        prot = Chem.MolFromPDBFile(protein_path, removeHs=False, sanitize=False)
+        prot = plf.Molecule(prot)
+    else:
+        prot = mda.Universe(protein_path)
+        prot = plf.Molecule.from_mda(prot, NoImplicit=False)
     return prot
 
 
-@lru_cache(maxsize=100)
-def load_protein_from_pdb(pdb_path: str, reduce: bool = True, reduce_path: str = REDUCE_PATH):
+# @lru_cache(maxsize=100)
+def load_protein_from_pdb(
+    pdb_path: str, reduce: bool = True, reduce_path: str = REDUCE_PATH
+):
     """Load protein from PDB file, add hydrogens, and convert it to a prolif.Molecule.
 
     Args:
@@ -133,7 +164,7 @@ def load_mols_from_sdf(sdf_path: str, add_hs: bool = True) -> Union[plf.Molecule
     tmp_path = sdf_path.split(".sdf")[0] + "_tmp.sdf"
 
     # Load molecules from the SDF file
-    mols = dm.read_sdf(sdf_path)
+    mols = read_sdf(sdf_path)
 
     # Remove radicals from the molecules
     mols = [remove_radicals(mol) for mol in mols]
@@ -146,7 +177,7 @@ def load_mols_from_sdf(sdf_path: str, add_hs: bool = True) -> Union[plf.Molecule
         return []
 
     # Write the molecules to a temporary file
-    dm.to_sdf(mols, tmp_path)
+    to_sdf(mols, tmp_path)
     ligs = load_sdf_prolif(tmp_path)
     os.remove(tmp_path)
 
@@ -157,7 +188,8 @@ def load_mols_from_sdf(sdf_path: str, add_hs: bool = True) -> Union[plf.Molecule
 
 
 def load_mols_from_rdkit(
-    mol_list: List[Chem.Mol], add_hs: bool = True
+    mol_list: List[Chem.Mol],
+    add_hs: bool = True,
 ) -> Union[plf.Molecule, List]:
     """Load ligand from an RDKit molecule, add hydrogens, and convert it to a prolif.Molecule.
 
@@ -177,6 +209,9 @@ def load_mols_from_rdkit(
             "Converting single molecule to list, to be consistent with load_mols_from_sdf"
         )
         mol_list = [mol_list]
+
+    # Remove radicals from the molecules
+    mol_list = [remove_radicals(mol) for mol in mol_list]
 
     # Add hydrogens to the molecules
     if add_hs:

@@ -5,7 +5,6 @@ import numpy as np
 import openbabel
 import openbabel as ob
 import rdkit.Chem as Chem
-from rdkit import Chem
 
 #### AutoDock Vina Parsing Functions ####
 

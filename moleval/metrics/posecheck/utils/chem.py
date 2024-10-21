@@ -1,7 +1,5 @@
 import numpy as np
 import rdkit.Chem as Chem
-from rdkit import Chem
-import datamol as dm
 
 
 def rmsd(mol1: Chem.Mol, mol2: Chem.Mol) -> float:
@@ -44,7 +42,7 @@ def remove_radicals(mol: Chem.Mol, sanitize: bool = True) -> Chem.Mol:
             atom.SetNumRadicalElectrons(0)
 
     if sanitize:
-        dm.sanitize_mol(mol)
+        Chem.SanitizeMol(mol)
 
     return mol
 

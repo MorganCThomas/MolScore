@@ -1,12 +1,12 @@
 import os
 from typing import Union
 
-import datamol as dm
 import numpy as np
 from rdkit import Chem
 
 from .constants import BOX_SIZE, SMINA_PATH
 from .docking_utils import *
+from .loading import read_sdf
 
 # TODO add this to .env file
 SMINA_PATH = "smina"
@@ -66,7 +66,7 @@ class SMINA(object):
         elif type(centre) == str:  # TODO add support for PDBQT
             # get from SDF
             try:
-                mol = dm.read_sdf(centre)[0]
+                mol = read_sdf(centre)[0]
                 centre = get_centroid_rdmol(mol)
             except:
                 raise ValueError(
@@ -176,7 +176,7 @@ class SMINA(object):
         )
 
         if not self.minimize and not self.score_only:
-            command += f"--exhaustiveness 8"
+            command += "--exhaustiveness 8"
 
         if self.minimize:
             command += "--minimize "
