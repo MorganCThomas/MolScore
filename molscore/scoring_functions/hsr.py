@@ -8,6 +8,7 @@ from functools import partial
 from molscore.scoring_functions.utils import Pool
 from rdkit import Chem
 
+from ccdc import io
 from ccdc import conformer
 from ccdc.molecule import Molecule as ccdcMolecule
 
@@ -75,15 +76,26 @@ class HSR:
         self.ref_molecule = pp.read_mol_from_file(ref_molecule)
         if self.ref_molecule is None:
             raise ValueError("Reference molecule is None. Check the extesnsion of the file is managed by HSR")
-        self.ref_mol_fp = fp.generate_fingerprint_from_molecule(self.ref_molecule, PROTON_FEATURES, scaling='matrix')
         self.generator = generator
         self.n_jobs = n_jobs
-        
-        # if self.generator == 'ccdc':
-        #     self.conformer_generator = conformer.ConformerGenerator()
-        # else:   
-        #     self.conformer_generator = None
-    
+        # TODO: Add the case when the there is no need for a generator and the molecule is already 3D
+        # or the array is directly provided
+        if self.generator == 'ccdc':
+            #Read molecule from file 
+            ref_mol = io.MoleculeReader(ref_molecule)[0]
+            ref_mol_array = get_array_from_ccdcmol(ref_mol)
+            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array, scaling='matrix')
+        elif self.generator == 'obabel':
+            #Read molecule from file (sdf)
+            ref_mol = next(pb.readfile("sdf", ref_molecule))
+            ref_mol_array = get_array_from_pybelmol(ref_mol)
+            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array, scaling='matrix')
+        else:
+            #Default for now: rdkit
+            #TODO: explicitly insert rdkit as a conformer generatore with the disclaimer that 
+            # it cannot deal with organometallic molecules
+            self.ref_mol_fp = fp.generate_fingerprint_from_molecule(self.ref_molecule, PROTON_FEATURES, scaling='matrix')
+ 
     def get_mols_3D(self, smile: str):
         """
         Generate 3D coordinates for a list of SMILES
@@ -265,6 +277,4 @@ class HSR:
         """
         return self.score(molecules=smiles, directory=directory, file_names=file_names)
 
-        
-        
-   
+    
