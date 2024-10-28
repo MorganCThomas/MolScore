@@ -2,11 +2,11 @@ import logging
 import os
 import time
 from typing import Union
-from openbabel import openbabel as ob
 from openbabel import pybel as pb
 import numpy as np
 from functools import partial
 from molscore.scoring_functions.utils import Pool
+import multiprocessing
 from rdkit import Chem
 
 from ccdc import io
@@ -18,7 +18,6 @@ from hsr import  pca_transform as pca
 from hsr import fingerprint as fp
 from hsr import similarity as sim
 from hsr.utils import PROTON_FEATURES
-import signal
 
 logger = logging.getLogger("HSR")
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -27,15 +26,6 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
-# Define a timeout handler
-class TimeoutException(Exception):
-    pass
-
-def timeout_handler(signum, frame):
-    raise TimeoutException
-
-# Set the signal handler for alarm
-signal.signal(signal.SIGALRM, timeout_handler)
 
 def get_array_from_pybelmol(pybelmol):
     # Iterate over the atoms in the molecule
@@ -115,11 +105,6 @@ class HSR:
         :param smile: SMILES string
         :return: 
         """
-        start = time.time()
-        
-        # Set the alarm for the timeout
-        signal.alarm(self.timeout)
-        
         try: 
             if self.generator == "obabel": 
                 mol_3d = pb.readstring("smi", smile)
@@ -133,23 +118,10 @@ class HSR:
                 conf = conformer_generator.generate(mol)
                 mol_3d = conf.hits[0].molecule
                 mol_sdf = mol_3d.to_string("sdf")
-                
-        except TimeoutException:
-            logger.error(f"3D generation for {smile} exceeded timeout of {self.timeout} seconds.")
-            # Ensure graceful cleanup in case of timeout
-            if 'conformer_generator' in locals():
-                del conformer_generator
-            if 'conf' in locals():
-                del conf
-            mol_3d, mol_sdf = None, None
-        
         except Exception as e:
             logger.error(f"Error generating 3D coordinates for {smile}: {e}")
             mol_3d, mol_sdf = None, None
             
-        finally:
-            # Disable the alarm
-            signal.alarm(0)
         return mol_3d, mol_sdf
 
     def score_mol(self, mol: Union[str, pb.Molecule, Chem.Mol, np.ndarray]):
@@ -282,8 +254,43 @@ class HSR:
         
         # Score individual smiles
         n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
+        # with Pool(n_processes) as pool:
+        #     results = [r for r in pool.imap(pfunc, molecules)]
+        
         with Pool(n_processes) as pool:
-            results = [r for r in pool.imap(pfunc, molecules)]
+            results = []
+            
+            # Submit tasks with apply_async and set a timeout for each scoring
+            async_results = []
+            for mol in molecules:
+                async_result = pool.apply_async(pfunc, args=(mol,))
+                async_results.append(async_result)
+
+            # Collect results, applying timeout and handling it gracefully
+            for i, async_result in enumerate(async_results):
+                try:
+                    # Try to get the result with a timeout equal to the specified time limit
+                    result = async_result.get(timeout=self.timeout)
+                except multiprocessing.TimeoutError:
+                    # Handle the timeout scenario by using default values
+                    logger.error(f"Timeout occurred for molecule: {molecules[i]}")
+                    result = {
+                        "smiles": molecules[i],
+                        f'3d_mol': 0.0,
+                        f'{self.prefix}_HSR_score': 0.0,
+                        'time_taken': self.timeout
+                    }
+                except Exception as e:
+                    # Handle any other exception
+                    logger.error(f"Error processing molecule {molecules[i]}: {e}")
+                    result = {
+                        "smiles": molecules[i],
+                        f'3d_mol': 0.0,
+                        f'{self.prefix}_HSR_score': 0.0,
+                        'time_taken': self.timeout
+                    }
+
+                results.append(result)
   
         # Save mols
         successes = 0
