@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from typing import Union
 from openbabel import openbabel as ob
 from openbabel import pybel as pb
@@ -102,6 +103,7 @@ class HSR:
         :param smile: SMILES string
         :return: 
         """
+        start = time.time()
         if self.generator == "obabel": 
             mol_3d = pb.readstring("smi", smile)
             mol_3d.addh()
@@ -114,6 +116,7 @@ class HSR:
             conf = conformer_generator.generate(mol)
             mol_3d = conf.hits[0].molecule
             mol_sdf = mol_3d.to_string("sdf")
+        print(f"Time to generate 3D coordinates: {time.time() - start}")
         return mol_3d, mol_sdf
 
     def score_mol(self, mol: Union[str, pb.Molecule, Chem.Mol, np.ndarray]):
@@ -122,7 +125,7 @@ class HSR:
         :param mol: SMILES string, rdkit molecule or numpy array
         :return: dict with the HSR similarity score
         """
-
+        start_time = time.time()
         # Generate 3D coordinates
         try:
             #Check what object the molecule is:
@@ -196,7 +199,7 @@ class HSR:
                 mol_fp = fp.generate_fingerprint_from_data(molecule, scaling='matrix')
                 
         except Exception as e:
-            logger.error(f"Error generating 3D coordinates for {mol}: {e}")
+            # logger.error(f"Error generating 3D coordinates for {mol}: {e}")
             result.update({
                 f'3d_mol': 0.0,
                 f'{self.prefix}_HSR_score': 0.0
@@ -215,6 +218,12 @@ class HSR:
         if np.isnan(sim_score):
             sim_score = 0.0 
         result.update({f'{self.prefix}_HSR_score': sim_score})
+        
+        # For debugging purposes:
+        # Calculate and add the time taken to the result
+        time_taken = time.time() - start_time
+        result.update({'time_taken': time_taken})
+        
         return result
     
     
@@ -241,8 +250,26 @@ class HSR:
             )
         
         # Score individual smiles
-        with Pool(self.n_jobs) as pool:
+        
+        n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
+        
+        with Pool(n_processes) as pool:
             results = [r for r in pool.imap(pfunc, molecules)]
+            
+        # for debugging purposes
+        # Extract time_taken values for further analysis, handle cases where it may be missing
+        time_taken_list = [result['time_taken'] for result in results if 'time_taken' in result]    
+        
+        if time_taken_list:
+            print(f'Successfully scored {len(time_taken_list)} molecules.\n')
+            avg_time = np.mean(time_taken_list)
+            min_time = np.min(time_taken_list)
+            max_time = np.max(time_taken_list)
+
+            print(f"Scoring times - Avg: {avg_time:.2f} sec, Min: {min_time:.2f} sec, Max: {max_time:.2f} sec")
+        else:
+            print("No valid scoring times available for analysis.")
+            
             
         # # for loop (for easier debugging)
         # results = []
