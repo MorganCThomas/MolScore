@@ -284,19 +284,7 @@ class HSR:
         n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
         with Pool(n_processes) as pool:
             results = [r for r in pool.imap(pfunc, molecules)]
-            
-        # for debugging purposes
-        # Extract time_taken values for further analysis, handle cases where it may be missing
-        time_taken_list = [result['time_taken'] for result in results if 'time_taken' in result]    
-
-        if time_taken_list:
-            avg_time = np.mean(time_taken_list)
-            min_time = np.min(time_taken_list)
-            max_time = np.max(time_taken_list)
-            print(f"Scoring times - Avg: {avg_time:.2f} sec, Min: {min_time:.2f} sec, Max: {max_time:.2f} sec")
-        else:
-            print("No valid scoring times available for analysis.")
-            
+  
         # Save mols
         successes = 0
         for r, name in zip(results, file_names):
