@@ -273,7 +273,7 @@ class HSR:
                     result = async_result.get(timeout=self.timeout)
                 except multiprocessing.TimeoutError:
                     # Handle the timeout scenario by using default values
-                    logger.error(f"Timeout occurred for molecule: {molecules[i]}")
+                    # logger.error(f"Timeout occurred for molecule: {molecules[i]}")
                     result = {
                         "smiles": molecules[i],
                         f'3d_mol': 0.0,
