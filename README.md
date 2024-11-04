@@ -27,6 +27,7 @@ Alternatively, MolScore is available via the Python Package Index.
 
     pip install molscore --upgrade
 
+**Installation time**: Installation of molscore in the environment should complete in less than 5 minutes (tested using mamba).
 
 ## Functionality
 Scoring functionality present in **molscore**, some scoring functions require external softwares and necessary licenses.  
