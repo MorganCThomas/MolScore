@@ -128,5 +128,5 @@ class ADMETAI(BaseServerSF):
             server_path=resources.files("molscore.scoring_functions.servers").joinpath(
                 "admet_ai_server.py"
             ),
-            server_grace=30,
+            server_grace=60,
         )
