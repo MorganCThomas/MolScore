@@ -7,8 +7,7 @@ import signal
 import subprocess
 import sys
 import time
-import warnings
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -97,6 +96,7 @@ class MolScore:
         # Here are attributes used
         self.model_name = model_name
         self.step = 0
+        self.current_idx = 0
         self.budget = budget
         self.termination_threshold = termination_threshold
         self.termination_patience = termination_patience
@@ -107,7 +107,7 @@ class MolScore:
         self.termination_exit = termination_exit
         self.replay_size = replay_size
         self.replay_purge = replay_purge
-        self.replay_df = pd.DataFrame()
+        self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.finished = False
         self.init_time = time.time()
         self.results_df = None
@@ -200,11 +200,11 @@ class MolScore:
             self.main_df = pd.read_csv(
                 os.path.join(self.save_dir, "scores.csv"),
                 index_col=0,
-                dtype={"Unnamed: 0": "int64", "valid": object, "unique": object},
             )
             logger.debug(self.main_df.head())
-            # Update step
+            # Update step and idx
             self.step = max(self.main_df["step"])
+            self.current_idx = max(self.main_df.index[-1] + 1)
             # Update time
             self.init_time = time.time() - self.main_df["absolute_time"].iloc[-1]
             # Update max min
@@ -234,10 +234,8 @@ class MolScore:
             # Load in replay buffer
             if os.path.exists(os.path.join(self.save_dir, "replay_buffer.csv")):
                 logger.info("Loading replay_buffer.csv from previous run")
-                self.replay_df = pd.read_csv(
-                    os.path.join(self.save_dir, "replay_buffer.csv"),
-                    index_col=0,
-                    dtype={"Unnamed: 0": "int64", "valid": object, "unique": object},
+                self.replay_buffer.load(
+                    os.path.join(self.save_dir, "replay_buffer.csv")
                 )
 
         # Registor write_scores and kill_monitor at close
@@ -347,7 +345,7 @@ class MolScore:
 
         # Reset replay buffer
         if reset_replay_buffer:
-            self.replay_df = pd.DataFrame()
+            self.replay_buffer.reset()
 
         # Add warning in case of possible neverending optimization
         if self.termination_threshold and not self.budget:
@@ -355,173 +353,217 @@ class MolScore:
                 "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
             )
 
-    ## TODO: FUNCTION ASSUMING ONLY SMILES AS INPUT AND REPRESENTATION
-    def parse_smiles(self, smiles: list, step: int):
+    def parse(
+        self,
+        step: int,
+        mol_ids: Optional[list] = None,
+        smiles: Optional[list] = None,
+        canonicalise_smiles: bool = True,
+        **molecular_inputs,
+    ):
         """
-        Create batch_df object from initial list of SMILES and calculate validity and
-        intra-batch uniqueness
+        Create batch_df object from initial list of molecular inputs and calculate validity and
+        intra-batch uniqueness if possible.
 
-        :param smiles: List of smiles taken from generative model
-        :param step: current generative model step
+        :param step: Current generative model step
+        :param mol_ids: List of molecular identifiers, otherwise the numeric index will be used.
+        :param smiles: List of smiles from a generative model
+        :param canonicalise_smiles: Whether to canonicalise smiles using RDKit
         """
         # Initialize df for batch
-        self.batch_df = pd.DataFrame(index=range(len(smiles)))
+        _batch_size = len(smiles) if smiles else len(list(molecular_inputs.values())[0])
+        _running_idx = list(range(self.current_idx, self.current_idx + _batch_size))
+        _batch_idx = list(range(_batch_size))
+        self.batch_df = pd.DataFrame(index=_running_idx)
 
-        # Parse smiles
-        parsed_smiles = []
-        valid = []
-        batch_idx = []
-        for i, smi in enumerate(smiles):
-            try:
-                can_smi = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
-                parsed_smiles.append(can_smi)
-                valid.append("true")
-            except TypeError:
-                try:
-                    mol = Chem.MolFromSmiles(smi)
-                    Chem.SanitizeMol(mol)  # Try to catch invalid molecules and sanitize
-                    can_smi = Chem.MolToSmiles(mol)
-                    parsed_smiles.append(can_smi)
-                    valid.append("sanitized")
-                except Exception:
-                    parsed_smiles.append(smi)
-                    # valid.append("false")
-                    # Check for debugging
-                    valid.append('true')
-            batch_idx.append(i)
-
+        # Add batch constants
         self.batch_df["model"] = self.model_name.replace(" ", "_")
         self.batch_df["task"] = self.cfg["task"].replace(" ", "_")
         self.batch_df["step"] = step
-        self.batch_df["batch_idx"] = batch_idx
         self.batch_df["absolute_time"] = time.time() - self.init_time
-        self.batch_df["smiles"] = parsed_smiles
-        self.batch_df["valid"] = valid
-        self.batch_df["valid_score"] = [1 if v == "true" else 0 for v in valid]  ##
 
-        # Check for duplicates
-        duplicated = self.batch_df.smiles.duplicated().tolist()
-        unique = [
-            str(not b).lower() for b in duplicated
-        ]  # Reverse true/false i.e. unique as oppose to duplicated
-        self.batch_df["unique"] = unique
+        # Add indexes
+        self.batch_df["batch_idx"] = _batch_idx
+        self.batch_df["mol_id"] = mol_ids if mol_ids else _running_idx
 
-        # Count previous occurrences
-        occurrences = [
-            self.batch_df.smiles.iloc[:i][
-                self.batch_df.smiles.iloc[:i] == self.batch_df.smiles.iloc[i]
-            ].count()
-            for i in range(len(self.batch_df))
-        ]
-        self.batch_df["occurrences"] = occurrences
+        # Parse SMILES if present
+        if smiles:
+            parsed_smiles = []
+            valid = []
+            for smi in smiles:
+                if canonicalise_smiles:
+                    try:
+                        can_smi = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+                        parsed_smiles.append(can_smi)
+                        valid.append(True)
+                    except TypeError:
+                        try:
+                            # Try to catch invalid molecules and sanitize
+                            mol = Chem.MolFromSmiles(smi)
+                            Chem.SanitizeMol(mol)
+                            can_smi = Chem.MolToSmiles(mol)
+                            parsed_smiles.append(can_smi)
+                            valid.append(True)
+                        except Exception:
+                            parsed_smiles.append(smi)
+                            valid.append(False)
 
-        number_invalid = len(self.batch_df.loc[self.batch_df.valid == "false", :])
-        logger.debug(f"    Invalid molecules: {number_invalid}")
-        return self
+                else:
+                    parsed_smiles.append(smi)
 
-    def check_uniqueness(self):
+            self.batch_df["smiles"] = parsed_smiles
+            if valid:
+                self.batch_df["valid"] = valid
+                self.batch_df["valid_score"] = [1 if v else 0 for v in valid]
+                logger.debug(f"    Invalid molecules: {(~self.batch_df.valid).sum()}")
+
+        # Check for duplicates and count occurences
+        if mol_ids:
+            unique = list(~self.batch_df.mol_id.duplicated())
+            occurrences = [
+                self.batch_df.mol_id.iloc[:i][
+                    self.batch_df.mol_id.iloc[:i] == self.batch_df.mol_id.iloc[i]
+                ].count()
+                for i in range(len(self.batch_df))
+            ]
+            self.batch_df["unique"] = unique
+            self.batch_df["occurrences"] = occurrences
+            # TODO update mol_id with initial id
+        elif smiles:
+            unique = list(~self.batch_df.smiles.duplicated())
+            occurrences = [
+                self.batch_df.smiles.iloc[:i][
+                    self.batch_df.smiles.iloc[:i] == self.batch_df.smiles.iloc[i]
+                ].count()
+                for i in range(len(self.batch_df))
+            ]
+            self.batch_df["unique"] = unique
+            self.batch_df["occurrences"] = occurrences
+            # TODO update mol_id with initial id
+        else:
+            pass
+
+    def check_uniqueness(self, mol_ids: Optional[list] = None):
         """
         Check batch_df smiles against main_df of any previously sampled smiles
+        :param mol_ids: If provided will check by mol_id.
         """
+        if mol_ids:
+            # Pull duplicated mol_ids from the main_df
+            self.exists_df = self.main_df[
+                self.main_df.mol_id.isin(self.batch_df.mol_id.tolist())
+            ]
 
-        # Pull duplicated smiles from the main df
-        self.exists_df = self.main_df[
-            self.main_df.smiles.isin(self.batch_df.smiles.tolist())
-        ]
+            # Update unique and occurence columns
+            if len(self.exists_df) > 0:
+                for id in self.batch_df.mol_id.unique():
+                    tdf = self.exists_df[self.exists_df.mol_id == id]
+                    if len(tdf) > 0:
+                        self.batch_df.loc[self.batch_df.mol_id == id, "unique"] = False
+                        self.batch_df.loc[
+                            self.batch_df.mol_id == id, "occurrences"
+                        ] += len(tdf)
+            # TODO update mol_id with initial id
+        elif "smiles" in self.batch_df.columns:
+            # Pull duplicated smiles from the main_df
+            self.exists_df = self.main_df[
+                self.main_df.smiles.isin(self.batch_df.smiles.tolist())
+            ]
 
-        # Update unique and occurrence columns
-        if len(self.exists_df) > 0:
-            for smi in self.batch_df.smiles.unique():
-                tdf = self.exists_df[self.exists_df.smiles == smi]
-                if len(tdf) > 0:
-                    self.batch_df.loc[self.batch_df.smiles == smi, "unique"] = "false"
-                    self.batch_df.loc[self.batch_df.smiles == smi, "occurrences"] += (
-                        len(tdf)
-                    )
-        return self
+            # Update unique and occurrence columns
+            if len(self.exists_df) > 0:
+                for smi in self.batch_df.smiles.unique():
+                    tdf = self.exists_df[self.exists_df.smiles == smi]
+                    if len(tdf) > 0:
+                        self.batch_df.loc[self.batch_df.smiles == smi, "unique"] = False
+                        self.batch_df.loc[
+                            self.batch_df.smiles == smi, "occurrences"
+                        ] += len(tdf)
+            # TODO update mol_id with initial id
+        else:
+            pass
 
     def run_scoring_functions(
-        self, smiles: list, file_names: list, additional_formats: dict = None
+        self, batch_index: list, file_names: list, **molecular_inputs
     ):
         """
-        Calculate respective scoring function scores for a list of unique smiles
-         (with file names for logging if necessary).
+        Iterate over respective scoring/fitness functions to score molecular inputs and populate self.results_df
+         (file_names are necessary for logging).
 
-        :param smiles: A list of valid smiles, preferably without duplicated or known scores
+        :param batch_index: Batch index of the molecular inputs being scored
         :param file_names: A corresponding list of file prefixes for tracking - format={step}_{batch_idx}
-        :return: self.results (a list of dictionaries with smiles and resulting scores)
+        :param molecular_inputs: Molecular_inputs to pass to scoring functions
+        :return: None
         """
-        # self.results_df = pd.DataFrame(smiles, columns=["smiles"])
-        
-        #TODO: Need for a better handling of different format of molecules
+        self.results_df = pd.DataFrame(batch_index, columns=["batch_idx"])
         for function in self.scoring_functions:
             results = function(
-                smiles=smiles,
-                directory=self.save_dir,
-                file_names=file_names,
-                additional_formats=additional_formats,
+                directory=self.save_dir, file_names=file_names, **molecular_inputs
             )
             results_df = pd.DataFrame(results)
-            #TODO: Identify all places the dataase is use to extract smiles and their prorperties
-            # self.results_df = self.results_df.merge(
-            #     results_df, on="smiles", how="outer", sort=False
-            # )
-            
-            if self.results_df is None:
-                self.results_df = results_df
-            else:
-                self.results_df = pd.concat([self.results_df, results_df], axis=1)
-              
-        # TODO: remove this and use identifiers and mol objects in conjunction with smiles  
-        # Iterate through the 'smiles' column and convert non-strings to strings
-        self.results_df['smiles'] = self.results_df['smiles'].apply(
-            lambda x: str(x) if not isinstance(x, str) else x
-        )
-            
+            results_df["batch_idx"] = batch_index
+            # Merge
+            self.results_df = self.results_df.merge(results_df, how="outer", sort=False)
+
         # Drop any duplicates in results
-        self.results_df = self.results_df.drop_duplicates(subset="smiles")
-        return self
+        if "smiles" in self.results_df.columns:
+            self.results_df = self.results_df.drop_duplicates(subset="smiles")
 
     def first_update(self):
         """
-        Append calculated scoring function values to batch dataframe. Only used for the first step/batch.
+        Merge results_df with batch_df. Only used for the first step/batch.
         """
         logger.debug("    Merging results to batch df")
-        self.batch_df = self.batch_df.merge(
-            self.results_df, on="smiles", how="left", sort=False
-        )
+        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False)
         self.batch_df.fillna(0.0, inplace=True)
-        return self
 
-    def concurrent_update(self):
+    def concurrent_update(self, mol_ids: Optional[list] = None):
         """
-        Append calculated scoring function values to batch dataframe while looking up duplicated entries to avoid
-        re-calculating.
-
-        :return:
+        Merge results_df with batch_df and look up duplicated entries to avoid re-calculating.
+        :param mol_ids: If provided will check by mol_id.
         """
-        # Grab data for pre-existing smiles
+        # Update results_df with prexisting scores for duplicates
         if len(self.exists_df) > 0:
-            self.exists_df = self.exists_df.drop_duplicates(subset="smiles")
-            self.exists_df = self.exists_df.loc[:, self.results_df.columns]
-            # Check no duplicated values in exists and results df
-            dup_idx = self.exists_df.loc[
-                self.exists_df.smiles.isin(self.results_df.smiles), :
-            ].index.tolist()
-            if len(dup_idx) > 0:
-                self.exists_df.drop(index=dup_idx, inplace=True)
-            # Append to results, assuming no duplicates in results_df...
-            self.results_df = pd.concat(
-                [self.results_df, self.exists_df], axis=0, ignore_index=True, sort=False
-            )
+            if mol_ids:
+                self.exists_df = self.exists_df.drop_duplicates(subset="mol_id")
+                self.exists_df = self.exists_df.loc[:, self.results_df.columns]
+                # Check duplicated values in exists and results df
+                dup_idx = self.exists_df.loc[
+                    self.exists_df.mol_id.isin(self.results_df.mol_id), :
+                ].index.tolist()
+                if len(dup_idx) > 0:
+                    self.exists_df.drop(index=dup_idx, inplace=True)
+                # Append to results, assuming no duplicates in results_df...
+                # TODO might need to pass mol_id to run_scoring_functions() to check this
+                self.results_df = pd.concat(
+                    [self.results_df, self.exists_df],
+                    axis=0,
+                    ignore_index=True,
+                    sort=False,
+                )
+            elif "smiles" in self.exists_df.columns:
+                self.exists_df = self.exists_df.drop_duplicates(subset="smiles")
+                self.exists_df = self.exists_df.loc[:, self.results_df.columns]
+                # Check duplicated values in exists and results df
+                dup_idx = self.exists_df.loc[
+                    self.exists_df.smiles.isin(self.results_df.smiles), :
+                ].index.tolist()
+                if len(dup_idx) > 0:
+                    self.exists_df.drop(index=dup_idx, inplace=True)
+                # Append to results, assuming no duplicates in results_df...
+                self.results_df = pd.concat(
+                    [self.results_df, self.exists_df],
+                    axis=0,
+                    ignore_index=True,
+                    sort=False,
+                )
+            else:
+                pass
 
         # Merge with batch_df
         logger.debug("    Merging results to batch df")
-        self.batch_df = self.batch_df.merge(
-            self.results_df, on="smiles", how="left", sort=False
-        )
+        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False)
         self.batch_df.fillna(0.0, inplace=True)
-        return self
 
     def update_maxmin(self, df):
         """
@@ -551,21 +593,25 @@ class MolScore:
                     logger.debug(f"    Updated {metric['name']} min to {df_min}")
                 else:
                     pass
-        return self
 
     def compute_score(self, df):
         """
         Compute the final score i.e. combination of which metrics according to which method.
+
+        :param df: DataFrame containing the scores for each metric
         """
         mpo_columns = {"names": [], "weights": []}
         filter_columns = {"names": []}
-        # Iterate through specified metrics and apply modifier
         transformed_columns = {}
+
+        # Iterate through scoring parameters/metrics, transform and aggregate
         for metric in self.cfg["scoring"]["metrics"]:
             mod_name = f"{metric['modifier']}_{metric['name']}"
-            # NEW filter_columns else mpo_columns
+
+            # Store parameter as filter (multiply final fitness function)
             if metric.get("filter", False):
                 filter_columns["names"].append(mod_name)
+            # Store parameter for aggregation into fitness function
             else:
                 mpo_columns["names"].append(mod_name)
                 mpo_columns["weights"].append(metric["weight"])
@@ -574,10 +620,12 @@ class MolScore:
                 if metric["modifier"] == mod.__name__:
                     modifier = mod
 
-            # Check the modifier function exists, and the metric can be found in the dataframe
+            # Check the modifier function exists
             assert any(
                 [metric["modifier"] == mod.__name__ for mod in self.modifier_functions]
             ), f"Score modifier {metric['modifier']} not found"
+
+            # Check the metric can be found in the dataframe
             try:
                 assert (
                     metric["name"] in df.columns
@@ -586,19 +634,23 @@ class MolScore:
                 self._write_temp_state(step=self.step)
                 raise e
 
+            # Apply transform to parameter
             transformed_columns[mod_name] = (
                 df.loc[:, metric["name"]]
                 .apply(lambda x: modifier(x, **metric["parameters"])) 
                 .rename(mod_name)
             )
+
+        # Merge transformed parameters into main dataframe
         df = pd.concat([df] + list(transformed_columns.values()), axis=1)
+
         # Double check we have no NaN or 0 values (necessary for geometric mean) for mpo columns
         df.loc[:, mpo_columns["names"]].fillna(1e-6, inplace=True)
         df[mpo_columns["names"]] = df[mpo_columns["names"]].apply(
             lambda x: [1e-6 if y < 1e-6 else y for y in x]
         )
 
-        # Compute final score
+        # Aggregate into final fitness score
         if mpo_columns["names"]:
             df[self.cfg["scoring"]["method"]] = df.loc[:, mpo_columns["names"]].apply(
                 lambda x: self.mpo_method(
@@ -615,10 +667,11 @@ class MolScore:
                 "No score columns provided for aggregation, returning a full reward of 1.0"
             )
 
-        # NEW Add filter metrics
+        # Combine filter parameters (anticipated to be 1 or 0)
         df["filter"] = df.loc[:, filter_columns["names"]].apply(
             lambda x: np.prod(x), axis=1, raw=True
         )
+        # Multiply fitness score by any filter parameters
         df[self.cfg["scoring"]["method"]] = (
             df[self.cfg["scoring"]["method"]] * df["filter"]
         )
@@ -627,6 +680,9 @@ class MolScore:
 
     def run_diversity_filter(self, df):
         if self.diversity_filter == "Unique":
+            assert (
+                "unique" in df.columns
+            ), "Unique column not found in dataframe, cannot apply unique diversity filter"
             df[f"filtered_{self.cfg['scoring']['method']}"] = [
                 s if u == "true" else 0.0
                 for u, s in zip(df["unique"], df[self.cfg["scoring"]["method"]])
@@ -641,6 +697,9 @@ class MolScore:
             df.fillna(1e-6)
 
         elif self.diversity_filter == "Occurrence":
+            assert (
+                "occurrences" in df.columns
+            ), "occurrences column not found in dataframe, cannot apply occurrences diversity filter"
             df[f"filtered_{self.cfg['scoring']['method']}"] = [
                 s
                 * utils.lin_thresh(
@@ -661,6 +720,9 @@ class MolScore:
             ]
 
         else:  # Memory-assisted
+            assert (
+                "smiles" in df.columns
+            ), "smiles column not found in dataframe, cannot apply memory-assisted diversity filter"
             scores_dict = {
                 "total_score": np.asarray(
                     df[self.cfg["scoring"]["method"]].tolist(), dtype=np.float64
@@ -680,7 +742,6 @@ class MolScore:
 
     def log_parameters(self, parameters: dict):
         self.logged_parameters.update(parameters)
-        return self
 
     def write_scores(self):
         """
@@ -707,12 +768,10 @@ class MolScore:
             self.diversity_filter.savetocsv(
                 os.path.join(self.save_dir, "scaffold_memory.csv")
             )
-        if not self.replay_df.empty:
-            self.replay_df.to_csv(os.path.join(self.save_dir, "replay_buffer.csv"))
+        if len(self.replay_buffer) > 0:
+            self.replay_buffer.save(os.path.join(self.save_dir, "replay_buffer.csv"))
 
         self.fh.close()
-
-        return self
 
     def _write_temp_state(self, step):
         try:
@@ -723,8 +782,8 @@ class MolScore:
                 self.diversity_filter.savetocsv(
                     os.path.join(self.save_dir, f"scaffold_memory_{step}.csv")
                 )
-            if not self.replay_df.empty:
-                self.replay_df.to_csv(
+            if len(self.replay_buffer) > 0:
+                self.replay_buffer.save(
                     os.path.join(self.save_dir, f"replay_buffer_{step}.csv")
                 )
             self.batch_df.to_csv(os.path.join(self.save_dir, f"batch_df_{step}.csv"))
@@ -778,7 +837,6 @@ class MolScore:
         # Start dash_utils monitor (Killed in write scores method)
         cmd = ["streamlit", "run", self.monitor_app_path, self.save_dir]
         self.monitor_app = subprocess.Popen(cmd, preexec_fn=os.setsid)
-        return self
 
     def kill_monitor(self):
         """
@@ -837,60 +895,54 @@ class MolScore:
         if self.termination_exit and self.finished:
             sys.exit(1)
 
-    def update_replay_buffer(self, df):
-        df = df.copy()
-        # Purge df
-        if self.replay_purge:
-            if self.diversity_filter:
-                df = df.loc[df.passes_diversity_filter, :]
-            else:
-                logger.warn(
-                    "Cannot purge replay buffer without a running diversity filter"
-                )
-        # Concat
-        self.replay_df = pd.concat([self.replay_df, df], axis=0)
-        # Drop_duplicates
-        self.replay_df.drop_duplicates(subset="smiles", inplace=True)
-        # Sort
-        self.replay_df.sort_values(
-            by=self.cfg["scoring"]["method"], ascending=False, inplace=True
-        )
-        # Prune
-        self.replay_df = self.replay_df.iloc[: self.replay_size, :]
-
-    def score_only(self, smiles: list, step: int = None, flt: bool = False):
+    def _score_only(
+        self,
+        step: int = None,
+        flt: bool = False,
+        **molecular_inputs,
+        ):
+        """
+        This hidden method will only score inputs without caching the data.
+        """
+        
+        # Set some values
         batch_start = time.time()
         if step is not None:
             self.step = step
-        logger.info(f"   Scoring: {len(smiles)} SMILES")
-        run_smiles = list(set(smiles))
-        file_names = [f"{self.step}_{i}" for i, smi in enumerate(run_smiles)]
-        self.run_scoring_functions(smiles=run_smiles, file_names=file_names)
+        else:
+            self.step += 1
+        _batch_size = [len(v) for v in molecular_inputs.values()][0]
+        logger.info(f"   Scoring: {_batch_size} molecular inputs")
+        
+        # Parse inputs to scoring function
+        _process_batch_idxs = list(range(_batch_size))
+        file_names = [f"{self.step}_{i}" for i in _process_batch_idxs]
+        self.run_scoring_functions(
+            batch_index=_process_batch_idxs,
+            file_names=file_names,
+            **molecular_inputs,
+        )
         logger.info(
             f"    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s"
         )
-        self.update_maxmin(self.results_df)
+        
+        # Compute final fitness score
+        self.update_maxmin(df=self.results_df)
         self.results_df = self.compute_score(self.results_df)
+        
+        # Apply diversity filter if specified
         if self.diversity_filter is not None:
             self.results_df = self.run_diversity_filter(self.results_df)
             score_col = f"filtered_{self.cfg['scoring']['method']}"
         else:
             score_col = self.cfg["scoring"]["method"]
-
-        # TODO: Remove the str conversion of smiles
-        # smiles = [str(smi) if not isinstance(smi, str) else smi for smi in smiles]
-        
-        scores = [
-            float(self.results_df.loc[self.results_df.smiles == smi, score_col])
-            for smi in smiles
-            # # TODO: see above
             
-            # float(self.results_df.iloc[i][score_col]) for i in range(len(self.results_df.smiles))
-        ]
+        # Fetch scores
+        scores = self.results_df.loc[:, score_col].tolist()
         if not flt:
             scores = np.array(scores, dtype=np.float32)
         logger.info(
-            f"    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s"
+            f"    Score returned for {len(self.results_df)} molecular inputs in {time.time() - batch_start:.02f}s"
         )
 
         # Clean up class
@@ -901,29 +953,67 @@ class MolScore:
 
     def score(
         self,
-        smiles: list,
+        smiles: Optional[list] = None,
+        mol_ids: Optional[list] = None,
         step: int = None,
         flt: bool = False,
+        canonicalise_smiles: bool = True,
         recalculate: bool = False,
         score_only: bool = False,
-        additional_formats=None,
-        **kwargs,
+        **molecular_inputs,
     ):
         """
-        Calling this method will result in the primary function of scoring smiles and logging data in
+        Calling this method will result in the primary function of scoring molecular inputs and logging data in
          an automated fashion, and returning output values.
 
-        :param smiles: A list of smiles for scoring.
+        :param smiles: A list of smiles to score.
+        :param mol_ids: A list of molecular identifiers, if not provided the numeric index will be used.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
-        :param recalculate: Whether to recalculate scores for duplicated values,
-         in case scoring function may be somewhat stochastic.
-          (default False i.e. use existing scores for duplicated molecules)
-        :param score_only: Whether to log molecule data or simply score and return
+        :param canonicalise_smiles: Whether to canonicalise smiles during parsing
+        :param recalculate: Whether to pass duplicated mol_ids to the scoring functions again,
+          may be desirable if the scoring function is somewhat stochastic.
+          (default False i.e. re-use existing scores for duplicated molecules to save)
+        :param score_only: Whether to cache molecular data or simply score inputs and return scores
+        :param molecular_inputs: Score accepts arbitrary keyword arguments of molecular representations that will be passed to scoring functions
         :return: Scores (either float list or np.array)
+
+        Examples:
+            >>> from molscore import MolScore, MockGenerator
+
+            # Scoring smiles
+            >>> MS = MolScore(model_name='test', task_config='GuacaMol:Albuterol_similarity')
+            >>> MG = MockGenerator()
+            >>> smiles = MG.sample(10)
+            >>> scores = MS.score(smiles=smiles)
+
+            # Passing other representations e.g., RDKit Mol objects
+            >>> mols = [Chem.MolFromSmiles(smi) for smi in smiles]
+            >>> scores = MS.score(rdkit_mols=mols) # Scoring function used should anticipate rdkit_mols as input
+
+            # Using both representations and a custom identifier
+            >>> inchis = [Chem.MolToInchi(mol) for mol in mols]
+            >>> scores = MS.score(smiles=smiles, mol_ids=inchis, rdkit_mols=mols)
         """
+        # Check and organise our molecular representations
+        assert (
+            smiles or len(molecular_inputs)
+        ), "No molecular representations provided, please supply smiles or other representations as keyword arguments"
+        if smiles:
+            molecular_inputs["smiles"] = smiles
+        assert all(
+            isinstance(v, list) for v in molecular_inputs.values()
+        ), "All molecular representations must be lists"
+        _batch_size = [len(v) for v in molecular_inputs.values()]
+        assert all(
+            s == _batch_size[0] for s in _batch_size
+        ), f"All molecular representations must of equal number but got {_batch_size}"
+        _batch_size = _batch_size[0]
+
         if score_only:
-            return self.score_only(smiles=smiles, step=step, flt=flt)
+            return self._score_only(
+                step=step, flt=flt, **molecular_inputs
+            )  # TODO accept any molecular representation
 
         # Set some values
         batch_start = time.time()
@@ -932,82 +1022,88 @@ class MolScore:
         else:
             self.step += 1
         logger.info(f"STEP {self.step}")
-        logger.info(f"    Received: {len(smiles)} SMILES")
+        logger.info(f"    Received: {_batch_size} molecular inputs")
 
         # Parse smiles and initiate batch df
-        self.parse_smiles(smiles=smiles, step=self.step)
-        logger.debug(f"    Pre-processed: {len(self.batch_df)} SMILES")
-        logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
+        self.parse(
+            mol_ids=mol_ids,
+            step=self.step,
+            canonicalise_smiles=canonicalise_smiles,
+            **molecular_inputs,
+        )
+        logger.debug(f"    Pre-processed: {len(self.batch_df)} molecular inputs")
 
         # If a main df exists check if some molecules have already been sampled
         if isinstance(self.main_df, pd.core.frame.DataFrame):
-            self.check_uniqueness()
+            self.check_uniqueness(mol_ids=mol_ids)
             logger.debug(f"    Uniqueness updated: {len(self.batch_df)} SMILES")
-        logger.info(
-            f'    Duplicates found: {(self.batch_df.unique == "false").sum()} SMILES'
-        )
 
-        # Subset only unique and valid smiles
+        # Subset molecular inputs to pass to scoring functions
+        _process_batch_idxs = list(range(_batch_size))
         if recalculate:
-            smiles_to_process = self.batch_df.loc[
-                self.batch_df.valid.isin(["true", "sanitized"]), "smiles"
-            ].tolist()
-            smiles_to_process_index = self.batch_df.loc[
-                self.batch_df.valid.isin(["true", "sanitized"]), "batch_idx"
-            ].tolist()
+            # Pass all valid molecules to scoring functions
+            if "valid" in self.batch_df.columns:
+                _process_batch_idxs = self.batch_df.loc[
+                    self.batch_df.valid, "batch_idx"
+                ].tolist()
         else:
-            smiles_to_process = self.batch_df.loc[
-                (self.batch_df.valid.isin(["true", "sanitized"]))
-                & (self.batch_df.unique == "true"),
-                "smiles",
-            ].tolist()
-            smiles_to_process_index = self.batch_df.loc[
-                (self.batch_df.valid.isin(["true", "sanitized"]))
-                & (self.batch_df.unique == "true"),
-                "batch_idx",
-            ].tolist()
-        if len(smiles_to_process) == 0:
-            # If no smiles to process then instead submit 10 (scoring function should handle invalid)
-            logger.info("    No smiles to score so submitting first 10 SMILES")
-            smiles_to_process = self.batch_df.loc[:9, "smiles"].tolist()
-            smiles_to_process_index = self.batch_df.loc[:9, "batch_idx"].tolist()
+            # Pass all valid and unique molecules to scoring functions
+            # If valid column, there should be unique column
+            if ("valid" in self.batch_df.columns) and (
+                "unique" in self.batch_df.columns
+            ):
+                _process_batch_idxs = self.batch_df.loc[
+                    self.batch_df.valid & self.batch_df.unique,
+                    "batch_idx",
+                ].tolist()
+            # But unique can exist without valid
+            elif "unique" in self.batch_df.columns:
+                _process_batch_idxs = self.batch_df.loc[
+                    self.batch_df.unique, "batch_idx"
+                ].tolist()
+            else:
+                pass
 
-        assert len(smiles_to_process) == len(smiles_to_process_index)
-        file_names = [f"{self.step}_{i}" for i in smiles_to_process_index]
-        logger.info(f"    Scoring: {len(smiles_to_process)} SMILES")
+        if len(_process_batch_idxs) == 0:
+            # If nothing to process then instead submit atleast 1 (scoring function should handle invalid)
+            logger.info("    No smiles to score so submitting first input")
+            _process_batch_idxs = [0]
 
-        # If additional formats are specified, then index and run these too
-        if additional_formats is not None:
-            additional_formats = {
-                k: [m for i, m in enumerate(v) if i in smiles_to_process_index]
-                for k, v in additional_formats.items()
-            }
+        # Prepare file names and molecular inputs for scoring function
+        file_names = [f"{self.step}_{i}" for i in _process_batch_idxs]
+        _process_molecular_inputs = {
+            k: [m for i, m in enumerate(v) if i in _process_batch_idxs]
+            for k, v in molecular_inputs.items()
+        }
+        logger.info(f"    Scoring: {len(_process_batch_idxs)} molecular inputs")
 
         # Run scoring function
         scoring_start = time.time()
         self.run_scoring_functions(
-            smiles=smiles_to_process,
+            batch_index=_process_batch_idxs,
             file_names=file_names,
-            additional_formats=additional_formats,
+            **_process_molecular_inputs,
         )
-        logger.debug(f"    Returned score for {len(self.results_df)} SMILES")
+        logger.debug(f"    Returned score for {len(self.results_df)} molecular inputs")
         logger.debug(f"    Scoring elapsed time: {time.time() - scoring_start:.02f}s")
 
         # Append scoring results
         if isinstance(self.main_df, pd.core.frame.DataFrame) and not recalculate:
-            self.concurrent_update()
+            self.concurrent_update(mol_ids=mol_ids)
         else:
             self.first_update()
-        logger.debug(f"    Scores updated: {len(self.batch_df)} SMILES")
+        logger.debug(f"    Scores updated: {len(self.batch_df)} molecular inputs")
 
-        # Compute average / score
+        # Compute final fitness score
         self.update_maxmin(df=self.batch_df)
         self.batch_df = self.compute_score(df=self.batch_df)
-        logger.debug(f"    Aggregate score calculated: {len(self.batch_df)} SMILES")
+        logger.debug(
+            f"    Aggregate score calculated: {len(self.batch_df)} molecular inputs"
+        )
         if self.diversity_filter is not None:
             self.batch_df = self.run_diversity_filter(self.batch_df)
             logger.info(
-                f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} SMILES'
+                f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} molecular inputs'
             )
 
         # Add information of scoring time
@@ -1015,11 +1111,12 @@ class MolScore:
 
         # Append batch df to main df if it exists, else initialise it.
         if isinstance(self.main_df, pd.core.frame.DataFrame):
-            # update indexing based on most recent index
-            self.batch_df.index = self.batch_df.index + self.main_df.index[-1] + 1
+            # Update indexing based on most recent index
             self.main_df = pd.concat([self.main_df, self.batch_df], axis=0)
         else:
             self.main_df = self.batch_df.copy()
+        # Update current idx
+        self.current_idx = self.main_df.index[-1] + 1
 
         # Write out csv log for each iteration
         self.batch_df.to_csv(
@@ -1027,8 +1124,13 @@ class MolScore:
         )
 
         # Update replay buffer
-        if self.replay_size:
-            self.update_replay_buffer(self.batch_df)
+        if self.replay_size:  # TODO accept any molecular input
+            self.replay_buffer.update(
+                self.batch_df,
+                endpoint_key=self.cfg["scoring"]["method"],
+                using_DF=bool(self.diversity_filter),
+                **molecular_inputs
+            )
 
         # Start dash_utils monitor to track iteration files once first one is written!
         if self.monitor_app is True:
@@ -1054,8 +1156,10 @@ class MolScore:
                 self.diversity_filter.savetocsv(
                     os.path.join(self.save_dir, "scaffold_memory.csv")
                 )
-            if not self.replay_df.empty:
-                self.replay_df.to_csv(os.path.join(self.save_dir, "replay_buffer.csv"))
+            if len(self.replay_buffer) > 0:
+                self.replay_buffer.save(
+                    os.path.join(self.save_dir, "replay_buffer.csv")
+                )
 
         # Clean up class
         self.evaluate_finished()
@@ -1065,63 +1169,24 @@ class MolScore:
 
         return scores
 
-    def __call__(
-        self,
-        smiles: list,
-        step: int = None,
-        flt: bool = False,
-        recalculate: bool = False,
-        score_only: bool = False,
-        additional_formats=None,
-    ):
+    def __call__(self, *args, **kwargs):
         """
-        Calling MolScore will result in the primary function of scoring smiles and logging data in
-         an automated fashion, and returning output values.
-
-        :param smiles: A list of smiles for scoring.
-        :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
-        :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
-        :param recalculate: Whether to recalculate scores for duplicated values,
-         in case scoring function may be somewhat stochastic.
-          (default False i.e. use existing scores for duplicated molecules)
-        :param score_only: Whether to log molecule data or simply score and return
-        :return: Scores (either float list or np.array)
+        Directly calling MolScore is being deprecated, please use score() instead.
         """
-        
-        # TODO: Can we make HERE the distinction between the different formats of molecules?
-        # Between 2D and 3D, by making a score function tailored for 3D which accepts different formats of 
-        # molecules (it does not assume the use of SMILES)
-        # OR it is better to "split" the smiles field in a molecular identifier and a molecular
-        # representation and adjust the existing code?
-        
-        
-        return self.score(
-            smiles=smiles,
-            step=step,
-            flt=flt,
-            recalculate=recalculate,
-            score_only=score_only,
-            additional_formats=additional_formats,
-        )
+        return self.score(*args, **kwargs)
 
     # ----- Additional methods only run if called directly -----
-    def replay(self, n, augment: bool = False) -> Union[list, list]:
+    def replay(self, n, molecule_key: str = 'smiles', augment: bool = False) -> Union[list, list]:
         """
         Sample n molecules from the replay buffer
         :param n: Number of molecules to sample
+        :param molecule_key: What type of possible representation to return if present
         :param augment: Whether to augment the replay buffer by randomizing the smiles
         :return: List of SMILES and scores
         """
-        if n > len(self.replay_df):
-            n = len(self.replay_df)
-        # Sample n from buffer
-        sample_df = self.replay_df.sample(n=n)
-        smiles = sample_df.smiles.tolist()
-        scores = sample_df[self.cfg["scoring"]["method"]].tolist()
-        # Augment
-        if augment:
-            smiles = utils.augment_smiles(smiles)
-        return smiles, scores
+        return self.replay_buffer.sample(
+            n=n, endpoint_key=self.cfg["scoring"]["method"], molecule_key=molecule_key, augment=augment
+        )
 
     def compute_metrics(
         self,
