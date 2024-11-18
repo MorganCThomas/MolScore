@@ -355,6 +355,7 @@ class MolScore:
                 "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
             )
 
+    ## TODO: FUNCTION ASSUMING ONLY SMILES AS INPUT AND REPRESENTATION
     def parse_smiles(self, smiles: list, step: int):
         """
         Create batch_df object from initial list of SMILES and calculate validity and
@@ -461,7 +462,7 @@ class MolScore:
                 additional_formats=additional_formats,
             )
             results_df = pd.DataFrame(results)
-
+            #TODO: Identify all places the dataase is use to extract smiles and their prorperties
             # self.results_df = self.results_df.merge(
             #     results_df, on="smiles", how="outer", sort=False
             # )
@@ -1090,7 +1091,8 @@ class MolScore:
         # TODO: Can we make HERE the distinction between the different formats of molecules?
         # Between 2D and 3D, by making a score function tailored for 3D which accepts different formats of 
         # molecules (it does not assume the use of SMILES)
-        
+        # OR it is better to "split" the smiles field in a molecular identifier and a molecular
+        # representation and adjust the existing code?
         
         
         return self.score(
