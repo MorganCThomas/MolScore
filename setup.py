@@ -14,7 +14,7 @@ setup(
             'configs/**/*',
             'scoring_functions/gypsum_dl/**/*'],
         'moleval': [
-            'test/data/sample.smi',
+            'tests/data/**',
             'metrics/mcf.csv',
             'metrics/wehi_pains.csv',
             'metrics/quality_filters/alert_collection.csv',

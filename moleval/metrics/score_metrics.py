@@ -16,7 +16,12 @@ from moleval.metrics.metrics_utils import (
     mapper,
     neutralize_atoms,
 )
-from moleval.utils import Fingerprints, maxmin_picker
+from moleval.utils import (
+    Fingerprints,
+    check_env_jobs,
+    get_multiprocessing_context,
+    maxmin_picker,
+)
 
 
 class ScoreMetrics:
@@ -31,7 +36,7 @@ class ScoreMetrics:
         benchmark=None,
     ):
         # Pre-process scores
-        self.n_jobs = n_jobs
+        self.n_jobs = check_env_jobs(n_jobs)
         self.total = len(scores)
         self.budget = budget if budget else self.total
         self.scores = self._preprocess_scores(
@@ -152,17 +157,18 @@ class ScoreMetrics:
         scaffolds = mapper(self.n_jobs)(get_scaff, smiles)
         return smiles, scaffolds
 
+    @staticmethod
     def top_avg(
-        self,
+        scores,
         top_n=[1, 10, 100],
         endpoint=None,
-        basic_filter=False,
-        target_filter=False,
         diverse=False,
+        prefix="",
+        queue=None,
     ):
         """Return the average score of the top n molecules"""
         # Filter by chemistry
-        tdf = self.filter(basic=basic_filter, target=target_filter)
+        tdf = scores
         buffer = ChemistryBuffer(buffer_size=max(top_n))
         if diverse:
             buffer.update_from_score_metrics(df=tdf, endpoint=endpoint)
@@ -175,23 +181,40 @@ class ScoreMetrics:
                 results.append(buffer.top_n(n))
             else:
                 results.append(tdf.iloc[:n][endpoint].mean())
-        return results
 
+        if queue:
+            # Return as dictionary
+            if diverse:
+                output = [
+                    (prefix + f"Top-{n} Avg (Div) {endpoint}", r)
+                    for n, r in zip(top_n, results)
+                ]
+            else:
+                output = [
+                    (prefix + f"Top-{n} Avg {endpoint}", r)
+                    for n, r in zip(top_n, results)
+                ]
+            for o in output:
+                queue.put(o)
+        else:
+            return results
+
+    @staticmethod
     def top_auc(
-        self,
+        scores,
+        budget,
         top_n=[1, 10, 100],
         endpoint=None,
         window=100,
         extrapolate=True,
-        basic_filter=False,
-        target_filter=False,
         diverse=False,
         return_trajectory=False,
+        prefix="",
+        queue=None,
     ):
         """Return the area under the curve of the top n molecules"""
         # Filter by chemistry
-        tdf = self.filter(basic=basic_filter, target=target_filter)
-
+        tdf = scores
         cumsum = [0] * len(top_n)
         prev = [0] * len(top_n)
         called = 0
@@ -199,7 +222,7 @@ class ScoreMetrics:
         auc_values = [[0] for _ in range(len(top_n))]
         buffer = ChemistryBuffer(buffer_size=max(top_n))
         # Per log freq
-        for idx in range(window, min(tdf.index.max(), self.budget), window):
+        for idx in range(window, min(tdf.index.max(), budget), window):
             if diverse:
                 # Buffer keeps a memory so only need the latest window
                 buffer.update_from_score_metrics(
@@ -235,9 +258,9 @@ class ScoreMetrics:
                 indices[i].append(tdf.index.max())
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
-                if extrapolate and (tdf.index.max() < self.budget):
-                    cumsum[i] += (self.budget - tdf.index.max()) * n_now
-                    indices[i].append(self.budget)
+                if extrapolate and (tdf.index.max() < budget):
+                    cumsum[i] += (budget - tdf.index.max()) * n_now
+                    indices[i].append(budget)
                     auc_values[i].append(n_now)
         else:
             temp_result = tdf.sort_values(by=endpoint, ascending=False)
@@ -248,47 +271,75 @@ class ScoreMetrics:
                 indices[i].append(tdf.index.max())
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
-                if extrapolate and (tdf.index.max() < self.budget):
-                    cumsum[i] += (self.budget - tdf.index.max()) * n_now
-                    indices[i].append(self.budget)
+                if extrapolate and (tdf.index.max() < budget):
+                    cumsum[i] += (budget - tdf.index.max()) * n_now
+                    indices[i].append(budget)
                     auc_values[i].append(n_now)
-        if return_trajectory:
-            return [x / self.budget for x in cumsum], indices, auc_values
-        else:
-            return [x / self.budget for x in cumsum]
 
+        if return_trajectory:
+            return [x / budget for x in cumsum], indices, auc_values
+
+        if queue:
+            # Return as dictionary
+            if diverse:
+                output = [
+                    (prefix + f"Top-{n} AUC (Div) {endpoint}", x / budget)
+                    for n, x in zip(top_n, cumsum)
+                ]
+            else:
+                output = [
+                    (prefix + f"Top-{n} AUC {endpoint}", x / budget)
+                    for n, x in zip(top_n, cumsum)
+                ]
+            for o in output:
+                queue.put(o)
+        else:
+            return [x / budget for x in cumsum]
+
+    @staticmethod
     def tyield(
-        self,
+        scores,
+        budget,
         endpoint,
         threshold,
         scaffold=False,
-        basic_filter=False,
-        target_filter=False,
-        diverse=False,
+        prefix="",
+        queue=None,
     ):
         """Threshold yield"""
         # Filter by chemistry
-        tdf = self.filter(basic=basic_filter, target=target_filter)
+        tdf = scores
         # Get number of hits
         hits = tdf.loc[tdf[endpoint] >= threshold]
         if scaffold:
             hits = hits.scaffold.dropna().unique()
-        return len(hits) / self.budget
 
+        if queue:
+            # Return as dictionary
+            if scaffold:
+                output = (prefix + f"Yield Scaffold {endpoint}", len(hits) / budget)
+            else:
+                output = (prefix + f"Yield {endpoint}", len(hits) / budget)
+            queue.put(output)
+        else:
+            return len(hits) / budget
+
+    @staticmethod
     def tyield_auc(
-        self,
+        scores,
+        budget,
         endpoint,
         threshold,
         window=100,
         extrapolate=True,
         scaffold=False,
-        basic_filter=False,
-        target_filter=False,
         return_trajectory=False,
+        prefix="",
+        queue=None,
     ):
         """Return the AUC of the thresholded yield"""
         # Filter by chemistry
-        tdf = self.filter(basic=basic_filter, target=target_filter)
+        tdf = scores
 
         cumsum = 0
         prev = 0
@@ -296,7 +347,7 @@ class ScoreMetrics:
         indices = []
         yields = []
         # Per log freq
-        for idx in range(window, min(tdf.index.max(), self.budget), window):
+        for idx in range(window, min(tdf.index.max(), budget), window):
             temp_result = tdf.loc[:idx]
             # Get number of hits
             temp_hits = temp_result.loc[temp_result[endpoint] >= threshold]
@@ -317,14 +368,23 @@ class ScoreMetrics:
         indices.append(tdf.index.max())
         yields.append(tyield)
         # If finished early, extrapolate
-        if extrapolate and tdf.index.max() < self.budget:
-            cumsum += (self.budget - tdf.index.max()) * tyield
-            indices.append(self.budget)
+        if extrapolate and tdf.index.max() < budget:
+            cumsum += (budget - tdf.index.max()) * tyield
+            indices.append(budget)
             yields.append(tyield)
         if return_trajectory:
-            return cumsum / self.budget, indices, yields
+            return cumsum / budget, indices, yields
+
+        if queue:
+            # Return as dictionary
+            if scaffold:
+                output = (prefix + f"Yield AUC Scaffold {endpoint}", cumsum / budget)
+            else:
+                output = (prefix + f"Yield AUC {endpoint}", cumsum / budget)
+            queue.put(output)
+
         else:
-            return cumsum / self.budget
+            return cumsum / budget
 
     def targets_rediscovered(
         self, smiles, target_smiles, scaffolds=[], target_scaffolds=[]
@@ -340,7 +400,9 @@ class ScoreMetrics:
         return rediscovered_smiles, rediscovered_scaffolds
 
     def guacamol_score(self, endpoint):
+        # Calculate Score
         task = self.scores.task.unique()[0]
+        tdf = self.scores.copy()
         if any(
             [
                 task.lower().startswith(name)
@@ -367,10 +429,9 @@ class ScoreMetrics:
             ]
         ):
             top1, top10, top100 = self.top_avg(
+                scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-                basic_filter=False,
-                target_filter=False,
             )
             score = np.mean([top1, top10, top100])
         elif any(
@@ -380,26 +441,45 @@ class ScoreMetrics:
             ]
         ):
             (score,) = self.top_avg(
-                top_n=[1], endpoint=endpoint, basic_filter=False, target_filter=False
+                scores=tdf,
+                top_n=[1],
+                endpoint=endpoint,
             )
         elif task == "C11H24":
             (score,) = self.top_avg(
-                top_n=[159], endpoint=endpoint, basic_filter=False, target_filter=False
+                scores=tdf,
+                top_n=[159],
+                endpoint=endpoint,
             )
         elif task == "C9H10N2O2PF2Cl":
             (score,) = self.top_avg(
-                top_n=[250], endpoint=endpoint, basic_filter=False, target_filter=False
+                scores=tdf,
+                top_n=[250],
+                endpoint=endpoint,
             )
         else:
             print(f"Unknown GuacaMol task {task}, returning uniform specification")
             top1, top10, top100 = self.top_avg(
+                scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-                basic_filter=False,
-                target_filter=False,
             )
             score = np.mean([top1, top10, top100])
-        return score
+        # Calculate Quality
+        qf = QualityFilter(n_jobs=self.n_jobs)
+        top100_mols = self.scores.sort_values(by=endpoint, ascending=False)[
+            "smiles"
+        ].iloc[:100]
+        if len(top100_mols) < 100:
+            print("Less than 100 molecules to score for GuacaMol Quality, returning 0")
+            quality_score = 0
+        else:
+            quality_score = qf.score_mols(top100_mols)
+        metrics = {
+            "GuacaMol_Score": score,
+            "GuacaMol_Quality": quality_score,
+        }
+        return metrics
 
     def libinvent_score(self, endpoint):
         task = self.scores.task.unique()[0]
@@ -425,6 +505,7 @@ class ScoreMetrics:
         return metrics
 
     def molexp_score(self):
+        tdf = self.scores.copy()
         sim_endpoints = [
             c for c in self.scores.columns if re.search("_Cmpd[0-9]*_Sim", c)
         ]
@@ -433,20 +514,19 @@ class ScoreMetrics:
         for endpoint in sim_endpoints:
             # Calculate top AVG
             top1, top10, top100 = self.top_avg(
+                scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-                basic_filter=False,
-                target_filter=False,
             )
             top_avgs.append([top1, top10, top100])
             # Calculate top AUC
             top1, top10, top100 = self.top_auc(
+                scores=tdf,
+                budget=self.budget,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
                 window=100,
                 extrapolate=True,
-                basic_filter=False,
-                target_filter=False,
             )
             top_aucs.append([top1, top10, top100])
         # Aggregate and take product
@@ -469,36 +549,9 @@ class ScoreMetrics:
             pass
         if self.benchmark.startswith("MolExp"):
             benchmark_metrics.update(self.molexp_score())
-        elif self.benchmark == "GuacaMol":
+        elif self.benchmark in ["GuacaMol", "GuacaMol_Scaffold"]:
             # Score
-            benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
-            # Quality
-            qf = QualityFilter(n_jobs=self.n_jobs)
-            top100_mols = self.scores.sort_values(by=endpoint, ascending=False)[
-                "smiles"
-            ].iloc[:100]
-            if len(top100_mols) < 100:
-                print(
-                    "Less than 100 molecules to score for GuacaMol Quality, returning 0"
-                )
-                benchmark_metrics["GuacaMol_Quality"] = 0
-            else:
-                benchmark_metrics["GuacaMol_Quality"] = qf.score_mols(top100_mols)
-        elif self.benchmark == "GuacaMol_Scaffold":
-            # Score
-            benchmark_metrics["GuacaMol_Score"] = self.guacamol_score(endpoint=endpoint)
-            # Quality
-            qf = QualityFilter(n_jobs=self.n_jobs)
-            top100_mols = self.scores.sort_values(by=endpoint, ascending=False)[
-                "smiles"
-            ].iloc[:100]
-            if len(top100_mols) < 100:
-                print(
-                    "Less than 100 molecules to score for GuacaMol Quality, returning 0"
-                )
-                benchmark_metrics["GuacaMol_Quality"] = 0
-            else:
-                benchmark_metrics["GuacaMol_Quality"] = qf.score_mols(top100_mols)
+            benchmark_metrics.update(self.guacamol_score(endpoint=endpoint))
         elif self.benchmark == "LibINVENT_Exp1":
             benchmark_metrics.update(self.libinvent_score(endpoint=endpoint))
         else:
@@ -520,6 +573,14 @@ class ScoreMetrics:
         extrapolate=True,
     ):
         # NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
+
+        # Setup parallelisation
+        mp = get_multiprocessing_context()
+        queue = mp.Queue()
+        process_list = []  # (func, kwargs, block)
+        process_done = []
+
+        # Setup metrics
         metrics = {}
         metrics.update(
             {
@@ -528,6 +589,7 @@ class ScoreMetrics:
             }
         )
 
+        # Setup filters to iterate
         filters = [[False, False]]
         if chemistry_filter_basic:
             filters.append([True, False])
@@ -540,6 +602,8 @@ class ScoreMetrics:
             target_smiles, target_scaffolds = self._preprocess_smiles(target_smiles)
 
         for basic, target in filters:
+            # ----- Filter scores
+            filtered_scores = self.filter(basic=basic, target=target).copy()
             prefix = ""
             if basic:
                 prefix = "B-CF "
@@ -547,110 +611,153 @@ class ScoreMetrics:
                 prefix = "T-CF "
             if basic and target:
                 prefix = "B&T-CF "
+
             # ----- Endpoint related
             for i, endpoint in enumerate(endpoints):
-                # Top avg score
-                top1, top10, top100 = self.top_avg(
-                    top_n=[1, 10, 100],
-                    endpoint=endpoint,
-                    basic_filter=basic,
-                    target_filter=target,
-                )
-                metrics.update(
-                    {
-                        prefix + f"Top-1 Avg {endpoint}": top1,
-                        prefix + f"Top-10 Avg {endpoint}": top10,
-                        prefix + f"Top-100 Avg {endpoint}": top100,
-                    }
+                # Top Avg score
+                process_list.append(
+                    (
+                        self.top_avg,
+                        (filtered_scores, [1, 10, 100], endpoint, False, prefix, queue),
+                        False,
+                    )
                 )
                 if diverse:
-                    top1, top10, top100 = self.top_avg(
-                        top_n=[1, 10, 100],
-                        endpoint=endpoint,
-                        basic_filter=basic,
-                        target_filter=target,
-                        diverse=True,
-                    )
-                    metrics.update(
-                        {
-                            prefix + f"Top-1 Avg (Div) {endpoint}": top1,
-                            prefix + f"Top-10 Avg (Div) {endpoint}": top10,
-                            prefix + f"Top-100 Avg (Div) {endpoint}": top100,
-                        }
+                    process_list.append(
+                        (
+                            self.top_avg,
+                            (
+                                filtered_scores,
+                                [1, 10, 100],
+                                endpoint,
+                                True,
+                                prefix,
+                                queue,
+                            ),
+                            False,
+                        )
                     )
                 # Top AUC
-                top1, top10, top100 = self.top_auc(
-                    top_n=[1, 10, 100],
-                    endpoint=endpoint,
-                    window=100,
-                    extrapolate=extrapolate,
-                    basic_filter=basic,
-                    target_filter=target,
-                )
-                metrics.update(
-                    {
-                        prefix + f"Top-1 AUC {endpoint}": top1,
-                        prefix + f"Top-10 AUC {endpoint}": top10,
-                        prefix + f"Top-100 AUC {endpoint}": top100,
-                    }
+                process_list.append(
+                    (
+                        self.top_auc,
+                        (
+                            filtered_scores,
+                            self.budget,
+                            [1, 10, 100],
+                            endpoint,
+                            100,
+                            extrapolate,
+                            False,
+                            False,
+                            prefix,
+                            queue,
+                        ),
+                        False,
+                    )
                 )
                 if diverse:
-                    top1, top10, top100 = self.top_auc(
-                        top_n=[1, 10, 100],
-                        endpoint=endpoint,
-                        window=100,
-                        extrapolate=extrapolate,
-                        basic_filter=basic,
-                        target_filter=target,
-                        diverse=True,
-                    )
-                    metrics.update(
-                        {
-                            prefix + f"Top-1 AUC (Div) {endpoint}": top1,
-                            prefix + f"Top-10 AUC (Div) {endpoint}": top10,
-                            prefix + f"Top-100 AUC (Div) {endpoint}": top100,
-                        }
+                    process_list.append(
+                        (
+                            self.top_auc,
+                            (
+                                filtered_scores,
+                                self.budget,
+                                [1, 10, 100],
+                                endpoint,
+                                100,
+                                extrapolate,
+                                True,
+                                False,
+                                prefix,
+                                queue,
+                            ),
+                            False,
+                        )
                     )
                 # Yield ('Hits' / 'Budget')
                 try:
-                    metrics.update(
-                        {
-                            prefix + f"Yield {endpoint}": self.tyield(
-                                endpoint=endpoint,
-                                threshold=thresholds[i],
-                                basic_filter=basic,
-                                target_filter=target,
+                    threshold = thresholds[i]
+                    process_list.append(
+                        (
+                            self.tyield,
+                            (
+                                filtered_scores,
+                                self.budget,
+                                endpoint,
+                                threshold,
+                                False,
+                                prefix,
+                                queue,
                             ),
-                            prefix + f"Yield AUC {endpoint}": self.tyield_auc(
-                                endpoint=endpoint,
-                                threshold=thresholds[i],
-                                window=100,
-                                extrapolate=extrapolate,
-                                basic_filter=basic,
-                                target_filter=target,
+                            False,
+                        )
+                    )
+                    process_list.append(
+                        (
+                            self.tyield,
+                            (
+                                filtered_scores,
+                                self.budget,
+                                endpoint,
+                                threshold,
+                                True,
+                                prefix,
+                                queue,
                             ),
-                            prefix + f"Yield Scaffold {endpoint}": self.tyield(
-                                endpoint=endpoint,
-                                threshold=thresholds[i],
-                                scaffold=True,
-                                basic_filter=basic,
-                                target_filter=target,
+                            False,
+                        )
+                    )
+                    process_list.append(
+                        (
+                            self.tyield_auc,
+                            (
+                                filtered_scores,
+                                self.budget,
+                                endpoint,
+                                threshold,
+                                100,
+                                True,
+                                False,
+                                False,
+                                prefix,
+                                queue,
                             ),
-                            prefix + f"Yield AUC Scaffold {endpoint}": self.tyield_auc(
-                                endpoint=endpoint,
-                                threshold=thresholds[i],
-                                scaffold=True,
-                                window=100,
-                                extrapolate=extrapolate,
-                                basic_filter=basic,
-                                target_filter=target,
+                            False,
+                        )
+                    )
+                    process_list.append(
+                        (
+                            self.tyield_auc,
+                            (
+                                filtered_scores,
+                                self.budget,
+                                endpoint,
+                                threshold,
+                                100,
+                                True,
+                                True,
+                                False,
+                                prefix,
+                                queue,
                             ),
-                        }
+                            False,
+                        )
                     )
                 except IndexError:
                     pass
+
+                # ----- Submit and run endpoint related processes
+                process_done.extend(self._run_processes(process_list))
+                process_list = []
+                # Retrieve results from the queue
+                results = []
+                while not queue.empty():
+                    results.append(queue.get())
+                metrics.update(dict(results))
+
             # ----- Target related
-            gen_smiles = self.filter(basic=basic, target=target).smiles.tolist()
+            gen_smiles = filtered_scores.smiles.tolist()
             gen_smiles, gen_scaffolds = self._preprocess_smiles(gen_smiles)
             if target_smiles:
                 # Rediscovery rate and ratio
@@ -684,11 +791,13 @@ class ScoreMetrics:
                         prefix + "Analogue Ratio": ref_ans,
                     }
                 )
+
             # ----- Property related
             if len(gen_smiles) >= 1000:
                 metrics[prefix + "Diversity (SEDiv@1k)"] = se_diversity(
                     gen_smiles, k=1000, n_jobs=self.n_jobs
                 )
+
         # ----- Further property related
         # MCF filters
         metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
@@ -708,10 +817,44 @@ class ScoreMetrics:
             metrics["Predicted Purchasability"] = np.mean(
                 mapper(self.n_jobs)(buy, self.scores.smiles.tolist())
             )
+
         # ----- Add any benchmark related metrics
         if self.benchmark:
             metrics.update(self.add_benchmark_metrics(endpoint=endpoint))
+
         return metrics
+
+    def _run_processes(self, process_list):
+        mp = get_multiprocessing_context()
+        processes = []
+        done = []
+        for pargs in process_list:
+            # Submit process
+            if len(processes) < self.n_jobs:
+                p = mp.Process(target=pargs[0], args=pargs[1])
+                p.start()
+                processes.append(p)
+
+                # If it is blocking, wait for it to finish
+                if pargs[2]:
+                    p.join()
+                    done.append(processes.pop(-1))
+
+            # If out of workers, wait for one to finish
+            while len(processes) >= self.n_jobs:
+                # Wait for a process to finish
+                for i, p in enumerate(processes):
+                    if not p.is_alive():
+                        p.join()
+                        done.append(processes.pop(i))
+                        break
+
+        # Wait for all processes to finish
+        for i, p in enumerate(processes):
+            p.join()
+            done.append(processes.pop(i))
+
+        return done
 
     def plot_endpoint(
         self,
