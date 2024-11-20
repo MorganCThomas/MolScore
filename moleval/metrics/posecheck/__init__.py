@@ -1,7 +1,9 @@
-import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from .posecheck import PoseCheck
 
 except Exception as e:
-    warnings.warn(f"PoseCheck: currently unavailable due to the following: {e}")
+    logger.warning(f"PoseCheck metrics: currently unavailable due to the following: {e}")
