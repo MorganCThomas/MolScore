@@ -22,18 +22,20 @@ from molscore.gui import monitor_path
 logger = logging.getLogger("molscore")
 logger.setLevel(logging.WARNING)
 
-
-class MolScore:
-    """
-    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
-    """
-
-    presets = {
-        "Misc": resources.files("molscore.configs"),
+PRESETS = {
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
         "MolExp": resources.files("molscore.configs.MolExp"),
+        "MolExpL": resources.files("molscore.configs.MolExpL"),
+        "MolExpL-DF": resources.files("molscore.configs.MolExpL-DF"),
+        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
+        "MolExpL_baseline": resources.files("molscore.configs.MolExpL_baseline"),
+        "MolExp-DF_baseline": resources.files("molscore.configs.MolExp-DF_baseline"),
+        "MolExp-DF": resources.files("molscore.configs.MolExp-DF"),
+        "MolExp-DF2": resources.files("molscore.configs.MolExp-DF2"),
+        "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
+        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
         "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
         "5HT2A_Selectivity": resources.files(
             "molscore.configs.5HT2A.PIDGIN_Selectivity"
@@ -44,6 +46,13 @@ class MolScore:
         "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
     }
+
+
+class MolScore:
+    """
+    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
+    """
+    presets = PRESETS
 
     @staticmethod
     def load_config(task_config):
@@ -1174,30 +1183,7 @@ class MolScore:
 
 
 class MolScoreBenchmark:
-    presets = {
-        "GuacaMol": resources.files("molscore.configs.GuacaMol"),
-        "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
-        "MolOpt": resources.files("molscore.configs.MolOpt"),
-        "MolExp": resources.files("molscore.configs.MolExp"),
-        "MolExpL": resources.files("molscore.configs.MolExpL"),
-        "MolExpL-DF": resources.files("molscore.configs.MolExpL-DF"),
-        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
-        "MolExpL_baseline": resources.files("molscore.configs.MolExpL_baseline"),
-        "MolExp-DF_baseline": resources.files("molscore.configs.MolExp-DF_baseline"),
-        "MolExp-DF": resources.files("molscore.configs.MolExp-DF"),
-        "MolExp-DF2": resources.files("molscore.configs.MolExp-DF2"),
-        "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
-        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
-        "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
-        "5HT2A_Selectivity": resources.files(
-            "molscore.configs.5HT2A.PIDGIN_Selectivity"
-        ),
-        "5HT2A_Docking": resources.files(
-            "molscore.configs.5HT2A.Docking_Selectivity_rDock"
-        ),
-        "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
-        "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
-    }
+    presets = PRESETS
 
     def __init__(
         self,
