@@ -147,21 +147,24 @@ class MolScore:
             self.save_dir = os.path.abspath(self.cfg["output_dir"])
         if add_run_dir:
             self.save_dir = os.path.join(self.save_dir, self.run_name)
+        
         # Check to see if we're loading from previous results
         if self.cfg["load_from_previous"]:
             assert os.path.exists(
                 self.cfg["previous_dir"]
             ), "Previous directory does not exist"
             self.save_dir = self.cfg["previous_dir"]
+            
+        # Create save directory
         else:
-            if os.path.exists(self.save_dir):
+            if os.path.exists(self.save_dir) and add_run_dir:
                 print(
                     "Found existing directory, appending current time to distinguish"
                 )  # Not set up logging yet
                 self.save_dir = self.save_dir + time.strftime(
                     "_%H_%M_%S", time.localtime()
                 )
-            os.makedirs(self.save_dir)
+            os.makedirs(self.save_dir, exist_ok=True)
             os.makedirs(os.path.join(self.save_dir, "iterations"))
 
         # Setup log file
