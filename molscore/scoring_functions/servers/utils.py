@@ -1,6 +1,7 @@
 import os
 import multiprocessing
 import platform
+import atexit
 from typing import Union
 
 import numpy as np
@@ -10,12 +11,30 @@ from rdkit.Chem import rdMolDescriptors, rdmolops
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 
 
-def Pool(*args):
+def Pool(n_jobs, return_map=True, **kwargs):
     if platform.system() == "Linux":
         context = multiprocessing.get_context("fork")
     else:
         context = multiprocessing.get_context("spawn")
-    return context.Pool(*args)
+
+    # Extract from environment as default, overriding configs
+    if "MOLSCORE_NJOBS" in os.environ.keys():
+        pool = context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
+        atexit.register(pool.terminate)
+        return pool.imap if return_map else pool
+    
+    # Transform float into fraction of CPUs
+    if isinstance(n_jobs, float):
+        cpu_count = os.cpu_count()
+        n_jobs = int(cpu_count * n_jobs)
+    
+    # Return pool or None
+    if isinstance(n_jobs, int) and (n_jobs > 1):
+        pool = context.Pool(n_jobs, *kwargs)
+        atexit.register(pool.terminate)
+        return pool.imap if return_map else pool
+    else:
+        return map if return_map else pool
 
 
 def get_mol(mol: Union[str, Chem.rdchem.Mol]):

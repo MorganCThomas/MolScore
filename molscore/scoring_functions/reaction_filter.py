@@ -78,6 +78,7 @@ class DecoratedReactionFilter:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
         self.reaction_smirks = []
         self.scaffold = get_mol(scaffold)
         assert self.scaffold, f"Error parsing scaffold {scaffold}"
@@ -160,8 +161,7 @@ class DecoratedReactionFilter:
     def __call__(self, smiles, **kwargs):
         """Score a list of SMILES strings"""
         results = []
-        with Pool(self.n_jobs) as pool:
-            scores = [score for score in pool.imap(self._score_smiles, smiles)]
+        scores = [score for score in self.mapper(self._score_smiles, smiles)]
         for smi, score in zip(smiles, scores):
             results.append({"smiles": smi, f"{self.prefix}_score": score})
         return results
@@ -184,6 +184,7 @@ class SelectiveDecoratedReactionFilter(DecoratedReactionFilter):
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
         self.reaction_smirks = []
         self.scaffold = get_mol(scaffold)
         assert self.scaffold, f"Error parsing scaffold {scaffold}"

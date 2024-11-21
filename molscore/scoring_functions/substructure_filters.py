@@ -2,7 +2,6 @@
 Adapted from
 https://github.com/MolecularAI/Reinvent
 """
-
 from functools import partial
 
 import numpy as np
@@ -582,6 +581,7 @@ class SubstructureFilters:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
         self.smarts = []
 
         if az_filters:
@@ -633,23 +633,13 @@ class SubstructureFilters:
         match_substructure_p = partial(
                 self.match_substructure, smarts_filters=self.smarts
             )
-        if self.n_jobs <= 1:
-            results = [
+    
+        results = [
                 {
                     "smiles": smi,
                     f"{self.prefix}_substruct_filt": match,
                     f"{self.prefix}_substruct": subs,
                 }
-                for smi, match, subs in map(match_substructure_p, smiles)
+                for smi, match, subs in self.mapper(match_substructure_p, smiles)
             ]
-        else:
-            with Pool(self.n_jobs) as pool:
-                results = [
-                    {
-                        "smiles": smi,
-                        f"{self.prefix}_substruct_filt": match,
-                        f"{self.prefix}_substruct": subs,
-                    }
-                    for smi, match, subs in pool.imap(match_substructure_p, smiles)
-                ]
         return results
