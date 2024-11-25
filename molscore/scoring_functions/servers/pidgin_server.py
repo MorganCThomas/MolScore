@@ -46,6 +46,7 @@ class Model:
         self.full_thresh = thresh[:-2] + " " + thresh[-2:]
         self.binarise = binarise
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
         self.fp = "ECFP4"
         self.nBits = 2048
         self.agg = getattr(np, method)
@@ -101,15 +102,14 @@ def compute():
     aggregated_predictions = []
 
     # Calculate fingerprints
-    with Pool(model.n_jobs) as pool:
-        pcalculate_fp = partial(
-            Fingerprints.get, name=model.fp, nBits=model.nBits, asarray=True
-        )
-        [
-            (valid.append(i), fps.append(fp))
-            for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-            if fp is not None
-        ]
+    pcalculate_fp = partial(
+        Fingerprints.get, name=model.fp, nBits=model.nBits, asarray=True
+    )
+    [
+        (valid.append(i), fps.append(fp))
+        for i, fp in enumerate(model.mapper(pcalculate_fp, smiles))
+        if fp is not None
+    ]
 
     # Return early if there's no results
     if len(fps) == 0:
