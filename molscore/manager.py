@@ -416,6 +416,7 @@ class MolScore:
                 self.batch_df["valid"] = valid
                 self.batch_df["valid_score"] = [1 if v else 0 for v in valid]
                 logger.debug(f"    Invalid molecules: {(~self.batch_df.valid).sum()}")
+            
 
         # Check for duplicates and count occurences
         if mol_ids:
@@ -464,28 +465,11 @@ class MolScore:
                             self.batch_df.mol_id == id, "occurrences"
                         ] += len(tdf)
             # TODO update mol_id with initial id
-        elif "smiles" in self.batch_df.columns:
-            # Pull duplicated smiles from the main_df
-            self.exists_df = self.main_df[
-                self.main_df.smiles.isin(self.batch_df.smiles.tolist())
-            ]
-
-            # Update unique and occurrence columns
-            if len(self.exists_df) > 0:
-                for smi in self.batch_df.smiles.unique():
-                    tdf = self.exists_df[self.exists_df.smiles == smi]
-                    if len(tdf) > 0:
-                        self.batch_df.loc[self.batch_df.smiles == smi, "unique"] = False
-                        self.batch_df.loc[
-                            self.batch_df.smiles == smi, "occurrences"
-                        ] += len(tdf)
-            # TODO update mol_id with initial id
         else:
             pass
 
     def run_scoring_functions(
-        self, batch_index: list, file_names: list, **molecular_inputs
-    ):
+        self, batch_index: list, file_names: list,  mol_ids: Optional[list] = None, **molecular_inputs,):
         """
         Iterate over respective scoring/fitness functions to score molecular inputs and populate self.results_df
          (file_names are necessary for logging).
@@ -496,6 +480,9 @@ class MolScore:
         :return: None
         """
         self.results_df = pd.DataFrame(batch_index, columns=["batch_idx"])
+        if mol_ids:
+            # add column mol_id and the values
+            self.results_df["mol_id"] = mol_ids
         for function in self.scoring_functions:
             results = function(
                 directory=self.save_dir, file_names=file_names, **molecular_inputs
@@ -527,42 +514,28 @@ class MolScore:
             if mol_ids:
                 self.exists_df = self.exists_df.drop_duplicates(subset="mol_id")
                 self.exists_df = self.exists_df.loc[:, self.results_df.columns]
-                # Check duplicated values in exists and results df
-                dup_idx = self.exists_df.loc[
-                    self.exists_df.mol_id.isin(self.results_df.mol_id), :
-                ].index.tolist()
-                if len(dup_idx) > 0:
-                    self.exists_df.drop(index=dup_idx, inplace=True)
-                # Append to results, assuming no duplicates in results_df...
-                # TODO might need to pass mol_id to run_scoring_functions() to check this
-                self.results_df = pd.concat(
-                    [self.results_df, self.exists_df],
-                    axis=0,
-                    ignore_index=True,
-                    sort=False,
-                )
+                
             elif "smiles" in self.exists_df.columns:
                 self.exists_df = self.exists_df.drop_duplicates(subset="smiles")
                 self.exists_df = self.exists_df.loc[:, self.results_df.columns]
-                # Check duplicated values in exists and results df
-                dup_idx = self.exists_df.loc[
-                    self.exists_df.smiles.isin(self.results_df.smiles), :
-                ].index.tolist()
-                if len(dup_idx) > 0:
-                    self.exists_df.drop(index=dup_idx, inplace=True)
-                # Append to results, assuming no duplicates in results_df...
-                self.results_df = pd.concat(
-                    [self.results_df, self.exists_df],
-                    axis=0,
-                    ignore_index=True,
-                    sort=False,
-                )
-            else:
-                pass
+                
+            # Check duplicated values in exists and results df
+            dup_idx = self.exists_df.loc[
+                self.exists_df.mol_id.isin(self.results_df.mol_id), :
+            ].index.tolist()
+            if len(dup_idx) > 0:
+                self.exists_df.drop(index=dup_idx, inplace=True)
+            # Append to results, assuming no duplicates in results_df...
+            self.results_df = pd.concat(
+                [self.results_df, self.exists_df],
+                axis=0,
+                ignore_index=True,
+                sort=False,
+            )
 
         # Merge with batch_df
         logger.debug("    Merging results to batch df")
-        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False)
+        self.batch_df = self.batch_df.merge(self.results_df, on='mol_id', how="left", sort=False)
         self.batch_df.fillna(0.0, inplace=True)
 
     def update_maxmin(self, df):
@@ -637,7 +610,7 @@ class MolScore:
             # Apply transform to parameter
             transformed_columns[mod_name] = (
                 df.loc[:, metric["name"]]
-                .apply(lambda x: modifier(x, **metric["parameters"]))
+                .apply(lambda x: modifier(x, **metric["parameters"])) 
                 .rename(mod_name)
             )
 
@@ -1001,6 +974,8 @@ class MolScore:
         ), "No molecular representations provided, please supply smiles or other representations as keyword arguments"
         if smiles:
             molecular_inputs["smiles"] = smiles
+            if not mol_ids:
+                mol_ids = smiles
         assert all(
             isinstance(v, list) for v in molecular_inputs.values()
         ), "All molecular representations must be lists"
@@ -1013,7 +988,7 @@ class MolScore:
         if score_only:
             return self._score_only(
                 step=step, flt=flt, **molecular_inputs
-            )  # TODO accept any molecular representation
+            )  
 
         # Set some values
         batch_start = time.time()
@@ -1031,14 +1006,20 @@ class MolScore:
             canonicalise_smiles=canonicalise_smiles,
             **molecular_inputs,
         )
+        # if smiles are canonicalised, update the mol_ids with the canonicalised smiles
+        if canonicalise_smiles:
+            mol_ids = self.batch_df.smiles.tolist()
+            self.batch_df["mol_id"] = mol_ids
+        
         logger.debug(f"    Pre-processed: {len(self.batch_df)} molecular inputs")
 
         # If a main df exists check if some molecules have already been sampled
         if isinstance(self.main_df, pd.core.frame.DataFrame):
             self.check_uniqueness(mol_ids=mol_ids)
-            logger.debug(f"    Uniqueness updated: {len(self.batch_df)} SMILES")
+            logger.debug(f"    Uniqueness updated: {len(self.batch_df)} molecular inputs")
 
         # Subset molecular inputs to pass to scoring functions
+        # Update batch indeces
         _process_batch_idxs = list(range(_batch_size))
         if recalculate:
             # Pass all valid molecules to scoring functions
@@ -1063,9 +1044,14 @@ class MolScore:
                 ].tolist()
             else:
                 pass
-
+            # Update mol_ids (if present)
+            if mol_ids:
+                # Extract mol_ids from batch_df with the correct batch_idx
+                mol_ids = [self.batch_df.loc[self.batch_df.batch_idx == i, "mol_id"].values[0] 
+                                for i in _process_batch_idxs]
+                    
         if len(_process_batch_idxs) == 0:
-            # If nothing to process then instead submit atleast 1 (scoring function should handle invalid)
+            # If nothing to process then instead submit at least 1 (scoring function should handle invalid)
             logger.info("    No smiles to score so submitting first input")
             _process_batch_idxs = [0]
 
@@ -1080,6 +1066,7 @@ class MolScore:
         # Run scoring function
         scoring_start = time.time()
         self.run_scoring_functions(
+            mol_ids=mol_ids,
             batch_index=_process_batch_idxs,
             file_names=file_names,
             **_process_molecular_inputs,
