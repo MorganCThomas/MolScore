@@ -1007,7 +1007,7 @@ class MolScore:
             **molecular_inputs,
         )
         # if smiles are canonicalised, update the mol_ids with the canonicalised smiles
-        if canonicalise_smiles:
+        if smiles and canonicalise_smiles:
             mol_ids = self.batch_df.smiles.tolist()
             self.batch_df["mol_id"] = mol_ids
         
