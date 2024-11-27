@@ -174,7 +174,7 @@ class GetMetrics(object):
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles or mols
         :param calc_valid: Return validity ratio
-        :param calc_unique: Return unique ratio
+        :param calc_unique: Return unique 
         :param unique_k: Return unique ratio for a subset of size k
         :param se_k: Sub-sample size for sphere exclusion diversity
         :param verbose: Print updates
