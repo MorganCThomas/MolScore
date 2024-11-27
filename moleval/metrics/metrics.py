@@ -25,10 +25,11 @@ from moleval.metrics.metrics_utils import compute_fragments, average_agg_tanimot
     get_mol, canonic_smiles, mol_passes_filters, analogues_tanimoto, compute_functional_groups, compute_ring_systems
 
 try:
-    from moleval.metrics import PoseCheck
+    from moleval.metrics.posecheck import PoseCheck
     _posecheck_available = True
-except Exception:
+except Exception as e:
     _posecheck_available = False
+    _posecheck_error = e
 
 
 class GetMetrics(object):
@@ -89,7 +90,7 @@ class GetMetrics(object):
     """
     def __init__(self, n_jobs=1, device='cpu', batch_size=512, pool=None,
                  test=None, test_scaffolds=None, ptest=None, ptest_scaffolds=None, train=None, ptrain=None,
-                 target=None, ptarget=None, target_structure=None, run_fcd=True, normalize=True, cumulative=False):
+                 target=None, ptarget=None, target_structure=None, target_ligand=None, run_fcd=True, normalize=True, cumulative=False):
         """
         Prepare to calculate metrics by declaring reference datasets and running pre-statistics
         """
@@ -123,6 +124,7 @@ class GetMetrics(object):
         self.ptarget = ptarget
         # Posecheck target structure
         self.target_structure = target_structure
+        self.target_ligand = target_ligand
         # Later defined
         self.kwargs = None
         self.kwargs_fcd = None
@@ -162,15 +164,15 @@ class GetMetrics(object):
         # Initialize posecheck
         if self.target_structure:
             if _posecheck_available:
-                self.posecheck = PoseCheck()
+                self.posecheck = PoseCheck(n_jobs=self.n_jobs)
                 self.posecheck.load_protein_from_pdb(self.target_structure)
             else:
-                warnings.warn("PoseCheck: currently unavailable due to import error")
+                warnings.warn(f"PoseCheck: currently unavailable due to {_posecheck_error} error")
 
-    def calculate(self, gen, gen_mols=None, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
+    def calculate(self, gen=None, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
         """
         Calculate metrics for a generate de novo dataset
-        :param gen: List of de novo generate smiles
+        :param gen: List of de novo generate smiles or mols
         :param calc_valid: Return validity ratio
         :param calc_unique: Return unique ratio
         :param unique_k: Return unique ratio for a subset of size k
@@ -182,7 +184,7 @@ class GetMetrics(object):
         metrics['#'] = len(gen)
 
         if verbose: print("Calculating Validity & Uniqueness")
-        gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, prev_gen=self.prev_gen, n_jobs=self.n_jobs, gen_mols=gen_mols)
+        gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, prev_gen=self.prev_gen, n_jobs=self.n_jobs)
 
         # ----- Intrinsic properties -----
 
@@ -253,10 +255,15 @@ class GetMetrics(object):
         # ---- PoseCheck metrics ----
         if self.target_structure and _posecheck_available:
             if verbose: print("Calculating PoseCheck metrics")
-            self.posecheck.load_ligands(gen)
-            metrics['PC_Clashes'] = np.mean(self.posecheck.calculate_clashes())
-            metrics['PC_StrainEnergy'] = np.mean(self.posecheck.calculate_strain_energy())
-            metrics['PC_Interactions'] = np.mean(self.posecheck.calculate_interactions())
+            self.posecheck.load_ligands_from_mols(mols, add_hs=True)
+            metrics['PC_Clashes'] = np.nanmean(self.posecheck.calculate_clashes())
+            metrics['PC_StrainEnergy'] = np.nanmean(self.posecheck.calculate_strain_energy())
+            if self.target_ligand:
+                metrics['PC_Interactions'] = np.mean(self.posecheck.calculate_interaction_similarity(
+                    ref_lig_path = self.target_ligand,
+                    similarity_func = "Tanimoto",
+                    count = False
+                ))
 
         # ---- Extrinsic properties ----
 
@@ -562,16 +569,13 @@ def sp_diversity(gen, k=None, n_jobs=1, normalize=True):
     else:
         return np.sum(f_)
     
-def preprocess_gen(gen, prev_gen=[], canonize=True, n_jobs=1, gen_mols=None):
+def preprocess_gen(gen, prev_gen=[], canonize=True, n_jobs=1):
     """
     Convert to valid, unique and return mols in one function (save compute redundancy)
     :return: (gen, mols, n_valid, fraction_valid, fraction_unique)
     """
     # Convert to mols
-    if gen_mols:
-        mols = gen_mols
-    else:
-        mols = mapper(n_jobs)(get_mol, gen)
+    mols = mapper(n_jobs)(get_mol, gen)
     fraction_invalid = 1 - mols.count(None) / len(mols)
     n_valid = len(mols) - mols.count(None)
     # Remove invalid

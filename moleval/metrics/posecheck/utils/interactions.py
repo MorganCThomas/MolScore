@@ -5,7 +5,13 @@ import prolif as plf
 from rdkit import DataStructs
 
 
-def generate_interaction_df(prot: plf.Molecule, lig: plf.Molecule) -> pd.DataFrame:
+def generate_interaction_df(
+    prot: plf.Molecule,
+    lig: plf.Molecule,
+    count: bool = False,
+    drop_empty: bool = True,
+    residues: Optional[List[str]] = None,
+) -> pd.DataFrame:
     """
     Generate a DataFrame with all interactions between protein and ligand.
 
@@ -16,9 +22,9 @@ def generate_interaction_df(prot: plf.Molecule, lig: plf.Molecule) -> pd.DataFra
     Returns:
         A DataFrame representing all interactions between the protein and ligand.
     """
-    fp = plf.Fingerprint()
-    fp.run_from_iterable(lig, prot)
-    df = fp.to_dataframe()
+    fp = plf.Fingerprint(count=count)
+    fp.run_from_iterable(lig, prot, residues=residues)
+    df = fp.to_dataframe(drop_empty=drop_empty)
     return df
 
 

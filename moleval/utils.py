@@ -45,12 +45,24 @@ def cuda_available():
     return cuda.is_available()
 
 
-def Pool(*args):
+def Pool(n_jobs):
     if platform.system() == "Linux":
         context = multiprocessing.get_context("fork")
     else:
         context = multiprocessing.get_context("spawn")
-    return context.Pool(*args)
+
+    # Extract from environment as default, overriding configs
+    if "MOLSCORE_NJOBS" in os.environ.keys():
+        return context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
+    else:
+        if isinstance(n_jobs, int):
+            return context.Pool(n_jobs)
+        elif isinstance(n_jobs, float):
+            n_jobs = int(context.cpu_count() * n_jobs)
+            assert 0 < n_jobs <= context.cpu_count(), f"n_jobs must be between 0 and {context.cpu_count()}"
+            return context.Pool(n_jobs)
+        else:
+            raise ValueError("n_jobs must be an integer or float")
 
 
 def mapper(function, input: list, n_jobs: int = 1, progress_bar: bool = True):

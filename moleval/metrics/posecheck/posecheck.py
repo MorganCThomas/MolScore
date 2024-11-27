@@ -1,15 +1,25 @@
 import os
-from typing import List
+from functools import partial
+from typing import Callable, List, Union
 
-import datamol as dm
 import pandas as pd
+import prolif as plf
 from rdkit import Chem
+from rdkit.Chem import DataStructs
+
+from moleval.utils import Pool
 
 from .utils.chem import rmsd
 from .utils.clashes import count_clashes
 from .utils.interactions import generate_interaction_df
-from .utils.loading import (load_mols_from_rdkit, load_mols_from_sdf,
-                               load_protein_from_pdb, read_pdbqt)
+from .utils.loading import (
+    load_mols_from_rdkit,
+    load_mols_from_sdf,
+    load_protein_from_pdb,
+    load_protein_prolif,
+    read_pdbqt,
+    to_sdf,
+)
 from .utils.strain import get_strain_energy
 
 
@@ -31,16 +41,18 @@ class PoseCheck(object):
     """
 
     def __init__(
-        self, reduce_path: str = "reduce", clash_tolerance: float = 0.5
+        self, reduce_path: str = "reduce", clash_tolerance: float = 0.5, n_jobs=None
     ) -> None:
         """Initialize the PoseCheck class.
 
         Args:
             reduce_path (str, optional): The path to the reduce executable. Defaults to "reduce".
             clash_tolerance (float, optional): The clash tolerance for checking clashes. Defaults to 0.5 A.
+            n_jobs (int, optional): The number of jobs to run in parallel. Defaults to None i.e., serial.
         """
         self.reduce_path = reduce_path
         self.clash_tolerance = clash_tolerance
+        self.n_jobs = n_jobs
 
     def load_protein_from_pdb(self, pdb_path: str, reduce: bool = True) -> None:
         """Load a protein from a PDB file.
@@ -51,7 +63,10 @@ class PoseCheck(object):
         Returns:
             None
         """
-        self.protein = load_protein_from_pdb(pdb_path, reduce=reduce, reduce_path=self.reduce_path)
+        self.pdb_path = pdb_path
+        self.protein = load_protein_from_pdb(
+            pdb_path, reduce=reduce, reduce_path=self.reduce_path
+        )
 
     def load_ligands_from_sdf(self, sdf_path: str) -> None:
         """Load a ligand from an SDF file."""
@@ -63,7 +78,7 @@ class PoseCheck(object):
 
         # Save to tmp sdf file and load with Hs
         tmp_path = pdbqt_path.split(".pdbqt")[0] + "_tmp.pdb"
-        dm.to_sdfile(mol, tmp_path)
+        to_sdf(mol, tmp_path)
         self.ligands = load_mols_from_sdf(tmp_path)
         os.remove(tmp_path)
 
@@ -77,6 +92,7 @@ class PoseCheck(object):
         Returns:
             None
         """
+        # Can't use parallel mapping or calculate interactions breaks
         self.ligands = load_mols_from_rdkit(mols, add_hs=add_hs)
 
     def load_ligands(self, ligand) -> None:
@@ -106,18 +122,76 @@ class PoseCheck(object):
 
     def calculate_clashes(self) -> int:
         """Calculate the number of steric clashes between protein and ligand."""
-        return [
-            count_clashes(self.protein, mol, tollerance=self.clash_tolerance)
-            for mol in self.ligands
-        ]
+        if self.n_jobs:
+            with Pool(self.n_jobs) as pool:
+                pf = partial(
+                    count_clashes, prot=self.protein, tollerance=self.clash_tolerance
+                )
+                return list(pool.map(pf, self.ligands))
+        else:
+            return [
+                count_clashes(self.protein, mol, tollerance=self.clash_tolerance)
+                for mol in self.ligands
+            ]
 
     def calculate_strain_energy(self) -> float:
         """Calculate the strain energy of the ligand."""
-        return [get_strain_energy(mol) for mol in self.ligands]
+        if self.n_jobs:
+            with Pool(self.n_jobs) as pool:
+                return list(pool.map(get_strain_energy, self.ligands))
+        else:
+            return [get_strain_energy(mol) for mol in self.ligands]
+
+    def calculate_ref_interactions(self, ref_lig_path: str) -> pd.DataFrame:
+        """Calculate the interactions between the protein and the reference ligand"""
+        # Reload protein, bug if passed through reduce, bug with MDAnalysis
+        # Seems more robust with Chem.MolFromPDB for now...
+
+        # Currently less interactions than repeating the same code in Ipython interactively???
+        protein = load_protein_prolif(self.pdb_path, rdkit=True)
+        lig = load_mols_from_sdf(ref_lig_path)
+        return generate_interaction_df(protein, lig)
 
     def calculate_interactions(self) -> pd.DataFrame:
         """Calculate the interactions between the protein and the ligand."""
-        return generate_interaction_df(self.protein, self.ligands)
+        # Reload protein, bug if passed through reduce, bug with MDAnalysis
+        # Seems more robust with Chem.MolFromPDB for now...
+        protein = load_protein_prolif(self.pdb_path, rdkit=True)
+        return generate_interaction_df(protein, self.ligands)
+
+    def calculate_interaction_similarity(
+        self,
+        ref_lig_path: str,
+        similarity_func: Union[Callable, str],
+        count: bool = False,
+    ) -> List[float]:
+        """Calculate the similarity between the reference ligand and all other ligands."""
+        protein = load_protein_prolif(self.pdb_path, rdkit=True)
+        ref_lig = load_mols_from_sdf(ref_lig_path)
+        residues = plf.utils.get_residues_near_ligand(ref_lig[0], protein, cutoff=6.0)
+        # Calculate ref fp
+        ref_fp = generate_interaction_df(
+            protein, ref_lig, count=count, drop_empty=False, residues=residues
+        )
+        # Calculate ligand fps
+        lig_fps = generate_interaction_df(
+            protein, self.ligands, count=count, drop_empty=False, residues=residues
+        )
+        # Append dataframes to ensure aligned
+        ifps = pd.concat([ref_fp, lig_fps], ignore_index=0).fillna(False)
+        # Get similarity function
+        if callable(similarity_func):
+            similarity_function = similarity_func
+        else:
+            similarity_function = getattr(
+                DataStructs, "Bulk" + similarity_func + "Similarity", None
+            )
+            if similarity_function is None:
+                raise KeyError(f"'{similarity_func}' not found in RDKit")
+        # Calculate similarity
+        bvs = plf.to_bitvectors(ifps)
+        similarities = similarity_function(bvs[0], bvs[1:])
+        return similarities
 
     def calculate_rmsd(self, mol1: Chem.Mol, mol2: Chem.Mol) -> float:
         """Calculate the RMSD between two molecules
