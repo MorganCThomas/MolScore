@@ -7,6 +7,7 @@ import signal
 import subprocess
 import threading
 import time
+import atexit
 from functools import partial
 from pathlib import Path
 from typing import Callable, Sequence, Union
@@ -52,7 +53,7 @@ def check_path(path):
 
 
 # ----- Multiprocessing related -----
-def Pool(*args):
+def Pool(n_jobs, return_map=True, **kwargs):
     if platform.system() == "Linux":
         context = multiprocessing.get_context("fork")
     else:
@@ -60,9 +61,22 @@ def Pool(*args):
 
     # Extract from environment as default, overriding configs
     if "MOLSCORE_NJOBS" in os.environ.keys():
-        return context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
+        pool = context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
+        atexit.register(pool.terminate)
+        return pool.imap if return_map else pool
+    
+    # Transform float into fraction of CPUs
+    if isinstance(n_jobs, float):
+        cpu_count = os.cpu_count()
+        n_jobs = int(cpu_count * n_jobs)
+    
+    # Return pool or None
+    if isinstance(n_jobs, int) and (n_jobs > 1):
+        pool = context.Pool(n_jobs, *kwargs)
+        atexit.register(pool.terminate)
+        return pool.imap if return_map else pool
     else:
-        return context.Pool(*args)
+        return map if return_map else pool
 
 
 def test_func():

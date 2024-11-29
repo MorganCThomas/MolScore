@@ -144,6 +144,13 @@ except Exception as e:
     logger.warning(f"chemprop: currently unavailable due to the following: {e}")
 
 try:
+    from molscore.scoring_functions.admet_ai import ADMETAI
+    
+    all_scoring_functions.append(ADMETAI)
+except Exception as e:
+    logger.warning(f"ADMETAI: currently unavailable due to the following: {e}")
+
+try:
     from molscore.scoring_functions.align3d import Align3D
 
     all_scoring_functions.append(Align3D)

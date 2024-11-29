@@ -52,6 +52,7 @@ class ApplicabilityDomain:
         self.qed = qed
         self.physchem = physchem
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
 
         # If file path provided, load smiles.
         if isinstance(ref_smiles, str):
@@ -65,12 +66,11 @@ class ApplicabilityDomain:
 
         # Calculate features
         logger.info("Computing reference features")
-        with Pool(self.n_jobs) as pool:
-            mols = [m for m in pool.imap(get_mol, self.ref_smiles) if m is not None]
-            pfunc = partial(
-                self.compute_features, fp=self.fp, qed=self.qed, physchem=self.physchem
-            )
-            self.ref_features = np.asarray([f for f in pool.imap(pfunc, mols)])
+        mols = [m for m in self.mapper(get_mol, self.ref_smiles) if m is not None]
+        pfunc = partial(
+            self.compute_features, fp=self.fp, qed=self.qed, physchem=self.physchem
+        )
+        self.ref_features = np.asarray([f for f in self.mapper(pfunc, mols)])
 
         # Compound bounds
         self.ref_max = np.max(self.ref_features, axis=0)
@@ -183,17 +183,16 @@ class ApplicabilityDomain:
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
         # Compute features
-        with Pool(self.n_jobs) as pool:
-            pfunc = partial(
-                self.score_smi,
-                prefix=self.prefix,
-                ref_max=self.ref_max,
-                ref_min=self.ref_min,
-                fp=self.fp,
-                qed=self.qed,
-                physchem=self.physchem,
-            )
-            results = [r for r in pool.imap(pfunc, smiles)]
+        pfunc = partial(
+            self.score_smi,
+            prefix=self.prefix,
+            ref_max=self.ref_max,
+            ref_min=self.ref_min,
+            fp=self.fp,
+            qed=self.qed,
+            physchem=self.physchem,
+        )
+        results = [r for r in self.mapper(pfunc, smiles)]
         return results
 
     def __call__(self, smiles: list, **kwargs):
