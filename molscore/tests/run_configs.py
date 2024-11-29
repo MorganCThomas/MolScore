@@ -21,7 +21,7 @@ def main(configs: list):
         )
         # Score 5 smiles 5 times
         for i in tqdm(range(5)):
-            _ = ms(mg.sample(10))
+            _ = ms(mg.sample(5))
         ms.write_scores()
         ms.kill_monitor()
         print(f"Output:\n{ms.main_df.head(10)}\n")
