@@ -131,15 +131,25 @@ class ScoreMetrics:
         if budget:
             scores = scores.iloc[:budget]
         # Valid
-        scores.loc[:, "valid"] = scores["valid"].astype(bool)
-        self.valid_ratio = scores.valid.sum() / len(scores)
+        if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
+            valid_value = "true"
+        elif isintance(scores.valid.dtype, np.dtypes.BoolDType):
+            valid_value = True
+        else:
+            raise ValueError("Valid column has un unrecognised dtype")
+        self.valid_ratio = (scores.valid == valid_value).sum() / len(scores)
         if valid:
-            scores = scores.loc[scores.valid == True]
+            scores = scores.loc[scores.valid == valid_value]
         # Unique
-        scores.loc[:, "unique"] = scores["unique"].astype(bool)
-        self.unique_ratio = scores.unique.sum() / len(scores)
+        if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
+            unique_value = "true"
+        elif isintance(scores.unique.dtype, np.dtypes.BoolDType):
+            unique_value = True
+        else:
+            raise ValueError("Unique column has un unrecognised dtype")
+        self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
         if unique:
-            scores = scores.loc[scores.unique == True]
+            scores = scores.loc[scores.unique == unique_value]
         # Add scaffold column if not present
         if "scaffold" not in scores.columns:
             get_scaff = partial(compute_scaffold, min_rings=1)
