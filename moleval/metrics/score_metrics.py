@@ -133,7 +133,7 @@ class ScoreMetrics:
         # Valid
         if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
             valid_value = "true"
-        elif isintance(scores.valid.dtype, np.dtypes.BoolDType):
+        elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
             valid_value = True
         else:
             raise ValueError("Valid column has un unrecognised dtype")
@@ -143,7 +143,7 @@ class ScoreMetrics:
         # Unique
         if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
             unique_value = "true"
-        elif isintance(scores.unique.dtype, np.dtypes.BoolDType):
+        elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
             unique_value = True
         else:
             raise ValueError("Unique column has un unrecognised dtype")
