@@ -45,6 +45,11 @@ class MolScore:
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
     }
 
+    preset_tasks = {
+        k:[p.name.strip(".json") for p in v.glob("*.json")] 
+        for k, v in presets.items()
+        }
+    
     @staticmethod
     def load_config(task_config):
         assert os.path.exists(
