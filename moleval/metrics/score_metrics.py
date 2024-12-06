@@ -332,7 +332,7 @@ class ScoreMetrics:
         if queue:
             queue.put(output)
         else:
-            return dict(output)
+            return dict([output])
 
     @staticmethod
     def tyield_auc(
@@ -393,7 +393,7 @@ class ScoreMetrics:
         if queue:
             queue.put(output)
         else:
-            return dict(output)
+            return dict([output])
 
     def targets_rediscovered(
         self, smiles, target_smiles, scaffolds=[], target_scaffolds=[]
@@ -441,7 +441,7 @@ class ScoreMetrics:
                 scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-            )
+            ).values()
             score = np.mean([top1, top10, top100])
         elif any(
             [
@@ -453,26 +453,26 @@ class ScoreMetrics:
                 scores=tdf,
                 top_n=[1],
                 endpoint=endpoint,
-            )
+            ).values()
         elif task == "C11H24":
             (score,) = self.top_avg(
                 scores=tdf,
                 top_n=[159],
                 endpoint=endpoint,
-            )
+            ).values()
         elif task == "C9H10N2O2PF2Cl":
             (score,) = self.top_avg(
                 scores=tdf,
                 top_n=[250],
                 endpoint=endpoint,
-            )
+            ).values()
         else:
             print(f"Unknown GuacaMol task {task}, returning uniform specification")
             top1, top10, top100 = self.top_avg(
                 scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-            )
+            ).values()
             score = np.mean([top1, top10, top100])
         # Calculate Quality
         qf = QualityFilter(n_jobs=self.n_jobs)
@@ -526,7 +526,7 @@ class ScoreMetrics:
                 scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-            )
+            ).values()
             top_avgs.append([top1, top10, top100])
             # Calculate top AUC
             top1, top10, top100 = self.top_auc(
@@ -536,7 +536,7 @@ class ScoreMetrics:
                 endpoint=endpoint,
                 window=100,
                 extrapolate=True,
-            )
+            ).values()
             top_aucs.append([top1, top10, top100])
         # Aggregate and take product
         top_avgs = np.vstack(top_avgs).prod(0)
