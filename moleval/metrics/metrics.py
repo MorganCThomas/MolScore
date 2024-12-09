@@ -169,164 +169,212 @@ class GetMetrics(object):
             else:
                 warnings.warn(f"PoseCheck: currently unavailable due to {_posecheck_error} error")
 
-    def calculate(self, gen=None, calc_valid=False, calc_unique=False, unique_k=None, se_k=1000, sp_k=1000, properties=False, verbose=False):
+    def calculate(self, gen=None, calc_valid=False, calc_unique=False, se_k=1000, sp_k=1000, properties=False, return_stats=False):
         """
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles or mols
         :param calc_valid: Return validity ratio
         :param calc_unique: Return unique ratio
-        :param unique_k: Return unique ratio for a subset of size k
         :param se_k: Sub-sample size for sphere exclusion diversity
+        :param sp_k: Sub-sample size for Solow Polasky diversity
         :param verbose: Print updates
         """
         
-        metrics = {}
-        metrics['#'] = len(gen)
+        # Store metrics as a list of dicts
+        metrics = []
+        def add_metric(key, value, **kwargs):
+            kwargs.update({
+                'metric': key,
+                'value': value,
+            })
+            metrics.append(kwargs)
+        add_metric('#', len(gen))
 
-        if verbose: print("Calculating Validity & Uniqueness")
         gen, mols, n_valid, fraction_valid, fraction_unique = preprocess_gen(gen, prev_gen=self.prev_gen, n_jobs=self.n_jobs)
 
         # ----- Intrinsic properties -----
 
-        # Report validity
-        if calc_valid and self.normalize: metrics['Validity'] = fraction_valid
-        metrics['# valid'] = n_valid
+        # Add validity
+        if calc_valid and self.normalize:
+            add_metric('Validity', fraction_valid)
+        add_metric('# valid', n_valid)
 
-        # Report Uniqueness
-        if calc_unique and self.normalize: metrics['Uniqueness'] = fraction_unique
-        metrics['# valid & unique'] = len(gen)
+        # Add Uniqueness
+        if calc_unique and self.normalize:
+            add_metric('Uniqueness', fraction_unique)
+        add_metric('# valid & unique', len(gen))
 
         # Compute pre-statistics
-        if verbose: print("Computing pre-statistics (fps, ring systems etc.)")
         mol_fps = fingerprints(mols, self.pool, already_unique=True, fp_type='morgan')
         scaffs = compute_scaffolds(mols, n_jobs=self.n_jobs)
         scaff_gen = list(scaffs.keys())
-        if self.cumulative: scaff_gen = list(set(scaff_gen) - set(self.prev_scaff))
         fgs = compute_functional_groups(mols, n_jobs=self.n_jobs)
-        if self.cumulative: fgs = Counter({k: v for k, v in fgs.items() if k not in self.prev_fg})
         rss = compute_ring_systems(mols, n_jobs=self.n_jobs)
-        if self.cumulative: rss = Counter({k: v for k, v in rss.items() if k not in self.prev_rs})
-        scaff_mols = mapper(self.pool)(get_mol, scaff_gen)
+        if self.cumulative:
+            scaff_gen = list(set(scaff_gen) - set(self.prev_scaff))
+            fgs = Counter({k: v for k, v in fgs.items() if k not in self.prev_fg})
+            rss = Counter({k: v for k, v in rss.items() if k not in self.prev_rs})
+        scaff_mols = mapper(self.pool)(get_mol, scaff_gen) 
         
-        # Calculate novelty
-        if verbose: print("Calculating Novelty")
+        # Add novelty
         if self.train:
-            if self.normalize: metrics['Novelty'] = novelty(gen, self.train, self.pool)
-            metrics['# novel'] = novelty(gen, self.train, self.pool, normalize=False)
+            if self.normalize:
+                add_metric('Novelty', novelty(gen, self.train, self.pool))
+            add_metric('# novel', novelty(gen, self.train, self.pool, normalize=False))
 
-        # Calculate diversity related metrics
-        if verbose: print("Calculating Diversity")
-        metrics['IntDiv1'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, p=1, device=self.device)
-        metrics['IntDiv2'] = internal_diversity(gen=mol_fps, n_jobs=self.pool, p=2, device=self.device)
+        # Add internal diversity
+        add_metric('IntDiv1', internal_diversity(gen=mol_fps, n_jobs=self.pool, p=1, device=self.device))
+        add_metric('IntDiv2', internal_diversity(gen=mol_fps, n_jobs=self.pool, p=2, device=self.device))
         
+        # Add sphere exclusion
         if se_k and (len(mols) < se_k):
             warnings.warn(f'Less than {se_k} molecules so SEDiv is non-standard.')
-            metrics['SEDiv'] = se_diversity(gen=mol_fps, n_jobs=self.pool, normalize=self.normalize)
+            add_metric('SEDiv', se_diversity(gen=mol_fps, n_jobs=self.pool, normalize=self.normalize))
         if se_k and (len(gen) >= se_k):
-            metrics[f'SEDiv@{se_k/1000:.0f}k'] = se_diversity(gen=mol_fps, k=se_k, n_jobs=self.pool, normalize=self.normalize)
+            add_metric(f'SEDiv@{se_k/1000:.0f}k', se_diversity(gen=mol_fps, k=se_k, n_jobs=self.pool, normalize=self.normalize))
         
+        # Add Solow Polasky diversity
         if sp_k and (len(mols) < sp_k):
             warnings.warn(f'Less than {sp_k} molecules so SPDiv is non-standard.')
-            metrics['SPDiv'] = sp_diversity(gen=mols, n_jobs=self.pool, normalize=self.normalize)
+            add_metric('SPDiv', sp_diversity(gen=mols, n_jobs=self.pool, normalize=self.normalize))
         if sp_k and (len(mols) >= sp_k):
-            metrics[f'SPDiv@{sp_k/1000:.0f}k'] = sp_diversity(gen=mols, k=1000, n_jobs=self.pool, normalize=self.normalize)
+            add_metric(f'SPDiv@{sp_k/1000:.0f}k', sp_diversity(gen=mols, k=sp_k, n_jobs=self.pool, normalize=self.normalize))
         
-        metrics['# scaffolds']  = len(scaff_gen)
+        # Add Scaffold diversity
+        add_metric('# scaffolds', len(scaff_gen))
+        add_metric('ScaffDiv', internal_diversity(gen=scaff_mols, n_jobs=self.pool, p=1, device=self.device, fp_type='morgan'))
+        if len(scaff_gen):
+            add_metric('ScaffUniqueness', len(scaff_gen)/len(gen))
+        else:
+            add_metric('ScaffUniqueness', 0.)
         
-        metrics['ScaffDiv'] = internal_diversity(gen=scaff_mols, n_jobs=self.pool, p=1, device=self.device, fp_type='morgan')
-        
-        if len(scaff_gen): metrics['ScaffUniqueness'] = len(scaff_gen)/len(gen)
-        else: metrics['ScaffUniqueness'] = 0.
-        
-        # Calculate number of FG and RS relative to sample size
-        if sum(fgs.values()): metrics['FG'] = len(list(fgs.keys()))/sum(fgs.values()) if self.normalize else len(list(fgs.keys()))
-        else: metrics['FG'] = 0.
-
-        if sum(rss.values()): metrics['RS'] = len(list(rss.keys()))/sum(rss.values()) if self.normalize else len(list(rss.keys()))
-        else: metrics['RS'] = 0.
+        # Calculate propertion of unique functional groups (FG) relative to all functional groups
+        if sum(fgs.values()):
+            fgs_n = sum(fgs.values())
+            fgs_value = len(list(fgs.keys()))/fgs_n if self.normalize else len(list(fgs.keys()))
+            add_metric('FG', fgs_value, n=fgs_n)
+        else:
+            add_metric('FG', 0.)
+            
+        # Calculate number of ring systems (RS) relative to sample size
+        if sum(rss.values()):
+            rss_n = sum(rss.values())
+            rss_value = len(list(rss.keys()))/rss_n if self.normalize else len(list(rss.keys()))
+            add_metric('RS', rss_value, n=rss_n)
+        else: 
+            add_metric('RS', 0.)
         
         # Calculate filters
-        if verbose: print("Calculating Filters")
-        metrics['Filters'] = fraction_passes_filters(mols, self.pool, normalize=self.normalize)
+        add_metric('Filters', fraction_passes_filters(mols, self.pool, normalize=self.normalize))
 
         # Calculate purchasability
-        metrics['Purchasable_ZINC20'] = np.mean(mapper(self.pool)(buy, gen)) if self.normalize else np.sum(mapper(self.pool)(buy, gen))
+        purchasable = mapper(self.pool)(buy, gen)
+        add_metric('Purchasable_ZINC20', np.mean(purchasable) if self.normalize else np.sum(purchasable))
 
         # ---- PoseCheck metrics ----
         if self.target_structure and _posecheck_available:
-            if verbose: print("Calculating PoseCheck metrics")
             self.posecheck.load_ligands_from_mols(mols, add_hs=True)
-            metrics['PC_Clashes'] = np.nanmean(self.posecheck.calculate_clashes())
-            metrics['PC_StrainEnergy'] = np.nanmean(self.posecheck.calculate_strain_energy())
+            clashes = self.posecheck.calculate_clashes()
+            add_metric('PC_Clashes', np.nanmean(clashes), dist=clashes)
+            strain_energy = self.posecheck.calculate_strain_energy()
+            add_metric('PC_StrainEnergy', np.nanmean(strain_energy), dist=strain_energy)
             if self.target_ligand:
-                metrics['PC_Interactions'] = np.mean(self.posecheck.calculate_interaction_similarity(
+                similarities = self.posecheck.calculate_interaction_similarity(
                     ref_lig_path = self.target_ligand,
                     similarity_func = "Tanimoto",
                     count = False
-                ))
+                )
+                add_metric('PC_Interactions', np.nanmean(similarities), dist=similarities)
 
         # ---- Extrinsic properties ----
 
         # Calculate FCD
         if self.run_fcd:
-            if verbose: print("Calculating FCD")
             pgen = FCDMetric(**self.kwargs_fcd).precalc(gen)
             if self.ptrain:
-                metrics['FCD_train'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptrain)
+                add_metric('FCD_train', FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptrain))
             if self.ptest:
-                metrics['FCD_test'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest)
+                add_metric('FCD_test', FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest))
             if self.ptest_scaffolds:
-                metrics['FCD_testSF'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds)
+                add_metric('FCD_testSF', FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptest_scaffolds))
             if self.ptarget:
-                metrics['FCD_target'] = FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget)
+                add_metric('FCD_target', FCDMetric(**self.kwargs_fcd)(pgen=pgen, pref=self.ptarget))
 
         # Test metrics
         if self.test_int is not None:
-            if verbose: print("Calculating Test metrics")
-            metrics['Novelty_test'] = novelty(gen, self.test, self.pool, normalize=self.normalize)
-            metrics['AnSim_test'], metrics['AnCov_test'] = \
-                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'], normalize=self.normalize)
-            metrics['FG_test'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.test_int['FG'])
-            metrics['RS_test'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.test_int['RS'])
-            metrics['SNN_test'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
-            metrics['Frag_test'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag'])
-            metrics['Scaf_test'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf'])
-            metrics['OutlierBits_test'] = self.test_sw.score_mols(mols, normalize=self.normalize)
+            add_metric('Novelty_test', novelty(gen, self.test, self.pool, normalize=self.normalize))
+            ansim_test, ancov_test = FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['Analogue'], normalize=self.normalize)
+            add_metric('AnSim_test', ansim_test)
+            add_metric('AnCov_test', ancov_test)
+            add_metric('FG_test', FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.test_int['FG']))
+            add_metric('RS_test', RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.test_int['RS']))
+            test_snns = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_int['SNN'])
+            add_metric(
+                'SNN_test',
+                np.mean(test_snns) if self.normalize else np.sum(test_snns),
+                dist=list(test_snns)
+            )
+            add_metric('Frag_test', FragMetric(**self.kwargs)(gen=mols, pref=self.test_int['Frag']))
+            add_metric('Scaf_test', ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_int['Scaf']))
+            outlier_bits_test = self.test_sw.score_mols(mols)
+            add_metric(
+                'OutlierBits_test',
+                np.mean(outlier_bits_test) if self.normalize else np.sum(outlier_bits_test),
+                dist=outlier_bits_test)
             if properties:
                 for name, func in [('logP', logP),
                                 ('NP', NP),
                                 ('SA', SA),
                                 ('QED', QED),
                                 ('Weight', weight)]:
-                    metrics[f'{name}_test'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name])
+                    add_metric(f'{name}_test', WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.test_int[name]))
 
         # Test scaff metrics
         if self.test_scaffolds_int is not None:
-            if verbose: print("Calculating Scaff metrics")
-            metrics['SNN_testSF'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
-            metrics['Frag_testSF'] = FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag'])
-            metrics['Scaf_testSF'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf'])
-            metrics['OutlierBits_testSF'] = self.test_scaffolds_sw.score_mols(mols, normalize=self.normalize)
+            testsf_snns = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.test_scaffolds_int['SNN'])
+            add_metric(
+                'SNN_testSF',
+                np.mean(testsf_snns) if self.normalize else np.sum(testsf_snns),
+                dist=list(testsf_snns)
+            )
+            add_metric('Frag_testSF', FragMetric(**self.kwargs)(gen=mols, pref=self.test_scaffolds_int['Frag']))
+            add_metric('Scaf_testSF', ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.test_scaffolds_int['Scaf']))
+            outlier_bits_testsf = self.test_scaffolds_sw.score_mols(mols)
+            add_metric(
+                'OutlierBits_testSF',
+                np.mean(outlier_bits_testsf) if self.normalize else np.sum(outlier_bits_testsf),
+                dist=outlier_bits_testsf
+            )
 
         # Target metrics
         if self.target_int is not None:
-            if verbose: print("Calculating Target metrics")
-            metrics['Novelty_target'] = novelty(gen, self.target, self.pool, normalize=self.normalize)
-            metrics['AnSim_target'], metrics['AnCov_target'] = \
-                FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'], normalize=self.normalize)
-            metrics['FG_target'] = FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.target_int['FG'])
-            metrics['RS_target'] = RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.target_int['RS'])
-            metrics['SNN_target'] = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['SNN'])
-            metrics['Frag_target'] = FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag'])
-            metrics['Scaf_target'] = ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf'])
-            metrics['OutlierBits_target'] = self.target_sw.score_mols(mols, normalize=self.normalize)
+            add_metric('Novelty_target', novelty(gen, self.target, self.pool, normalize=self.normalize))
+            ansim_target, ancov_target = FingerprintAnaloguesMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['Analogue'], normalize=self.normalize)
+            add_metric('AnSim_target', ansim_target)
+            add_metric('AnCov_target', ancov_target)
+            add_metric('FG_target', FGMetric(**self.kwargs)(pgen={'fgs': fgs}, pref=self.target_int['FG']))
+            add_metric('RS_target', RSMetric(**self.kwargs)(pgen={'rss': rss}, pref=self.target_int['RS']))
+            target_snns = SNNMetric(**self.kwargs)(pgen={'fps': mol_fps}, pref=self.target_int['SNN'])
+            add_metric(
+                'SNN_target',
+                np.mean(target_snns) if self.normalize else np.sum(target_snns),
+                dist=list(target_snns)
+            )
+            add_metric('Frag_target', FragMetric(**self.kwargs)(gen=mols, pref=self.target_int['Frag']))
+            add_metric('Scaf_target', ScafMetric(**self.kwargs)(pgen={'scaf': scaffs}, pref=self.target_int['Scaf']))
+            outlier_bits_target = self.target_sw.score_mols(mols)
+            add_metric(
+                'OutlierBits_target',
+                np.mean(outlier_bits_target) if self.normalize else np.sum(outlier_bits_target),
+                dist=outlier_bits_target
+            )
             if properties:
                 for name, func in [('logP', logP),
                                 ('NP', NP),
                                 ('SA', SA),
                                 ('QED', QED),
                                 ('Weight', weight)]:
-                    metrics[f'{name}_target'] = WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name])
+                    add_metric(f'{name}_target', WassersteinMetric(func, **self.kwargs)(gen=mols, pref=self.target_int[name]))
 
         if self.cumulative:
             metrics = self.cumulative_correction(metrics, len(gen), len(scaff_gen), len(list(fgs.keys())), len(list(rss.keys())))
@@ -334,7 +382,11 @@ class GetMetrics(object):
             self.prev_scaff.update(scaff_gen)
             self.prev_fg.update(fgs.keys())
             self.prev_rs.update(rss.keys())
-        return metrics
+            
+        if not return_stats:
+            return {m['metric']: m['value'] for m in metrics}
+        else:
+            return metrics
 
     def cumulative_correction(self, metrics, n, n_scaffs, n_fgs, n_rss):
         """
@@ -344,26 +396,27 @@ class GetMetrics(object):
         if self.prev_metrics:
             if self.normalize:
                 # For most metrics compute weighted sum
-                for key in metrics.keys():
+                for i, m in enumerate(metrics):
+                    key = m['metric']
                     # Keys that require addition
                     if key in ['#', '# valid', '# valid & unique', '# scaffolds']:
-                        metrics[key] += self.prev_metrics[key]
+                        m['value'] += self.prev_metrics[i]['value']
                     # Keys that require averaging by number of FGs
                     elif key in ['FG']:
-                        metrics[key] = (metrics[key] * n_fgs + self.prev_metrics[key] * self.prev_n['n_fg']) / (n_fgs + self.prev_n['n_fg'])   
+                        m['value'] = (m['value'] * n_fgs + self.prev_metrics[i]['value'] * self.prev_n['n_fg']) / (n_fgs + self.prev_n['n_fg'])   
                     # Keys that require averaging by number of RSs
                     elif key in ['RS']:
-                        metrics[key] = (metrics[key] * n_rss + self.prev_metrics[key] * self.prev_n['n_rs']) / (n_rss + self.prev_n['n_rs'])         
+                        m['value'] = (m['value'] * n_rss + self.prev_metrics[i]['value'] * self.prev_n['n_rs']) / (n_rss + self.prev_n['n_rs'])   
                     # Keys that require averaging by number of scaffolds
                     elif key in ['ScaffDiv']:
-                        metrics[key] = (metrics[key] * n_scaffs + self.prev_metrics[key] * self.prev_n['n_scaff']) / (n_scaffs + self.prev_n['n_scaff'])
+                        m['value'] = (m['value'] * n_scaffs + self.prev_metrics[i]['value'] * self.prev_n['n_scaff']) / (n_scaffs + self.prev_n['n_scaff'])
                     # Keys that require averaging by number of molecules
                     else:
-                        metrics[key] = (metrics[key] * n + self.prev_metrics[key] * self.prev_n['n']) / (n + self.prev_n['n'])
+                        m['value'] = (m['value'] * n + self.prev_metrics[i]['value'] * self.prev_n['n']) / (n + self.prev_n['n'])
             else:
                 # For all metrics sum
-                for key in metrics.keys():
-                    metrics[key] += self.prev_metrics[key]
+                for i, m in enumerate(metrics):
+                    m['value'] += self.prev_metrics[i]['value']
 
         # Update for next run
         self.prev_metrics = metrics
@@ -691,12 +744,9 @@ class SNNMetric(Metric):
         return {'fps': fingerprints(mols, n_jobs=self.n_jobs,
                                     fp_type=self.fp_type)}
 
-    def metric(self, pref, pgen, normalize=True):
+    def metric(self, pref, pgen):
         snns = average_agg_tanimoto(pref['fps'], pgen['fps'], device=self.device)
-        if normalize:
-            return np.mean(snns)
-        else:
-            return snns
+        return snns
     
 
 

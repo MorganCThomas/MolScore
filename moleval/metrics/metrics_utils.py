@@ -656,11 +656,11 @@ class SillyWalks:
             score = len(silly_bits) / len(on_bits)
             return score, silly_bits, bi
 
-    def score_mols(self, mols: list, normalize=True) -> float:
+    def score_mols(self, mols: list) -> float:
         """
         Return the average ratio of outlier FP bits for a list of molecules
         :param: List of SMILES or RDKit Mols
-        :return: Average ratio of outlier FP bits
+        :return: Scores for all molecules
         """
         mols = [m for m in mapper(self._n_jobs)(get_mol, mols) if m is not None]
         scores = [
@@ -669,7 +669,4 @@ class SillyWalks:
                 partial(self._score, count_dict=self.count_dict), mols
             )
         ]
-        if normalize:
-            return np.mean(scores)
-        else:
-            return np.sum(scores)
+        return scores
