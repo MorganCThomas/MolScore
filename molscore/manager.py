@@ -125,9 +125,9 @@ class MolScore:
         self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.finished = False
         self.init_time = time.time()
-        self.results_df = None
+        self.results_df = None # TODO make empty df ... 
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.main_df = None
         self.monitor_app = None
         self.diversity_filter = None
@@ -876,7 +876,7 @@ class MolScore:
 
         # Clean up class
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.results_df = None
         return scores
 
@@ -887,6 +887,7 @@ class MolScore:
         flt: bool = False,
         canonicalize: bool = True,
         recalculate: bool = False,
+        check_uniqueness: bool = True,
         score_only: bool = False,
         additional_formats: dict = None,
         additional_keys: dict = None,
@@ -902,7 +903,8 @@ class MolScore:
         :param canonicalize: Whether to canonicalize smiles before scoring
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
-          (default False i.e. use existing scores for duplicated molecules)
+         (default False i.e. use existing scores for duplicated molecules and renormalize/penalize if necessary)
+        :param check_uniqueness: Whether to check for uniqueness against cache of molecules in main_df
         :param score_only: Whether to log molecule data or simply score and return
         :param additional_formats: Additional formats to be passed to scoring functions
         :param additional_keys: Additional keys to store in the scores.csv file as new columns
@@ -943,7 +945,7 @@ class MolScore:
                 self.batch_df[k] = v
 
         # If a main df exists check if some molecules have already been sampled
-        if isinstance(self.main_df, pd.core.frame.DataFrame):
+        if isinstance(self.main_df, pd.core.frame.DataFrame) and check_uniqueness:
             self.check_uniqueness()
             logger.debug(f"    Uniqueness updated: {len(self.batch_df)} SMILES")
         logger.info(
@@ -1083,7 +1085,7 @@ class MolScore:
         # Clean up class
         self.evaluate_finished()
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.results_df = None
 
         return scores
