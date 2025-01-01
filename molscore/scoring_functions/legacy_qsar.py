@@ -48,7 +48,7 @@ class LegacyQSAR(BaseServerSF):
             resources.files("molscore.data.models.molopt"),
             "gsk3b.pkl",
             "legacy_qsar_server.py",
-            "ECFP6",
+            "ECFP4",
             2048,
         ),
         "molopt_GSK3B_current": (
@@ -56,7 +56,7 @@ class LegacyQSAR(BaseServerSF):
             resources.files("molscore.data.models.molopt"),
             "gsk3b_current.pkl",
             "legacy_qsar_server.py",
-            "ECFP6",
+            "ECFP4",
             2048,
         ),
         "molopt_JNK3": (
@@ -64,7 +64,7 @@ class LegacyQSAR(BaseServerSF):
             resources.files("molscore.data.models.molopt"),
             "jnk3.pkl",
             "legacy_qsar_server.py",
-            "ECFP6",
+            "ECFP4",
             2048,
         ),
         "molopt_JNK3_current": (
@@ -72,7 +72,7 @@ class LegacyQSAR(BaseServerSF):
             resources.files("molscore.data.models.molopt"),
             "jnk3_current.pkl",
             "legacy_qsar_server.py",
-            "ECFP6",
+            "ECFP4",
             2048,
         ),
     }

@@ -1136,7 +1136,6 @@ class MolScoreBenchmark:
         "MolExp-DF": resources.files("molscore.configs.MolExp-DF"),
         "MolExp-DF2": resources.files("molscore.configs.MolExp-DF2"),
         "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
-        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
         "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
         "5HT2A_Selectivity": resources.files(
             "molscore.configs.5HT2A.PIDGIN_Selectivity"

@@ -17,7 +17,7 @@
           "CC(C)(C)NCC(O)c1ccc(O)c(CO)c1"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": 16384,
         "features": true,
         "counts": true,
         "method": "max",
