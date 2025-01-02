@@ -408,15 +408,20 @@ class LinkerDescriptors(MolecularDescriptors):
 
         return descs
 
-    def __call__(self, linker_smiles: list, **kwargs):
+    def __call__(self, smiles: list, additional_formats: dict, **kwargs):
         """
         Calculate the scores for RDKitDescriptors
-        :param linker_smiles: List of linker SMILES
+        :param smiles: List of SMILES strings
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        # TODO calculate linker from full SMILES given fragments specified in __init__
-        results = [{"linker": linker} for linker in linker_smiles]
+        assert additional_formats and (
+            "linker" in additional_formats.keys()
+        ), "LinkerDescriptors requires a linker format in additional_formats"
+        results = [
+            {"smiles": smi, "linker": linker}
+            for smi, linker in zip(smiles, additional_formats["linker"])
+        ]
 
         # Compute descriptors in parallel
         descs = [r for r in self.mapper(self._score, additional_formats["linker"])]
