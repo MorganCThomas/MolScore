@@ -131,15 +131,25 @@ class ScoreMetrics:
         if budget:
             scores = scores.iloc[:budget]
         # Valid
-        scores.loc[:, "valid"] = scores["valid"].astype(bool)
-        self.valid_ratio = scores.valid.sum() / len(scores)
+        if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
+            valid_value = "true"
+        elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
+            valid_value = True
+        else:
+            raise ValueError("Valid column has un unrecognised dtype")
+        self.valid_ratio = (scores.valid == valid_value).sum() / len(scores)
         if valid:
-            scores = scores.loc[scores.valid == True]
+            scores = scores.loc[scores.valid == valid_value]
         # Unique
-        scores.loc[:, "unique"] = scores["unique"].astype(bool)
-        self.unique_ratio = scores.unique.sum() / len(scores)
+        if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
+            unique_value = "true"
+        elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
+            unique_value = True
+        else:
+            raise ValueError("Unique column has un unrecognised dtype")
+        self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
         if unique:
-            scores = scores.loc[scores.unique == True]
+            scores = scores.loc[scores.unique == unique_value]
         # Add scaffold column if not present
         if "scaffold" not in scores.columns:
             get_scaff = partial(compute_scaffold, min_rings=1)
@@ -182,22 +192,22 @@ class ScoreMetrics:
             else:
                 results.append(tdf.iloc[:n][endpoint].mean())
 
+        # Return as dictionary
+        if diverse:
+            output = [
+                (prefix + f"Top-{n} Avg (Div) {endpoint}", r)
+                for n, r in zip(top_n, results)
+            ]
+        else:
+            output = [
+                (prefix + f"Top-{n} Avg {endpoint}", r)
+                for n, r in zip(top_n, results)
+            ]
         if queue:
-            # Return as dictionary
-            if diverse:
-                output = [
-                    (prefix + f"Top-{n} Avg (Div) {endpoint}", r)
-                    for n, r in zip(top_n, results)
-                ]
-            else:
-                output = [
-                    (prefix + f"Top-{n} Avg {endpoint}", r)
-                    for n, r in zip(top_n, results)
-                ]
             for o in output:
                 queue.put(o)
         else:
-            return results
+            return dict(output)
 
     @staticmethod
     def top_auc(
@@ -279,22 +289,22 @@ class ScoreMetrics:
         if return_trajectory:
             return [x / budget for x in cumsum], indices, auc_values
 
+        # Return as dictionary
+        if diverse:
+            output = [
+                (prefix + f"Top-{n} AUC (Div) {endpoint}", x / budget)
+                for n, x in zip(top_n, cumsum)
+            ]
+        else:
+            output = [
+                (prefix + f"Top-{n} AUC {endpoint}", x / budget)
+                for n, x in zip(top_n, cumsum)
+            ]
         if queue:
-            # Return as dictionary
-            if diverse:
-                output = [
-                    (prefix + f"Top-{n} AUC (Div) {endpoint}", x / budget)
-                    for n, x in zip(top_n, cumsum)
-                ]
-            else:
-                output = [
-                    (prefix + f"Top-{n} AUC {endpoint}", x / budget)
-                    for n, x in zip(top_n, cumsum)
-                ]
             for o in output:
                 queue.put(o)
         else:
-            return [x / budget for x in cumsum]
+            return dict(output)
 
     @staticmethod
     def tyield(
@@ -314,15 +324,15 @@ class ScoreMetrics:
         if scaffold:
             hits = hits.scaffold.dropna().unique()
 
+        # Return as dictionary
+        if scaffold:
+            output = (prefix + f"Yield Scaffold {endpoint}", len(hits) / budget)
+        else:
+            output = (prefix + f"Yield {endpoint}", len(hits) / budget)
         if queue:
-            # Return as dictionary
-            if scaffold:
-                output = (prefix + f"Yield Scaffold {endpoint}", len(hits) / budget)
-            else:
-                output = (prefix + f"Yield {endpoint}", len(hits) / budget)
             queue.put(output)
         else:
-            return len(hits) / budget
+            return dict([output])
 
     @staticmethod
     def tyield_auc(
@@ -375,16 +385,15 @@ class ScoreMetrics:
         if return_trajectory:
             return cumsum / budget, indices, yields
 
-        if queue:
-            # Return as dictionary
-            if scaffold:
-                output = (prefix + f"Yield AUC Scaffold {endpoint}", cumsum / budget)
-            else:
-                output = (prefix + f"Yield AUC {endpoint}", cumsum / budget)
-            queue.put(output)
-
+        # Return as dictionary
+        if scaffold:
+            output = (prefix + f"Yield AUC Scaffold {endpoint}", cumsum / budget)
         else:
-            return cumsum / budget
+            output = (prefix + f"Yield AUC {endpoint}", cumsum / budget)
+        if queue:
+            queue.put(output)
+        else:
+            return dict([output])
 
     def targets_rediscovered(
         self, smiles, target_smiles, scaffolds=[], target_scaffolds=[]
@@ -432,7 +441,7 @@ class ScoreMetrics:
                 scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-            )
+            ).values()
             score = np.mean([top1, top10, top100])
         elif any(
             [
@@ -444,26 +453,26 @@ class ScoreMetrics:
                 scores=tdf,
                 top_n=[1],
                 endpoint=endpoint,
-            )
+            ).values()
         elif task == "C11H24":
             (score,) = self.top_avg(
                 scores=tdf,
                 top_n=[159],
                 endpoint=endpoint,
-            )
+            ).values()
         elif task == "C9H10N2O2PF2Cl":
             (score,) = self.top_avg(
                 scores=tdf,
                 top_n=[250],
                 endpoint=endpoint,
-            )
+            ).values()
         else:
             print(f"Unknown GuacaMol task {task}, returning uniform specification")
             top1, top10, top100 = self.top_avg(
                 scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-            )
+            ).values()
             score = np.mean([top1, top10, top100])
         # Calculate Quality
         qf = QualityFilter(n_jobs=self.n_jobs)
@@ -517,7 +526,7 @@ class ScoreMetrics:
                 scores=tdf,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
-            )
+            ).values()
             top_avgs.append([top1, top10, top100])
             # Calculate top AUC
             top1, top10, top100 = self.top_auc(
@@ -527,7 +536,7 @@ class ScoreMetrics:
                 endpoint=endpoint,
                 window=100,
                 extrapolate=True,
-            )
+            ).values()
             top_aucs.append([top1, top10, top100])
         # Aggregate and take product
         top_avgs = np.vstack(top_avgs).prod(0)
@@ -748,13 +757,19 @@ class ScoreMetrics:
                     pass
 
                 # ----- Submit and run endpoint related processes
-                process_done.extend(self._run_processes(process_list))
-                process_list = []
-                # Retrieve results from the queue
-                results = []
-                while not queue.empty():
-                    results.append(queue.get())
-                metrics.update(dict(results))
+                if self.n_jobs > 1:
+                    process_done.extend(self._run_processes(process_list))
+                    process_list = []
+                    # Retrieve results from the queue
+                    results = []
+                    while not queue.empty():
+                        results.append(queue.get())
+                    metrics.update(dict(results))
+                else:
+                    for target, args, _ in process_list:
+                        # Don't pass queue
+                        metrics.update(target(*args[:-1]))
+                    
 
             # ----- Target related
             gen_smiles = filtered_scores.smiles.tolist()

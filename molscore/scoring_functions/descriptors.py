@@ -46,6 +46,7 @@ class MolecularDescriptors:
         self.prefix = prefix.strip().replace(" ", "_")
         self.results = None
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
 
     @staticmethod
     def calculate_descriptors(smi, prefix):
@@ -259,11 +260,10 @@ class MolecularDescriptors:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        with Pool(self.n_jobs) as pool:
-            pcalculate_descriptors = partial(
-                self.calculate_descriptors, prefix=self.prefix
-            )
-            results = [result for result in pool.imap(pcalculate_descriptors, smiles)]
+        pcalculate_descriptors = partial(
+            self.calculate_descriptors, prefix=self.prefix
+        )
+        results = [result for result in self.mapper(pcalculate_descriptors, smiles)]
 
         return results
 
@@ -419,10 +419,9 @@ class LinkerDescriptors(MolecularDescriptors):
         results = [{"linker": linker} for linker in linker_smiles]
 
         # Compute descriptors in parallel
-        with Pool(self.n_jobs) as pool:
-            descs = [r for r in pool.imap(self._score, linker_smiles)]
-            # Add prefix
-            descs = [{f"{self.prefix}_{k}": v for k, v in ds.items()} for ds in descs]
+        descs = [r for r in self.mapper(self._score, additional_formats["linker"])]
+        # Add prefix
+        descs = [{f"{self.prefix}_{k}": v for k, v in ds.items()} for ds in descs]
 
         for r, d in zip(results, descs):
             r.update(d)

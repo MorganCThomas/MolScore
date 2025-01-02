@@ -48,8 +48,7 @@ while not ms.finished:
 A list of available configuration files can found here by running the following code snippet,
 ```python
 from molscore import MolScore
-named_tasks = {k:[p.name.strip(".json") for p in v.glob("*.json")] for k, v in MolScore.presets.items()}
-print(named_tasks)
+MolScore.preset_tasks
 ```
 The output will look something like this ...
 ```json
