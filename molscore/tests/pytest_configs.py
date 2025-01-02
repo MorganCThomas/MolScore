@@ -25,7 +25,7 @@ Description:
   This is mostly to check that it runs, or which errors are thrown (some should be expected).
 
 Examples:
-  python pytest_configs.py GuacaMol:Albuterol_similarity path/to/my_config.json /path/to/my_configs/
+  python pytest_configs.py GuacaMol:Albuterol_similarity path/to/my_config.json
 
   This will run the MolScore for Albuterol_similarity from the GuacaMol benchmark, my_config, and all JSON configuration files in my_configs.
             """
@@ -33,6 +33,7 @@ Examples:
 
 
 MG = MockGenerator(augment_invalids=True, augment_duplicates=True)
+BATCH_SIZE = 10
 
 
 @pytest.fixture
@@ -51,10 +52,9 @@ def test_v1(configs: Union[str, os.PathLike], recalculate: bool, score_only: boo
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
             replay_size=0,
         )
-        batch_size = 5
 
         for _ in range(5):
-            smiles = MG.sample(batch_size)
+            smiles = MG.sample(BATCH_SIZE)
             _ = ms(smiles=smiles, recalculate=recalculate, score_only=score_only)
 
         ms.write_scores()
@@ -82,7 +82,6 @@ def test_v2_smiles(
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
             replay_size=replay_size,
         )
-        batch_size = 5
 
         # Test score
         for _ in range(5):
@@ -91,12 +90,12 @@ def test_v2_smiles(
                 "canonicalise_smiles": canonicalise_smiles,
                 "recalculate": recalculate,
             }
-            smiles = MG.sample(batch_size)
+            smiles = MG.sample(BATCH_SIZE)
             kwargs["smiles"] = smiles
             if mol_id and mol_id == "smiles":
                 kwargs["mol_id"] = smiles
             if mol_id and mol_id == "random":
-                kwargs["mol_id"] = [str(uuid.uuid4()) for _ in range(batch_size)]
+                kwargs["mol_id"] = [str(uuid.uuid4()) for _ in range(BATCH_SIZE)]
 
             _ = ms.score(**kwargs)
             
@@ -129,7 +128,6 @@ def test_v2_mols(
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
             replay_size=replay_size,
         )
-        batch_size = 5
 
         # Test score
         for _ in range(5):
@@ -137,14 +135,14 @@ def test_v2_mols(
                 "score_only": score_only,
                 "recalculate": recalculate,
             }
-            smiles = MG.sample(batch_size)
+            smiles = MG.sample(BATCH_SIZE)
             kwargs["rdkit_mols"] = [
                 Chem.MolFromSmiles(smi, sanitize=False) for smi in smiles
             ]
             if mol_id and mol_id == "smiles":
                 kwargs["mol_id"] = smiles
             if mol_id and mol_id == "random":
-                kwargs["mol_id"] = [str(uuid.uuid4()) for _ in range(batch_size)]
+                kwargs["mol_id"] = [str(uuid.uuid4()) for _ in range(BATCH_SIZE)]
 
             try:
                 _ = ms.score(**kwargs)
