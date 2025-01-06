@@ -93,8 +93,7 @@ class HSR:
         
         :param prefix: Prefix to identify scoring function instance
         :param ref_molecule: Reference molecule file path (3D molecule provided as .mol, .mol2, .pdb, .xyz, or .sdf file)
-        :param generator: generator of 3D coordinates,  also package used to open the reference molecule file. 
-        options: 'rdkit', 'obabel', 'ccdc', 'None'
+        :param generator: generator of 3D coordinates,  also package used to open the reference molecule file. Options: 'rdkit', 'obabel', 'ccdc', 'None'
         :param n_jobs: Number of parralel jobs (number of molecules to score in parallel)
         :param timeout: Timeout value for the 3D generation process (in seconds)
         :param save_files: Save the 3D coordinates of the molecules in a file
