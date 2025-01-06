@@ -54,6 +54,7 @@ class Align3D:
         self.agg_method = getattr(np, agg_method)
         self.pharmacophore_similarity = pharmacophore_similarity
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
         self.ref_mols = []
 
         # Check input
@@ -371,8 +372,7 @@ class Align3D:
             pharmacophore=self.pharmacophore_similarity,
         )
         # Score individual smiles
-        with Pool(self.n_jobs) as pool:
-            results = [r for r in pool.imap(pfunc, smiles)]
+        results = [r for r in self.mapper(pfunc, smiles)]
         # Save mols
         for r, name in zip(results, file_names):
             file_path = os.path.join(directory, name + ".sdf")

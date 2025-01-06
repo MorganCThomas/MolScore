@@ -43,6 +43,7 @@ class SKLearnClassifier:
         self.fp = fp
         self.nBits = int(nBits)
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs)
 
         # Load in model and assign to attribute
         if model_path.endswith(".joblib"):
@@ -66,15 +67,14 @@ class SKLearnClassifier:
         results = [{"smiles": smi, f"{self.prefix}_pred_proba": 0.0} for smi in smiles]
         valid = []
         fps = []
-        with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(
-                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
-            )
-            [
-                (valid.append(i), fps.append(fp.reshape(1, -1)))
-                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-                if fp is not None
-            ]
+        pcalculate_fp = partial(
+            Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+        )
+        [
+            (valid.append(i), fps.append(fp.reshape(1, -1)))
+            for i, fp in enumerate(self.mapper(pcalculate_fp, smiles))
+            if fp is not None
+        ]
 
         if len(valid) != 0:
             probs = self.model.predict_proba(np.asarray(fps).reshape(len(fps), -1))[
@@ -127,15 +127,14 @@ class SKLearnRegressor(SKLearnClassifier):
         results = [{"smiles": smi, f"{self.prefix}_predict": 0.0} for smi in smiles]
         valid = []
         fps = []
-        with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(
-                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
-            )
-            [
-                (valid.append(i), fps.append(fp.reshape(1, -1)))
-                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-                if fp is not None
-            ]
+        pcalculate_fp = partial(
+            Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+        )
+        [
+            (valid.append(i), fps.append(fp.reshape(1, -1)))
+            for i, fp in enumerate(self.mapper(pcalculate_fp, smiles))
+            if fp is not None
+        ]
 
         if len(valid) != 0:
             preds = self.model.predict(np.asarray(fps).reshape(len(fps), -1))

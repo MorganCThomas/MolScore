@@ -1,5 +1,6 @@
 import logging
 import os
+import atexit
 from functools import partial
 from typing import Union
 
@@ -64,6 +65,7 @@ class MolecularSimilarity:
         self.nBits = bits
         self.n_jobs = n_jobs
         self.timeout = timeout
+        self.mapper = Pool(n_jobs, return_map=True)
 
         # If file path provided, load smiles.
         if isinstance(ref_smiles, str):
@@ -89,7 +91,7 @@ class MolecularSimilarity:
             Fingerprints.get(mol, self.fp, self.nBits, asarray=False)
             for mol in self.ref_mols
         ]
-
+    
     @staticmethod
     def calculate_sim(
         smi: str,
@@ -154,11 +156,8 @@ class MolecularSimilarity:
                 method=self.method,
                 prefix=self.prefix,
             )
-        if self.n_jobs != 1:
-            with Pool(self.n_jobs) as pool:
-                results = [result for result in pool.imap(calculate_sim_p, smiles)]
-        else:
-            results = [calculate_sim_p(smi) for smi in smiles]
+        
+        results = [result for result in self.mapper(calculate_sim_p, smiles)]
         return results
 
     def __call__(self, smiles: list, **kwargs):
@@ -211,6 +210,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
         self.thresh = thresh
         self.method = method
         self.n_jobs = n_jobs
+        self.mapper = Pool(n_jobs, return_map=True)
         self.timeout = timeout
 
         # If file path provided, load smiles.
@@ -283,11 +283,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
                     method=self.method,
                     prefix=self.prefix,
                 )
-        if self.n_jobs != 1:
-            with Pool(self.n_jobs) as pool:
-                results = [result for result in pool.imap(calculate_sim_p, smiles)]
-        else:
-            results = [calculate_sim_p(smi) for smi in smiles]
+        results = [result for result in self.mapper(calculate_sim_p, smiles)]
         return results
 
 

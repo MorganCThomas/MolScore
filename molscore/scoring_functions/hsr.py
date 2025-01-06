@@ -2,19 +2,15 @@ import logging
 import os
 import time
 from typing import Union
+import signal
 from openbabel import pybel as pb
 import numpy as np
 from functools import partial
 from molscore.scoring_functions.utils import Pool
 import multiprocessing
 from rdkit import Chem
-
-from ccdc import io
-from ccdc import conformer
-from ccdc.molecule import Molecule as ccdcMolecule
-
+import hsr
 from hsr import pre_processing as pp
-from hsr import  pca_transform as pca
 from hsr import fingerprint as fp
 from hsr import similarity as sim
 from hsr.utils import PROTON_FEATURES
@@ -26,7 +22,36 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
+try:
+    from ccdc import io
+    from ccdc import conformer
+    from ccdc.molecule import Molecule as ccdcMolecule
+except Exception as ccdc_exception:
+    logger.error(
+        f"Unexpected error with CCDC module: {ccdc_exception}. "
+        "If you want to use the ccdc Python api, please ensure the CCDC package is correctly installed and licensed."
+    )
+    io = None
+    conformer = None
+    ccdcMolecule = None
+    
+class DummyPool:
+    def apply_async(self, func, args=()):
+        class Result:
+            def __init__(self, value):
+                self.value = value
 
+            def get(self, timeout=None):
+                return self.value
+
+        return Result(func(*args))
+
+    def close(self):
+        pass
+
+    def join(self):
+        pass
+    
 def get_array_from_pybelmol(pybelmol):
     # Iterate over the atoms in the molecule
     atom_array = []
@@ -49,7 +74,7 @@ def get_array_from_ccdcmol(ccdcmol):
 
 class HSR:
     """
-    HSR (hyper-shape recognition) similarity measure
+    HSR (Hypershape Recognition) similarity method
     """
     
     return_metrics = ["HSR_score"]
@@ -60,50 +85,68 @@ class HSR:
         ref_molecule: os.PathLike,
         generator: str,  
         n_jobs: int = 1,    
-        timeout: int = 10  # New timeout parameter added here
-        #TODO: add parameteres to tweak the similairty measure
+        timeout: int = 10,
+        save_files: bool = False 
     ):
         """
         Initialize HSR similarity measure
         
         :param prefix: Prefix to identify scoring function instance
-        :param ref_molecule: reference molecule file path
-        :param generator: generator of 3D coordinates, ('obabel' is the only one supported for now, 'ccdc' will be added soon)
-        :param n_jobs: number of parralel jobs (number of molecules to score in parallel)
+        :param ref_molecule: Reference molecule file path (3D molecule provided as .mol, .mol2, .pdb, .xyz, or .sdf file)
+        :param generator: generator of 3D coordinates,  also package used to open the reference molecule file. Options: 'rdkit', 'obabel', 'ccdc', 'None'
+        :param n_jobs: Number of parralel jobs (number of molecules to score in parallel)
         :param timeout: Timeout value for the 3D generation process (in seconds)
-        #TODO: add parameteres to tweak the similairty measure
+        :param save_files: Save the 3D coordinates of the molecules in a file
         """
         
         self.prefix = prefix.strip().replace(" ", "_")
-        self.ref_molecule = pp.read_mol_from_file(ref_molecule)
-        if self.ref_molecule is None:
-            raise ValueError("Reference molecule is None. Check the extesnsion of the file is managed by HSR")
+        
         self.generator = generator
         self.n_jobs = n_jobs
         self.timeout = timeout
-        # TODO: Add the case when there is no need for a generator and the molecule is already 3D
-        # or the array is directly provided
+        self.save_files = save_files
         if self.generator == 'ccdc':
             #Read molecule from file 
             ref_mol = io.MoleculeReader(ref_molecule)[0]
             ref_mol_array = get_array_from_ccdcmol(ref_mol)
-            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array, scaling='matrix')
+            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
         elif self.generator == 'obabel':
             #Read molecule from file (sdf)
             ref_mol = next(pb.readfile("sdf", ref_molecule))
             ref_mol_array = get_array_from_pybelmol(ref_mol)
-            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array, scaling='matrix')
-        else:
-            #Default for now: rdkit
-            #TODO: explicitly insert rdkit as a conformer generatore with the disclaimer that 
-            # it cannot deal with organometallic molecules
-            self.ref_mol_fp = fp.generate_fingerprint_from_molecule(self.ref_molecule, PROTON_FEATURES, scaling='matrix')
+            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
+        elif self.generator == 'rdkit' or self.generator is None:
+            self.ref_molecule = pp.read_mol_from_file(ref_molecule)
+            if self.ref_molecule is None:
+                raise ValueError("Reference molecule is None. Check if the extension of the file is managed by HSR")
+            self.ref_mol_fp = fp.generate_fingerprint_from_molecule(self.ref_molecule, PROTON_FEATURES)
+        else:   
+            raise ValueError(f"Generator '{self.generator}' not supported. Please choose between 'rdkit', 'obabel', 'ccdc' or None")
+            
+            
+    def save_mols_to_file(self, results: dict, directory: str, file_names: list):
+        """
+        Save molecules to SDF files
+        """
+        for r, name in zip(results, file_names):
+            file_path = os.path.join(directory, name + ".sdf")
+            try:
+                mol_sdf = r[f"3d_mol"]
+                score = r[f"{self.prefix}_HSR_score"]
+                if score > 0.0 and mol_sdf != 0.0:
+                    with open(file_path, "w") as f:
+                        f.write(mol_sdf)
+                        f.write(f"\n> <HSR_score>\n{score}\n\n$$$$\n")
+            except KeyError:
+                continue
  
     def get_mols_3D(self, smile: str):
         """
-        Generate 3D coordinates for a list of SMILES
+        Generate 3D coordinates for a SMILES
         :param smile: SMILES string
         :return: 
+        mol_sdf: 3D coordinates in SDF format
+        mol_3d: 3D molecule object
         """
         try: 
             if self.generator == "obabel": 
@@ -118,13 +161,20 @@ class HSR:
                 conf = conformer_generator.generate(mol)
                 mol_3d = conf.hits[0].molecule
                 mol_sdf = mol_3d.to_string("sdf")
+            elif self.generator == "rdkit":
+                mol = Chem.MolFromSmiles(smile)
+                mol = Chem.AddHs(mol)
+                Chem.AllChem.EmbedMolecule(mol)
+                Chem.AllChem.MMFFOptimizeMolecule(mol)
+                mol_sdf = Chem.MolToMolBlock(mol)
+                mol_3d = mol
         except Exception as e:
             logger.error(f"Error generating 3D coordinates for {smile}: {e}")
             mol_3d, mol_sdf = None, None
             
         return mol_3d, mol_sdf
 
-    def score_mol(self, mol: Union[str, pb.Molecule, Chem.Mol, np.ndarray]):
+    def score_mol(self, mol: Union[str, pb.Molecule, Chem.Mol, np.ndarray,]):
         """
         Calculate the HSR similarity score for a molecule
         :param mol: SMILES string, rdkit molecule or numpy array
@@ -136,10 +186,7 @@ class HSR:
             #Check what object the molecule is:
             #The molecule is a SMILES string
             if isinstance(mol, str):
-                # TODO: This will have to become the molecule object or its identifier
-                result = {"smiles": mol}
-                # TODO: This instead has to become the smiles field of the molecule (if available)
-                result.update({f"smiles_ph": mol})
+                result = {"molecule": mol}
                 molecule, mol_sdf = self.get_mols_3D(mol)
                 # Handle exceptions in 3D generation gracefully
                 if molecule is None and mol_sdf is None:
@@ -147,72 +194,49 @@ class HSR:
                 result.update({f'3d_mol': mol_sdf})
                 if isinstance(molecule, pb.Molecule):
                     mol_array = get_array_from_pybelmol(molecule)
-                    mol_fp = fp.generate_fingerprint_from_data(mol_array, scaling='matrix')
+                    mol_fp = fp.generate_fingerprint_from_data(mol_array)
+                elif isinstance(molecule, Chem.Mol):
+                    mol_fp = fp.generate_fingerprint_from_molecule(molecule, PROTON_FEATURES)
                 elif isinstance(molecule, ccdcMolecule):
                     mol_array = get_array_from_ccdcmol(molecule)
-                    mol_fp = fp.generate_fingerprint_from_data(mol_array, scaling='matrix')
-                    
-            #The molecule is a rdkit molecule
-            elif isinstance(mol, Chem.Mol):
-                # If the conversion to smiles is successful save smiles in result
-                #TODO: same as above
-                result = {"smiles": mol}
-                try:
-                    result.update({f"smiles_ph": Chem.MolToSmiles(mol)})
-                except Exception as e:
-                    logger.error(f"Error converting rdkit molecule to smiles: {e}")
-                    result.update({f"smiles_ph": "N/A"})
-
-                # Check if molecule is 3d, otherwise generate 3D coordinates
-                if not mol.GetNumConformers():
-                    mol = Chem.AddHs(mol)
-                    Chem.AllChem.EmbedMolecule(mol)
-                    Chem.AllChem.MMFFOptimizeMolecule(mol)
+                    mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
+            #The molecule is a rdkit molecule (already in 3D)
+            elif isinstance(mol, Chem.Mol):
+                result = {"molecule": mol}
+                # Check if molecule is 3d
+                if not mol.GetNumConformers():
+                    logger.error(f"Molecule {mol} is not 3D")
+                    raise Exception("Molecule is not 3D")
                 mol_sdf = Chem.MolToMolBlock(mol)
                 result.update({f'3d_mol': mol_sdf})
-                mol_fp = fp.generate_fingerprint_from_molecule(mol, PROTON_FEATURES, scaling='matrix')
+                mol_fp = fp.generate_fingerprint_from_molecule(mol, PROTON_FEATURES)
                 
             #The molecule is a pybel molecule (obabel)
             elif isinstance(mol, pb.Molecule):
-                # TODO: Same as above
-                result = {"smiles": mol}
-                try:
-                    result.update({f"smiles_ph": mol.write("smi")})
-                except Exception as e:
-                    logger.error(f"Error converting pybel molecule to smiles: {e}")
-                    result.update({f"smiles_ph": "N/A"})
+                result = {"molecule": mol}
                 result.update({f'3d_mol': mol.write("sdf")})
                 mol_array = get_array_from_pybelmol(mol)
-                mol_fp = fp.generate_fingerprint_from_data(mol_array, scaling='matrix')
-               
-            #The molecule is a ccdc molecule 
-            elif isinstance(mol, ccdcMolecule):
-                # TODO: Same as above
-                result = {"smiles": mol}
-                try: 
-                    result.update({f"smiles_ph": mol.to_smiles()})
-                except Exception as e:
-                    logger.error(f"Error converting ccdc molecule to smiles: {e}")
-                    result.update({f"smiles_ph": "N/A"})
-                result.update({f'3d_mol': mol.to_string("sdf")})
-                mol_array = get_array_from_ccdcmol(mol)
-                mol_fp = fp.generate_fingerprint_from_data(mol_array, scaling='matrix')
+                mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
             #The molecule is an np.array
             elif isinstance(mol, np.ndarray):
-                # TODO: Add the possibility to save the 'molecule' in a file
-                # result = {"smiles": "N/A"}
-                mol_fp = fp.generate_fingerprint_from_data(molecule, scaling='matrix')
+                result = {"molecule": mol}
+                mol_fp = fp.generate_fingerprint_from_data(mol)
+            
+            #The molecule is a ccdc molecule 
+            elif isinstance(mol, ccdcMolecule):
+                result = {"molecule": mol}
+                mol_sdf = mol.to_string("sdf")
+                mol_array = get_array_from_ccdcmol(mol)
+                mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
         except Exception as e:
-            # logger.error(f"Error generating 3D coordinates for {mol}: {e}")
             result.update({
+                f'molecule': mol,
                 f'3d_mol': 0.0,
                 f'{self.prefix}_HSR_score': 0.0
             })
-            time_taken = time.time() - start_time
-            result['time_taken'] = time_taken
             return result
             
         # Calculate the similarity
@@ -221,26 +245,20 @@ class HSR:
         except Exception as e:
             result.update({f'{self.prefix}_HSR_score': 0.0})
             logger.error(f"Error calculating HSR similarity for {mol}: {e}")
-        # print(f"HSR score: {sim_score}")
         if np.isnan(sim_score):
             sim_score = 0.0 
         result.update({f'{self.prefix}_HSR_score': sim_score})
-        
-        # For debugging purposes:
-        # Calculate and add the time taken to the result
-        time_taken = time.time() - start_time
-        result.update({'time_taken': time_taken})
         
         return result
     
     def score(self, molecules: list, directory, file_names, **kwargs):
         """
-        Calculate the scores based on HSR similarity to reference molecules.
-        :param molecules: List of molecules to score, can be SMILES strings, rdkit molecules or numpy arrays
+        Calculate the HSR similarity scores of a list of molecules to a reference molecule.
+        :param molecules: List of molecules to score, can be SMILES strings, molecule objects (rdkit, pybel, ccdc) or numpy arrays
         :param directory: Directory to save files and logs into
-        :param file_names: List of corresponding file names for SMILES to match files to index
+        :param file_names: List of corresponding file names to save the molecules
         :param kwargs: Ignored
-        :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
+        :return: List of dicts i.e. [{'mol': mol, 'HSR_score': 'value', ...}, ...]
         """
         # Create directory
         step = file_names[0].split("_")[0]  # Assume first Prefix is step
@@ -254,12 +272,12 @@ class HSR:
         
         # Score individual smiles
         n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
-        # with Pool(n_processes) as pool:
-        #     results = [r for r in pool.imap(pfunc, molecules)]
         
-        with Pool(n_processes) as pool:
+        # pool = Pool(n_processes)
+        
+        pool = Pool(n_processes) if n_processes > 1 else DummyPool()
+        try:
             results = []
-            
             # Submit tasks with apply_async and set a timeout for each scoring
             async_results = []
             for mol in molecules:
@@ -275,51 +293,55 @@ class HSR:
                     # Handle the timeout scenario by using default values
                     # logger.error(f"Timeout occurred for molecule: {molecules[i]}")
                     result = {
-                        "smiles": molecules[i],
+                        "molecule": molecules[i],
                         f'3d_mol': 0.0,
                         f'{self.prefix}_HSR_score': 0.0,
-                        'time_taken': self.timeout
                     }
                 except Exception as e:
                     # Handle any other exception
                     logger.error(f"Error processing molecule {molecules[i]}: {e}")
                     result = {
-                        "smiles": molecules[i],
+                        "molecule": molecules[i],
                         f'3d_mol': 0.0,
                         f'{self.prefix}_HSR_score': 0.0,
-                        'time_taken': self.timeout
                     }
-
                 results.append(result)
+        finally:
+            pool.close()
+            pool.join()
   
         # Save mols
-        successes = 0
-        for r, name in zip(results, file_names):
-            file_path = os.path.join(directory, name + ".sdf")
-            try:
-                mol_sdf = r[f"3d_mol"]
-                score = r[f"{self.prefix}_HSR_score"]
-                if score > 0.0:
-                    successes += 1
-                if mol_sdf:
-                    with open(file_path, "w") as f:
-                        f.write(mol_sdf)
-                        f.write(f"\n> <SMILES>\n{r['smiles']}\n\n$$$$\n")
-                        f.write(f"\n> <HSR_score>\n{score}\n\n$$$$\n")
-                        
-            except KeyError:
-                continue
+        # Check if in results there is the key '3d_mol' (we are not using ndarray, 
+        # from which we cannot retrieve the 3D coordinates) 
+        if self.save_files:
+            if '3d_mol' in results[0].keys():
+                self.save_mols_to_file(results, directory, file_names)
+            else:
+                logger.error("3D coordinates not available for saving to file")
+                
+        # Remove 3d_mol key from results
+        for r in results:
+            if '3d_mol' in r.keys():
+                del r['3d_mol']
+           
         return results
             
-    def __call__(self, smiles: list, directory, file_names, **kwargs):
+    def __call__(self, directory, file_names, smiles=None, **kwargs):
         """
         Calculate the scores based on HSR similarity to reference molecules.
         :param smiles: List of SMILES strings.
         :param directory: Directory to save files and logs into
         :param file_names: List of corresponding file names for SMILES to match files to index
-        :param kwargs: Ignored
+        :param kwargs: contains 'molecular_inputs', aka the list of molecules to score
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        return self.score(molecules=smiles, directory=directory, file_names=file_names)
+        if smiles is None:
+            molecules =kwargs.get('molecular_inputs', [])
+            if molecules is None:
+                raise ValueError("Either 'smiles' or 'molecules' in kwargs must be provided.")
+        else:
+            molecules = smiles
+            
+        return self.score(molecules, directory=directory, file_names=file_names)
 
     

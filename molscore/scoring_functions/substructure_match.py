@@ -5,7 +5,7 @@ https://github.com/MolecularAI/Reinvent
 
 import os
 from functools import partial
-from typing import Union
+from typing import Union, Optional
 
 from rdkit import Chem
 
@@ -23,7 +23,7 @@ class SubstructureMatch:
         self,
         prefix: str,
         smarts: Union[list, os.PathLike],
-        n_jobs: int = 1,
+        n_jobs: Optional[int] = 1,
         method: str = "any",
         **kwargs,
     ):
@@ -36,6 +36,7 @@ class SubstructureMatch:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
+        self.mapper = Pool(self.n_jobs, return_map=True)
         self.smarts = smarts
         assert method in ["any", "all"]
         self.method = method
@@ -92,15 +93,8 @@ class SubstructureMatch:
         match_substructure_p = partial(
                 self.match_substructure, smarts=self.smarts, method=self.method
             )
-        if self.n_jobs <= 1:
-            results = [
+        results = [
                 {"smiles": smi, f"{self.prefix}_substruct_match": match}
-                for smi, match in map(match_substructure_p, smiles)
+                for smi, match in self.mapper(match_substructure_p, smiles)
             ]
-        else:
-            with Pool(self.n_jobs) as pool:
-                results = [
-                    {"smiles": smi, f"{self.prefix}_substruct_match": match}
-                    for smi, match in pool.imap(match_substructure_p, smiles)
-                ]
         return results
