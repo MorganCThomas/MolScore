@@ -131,9 +131,9 @@ class ScoreMetrics:
         if budget:
             scores = scores.iloc[:budget]
         # Valid
-        if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
+        if np.issubdtype(scores.valid.dtype, np.object_):
             valid_value = "true"
-        elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
+        elif np.issubdtype(scores.valid.dtype, np.bool_):
             valid_value = True
         else:
             raise ValueError("Valid column has un unrecognised dtype")
@@ -141,9 +141,9 @@ class ScoreMetrics:
         if valid:
             scores = scores.loc[scores.valid == valid_value]
         # Unique
-        if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
+        if np.issubdtype(scores.unique.dtype, np.object_):
             unique_value = "true"
-        elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
+        elif np.issubdtype(scores.unique.dtype, np.bool_):
             unique_value = True
         else:
             raise ValueError("Unique column has un unrecognised dtype")
@@ -154,7 +154,7 @@ class ScoreMetrics:
         if "scaffold" not in scores.columns:
             get_scaff = partial(compute_scaffold, min_rings=1)
             scaffs = mapper(self.n_jobs)(get_scaff, scores.smiles.tolist())
-            scores["scaffold"] = scaffs
+            scores.loc[:,"scaffold"] = scaffs
         return scores
 
     def _preprocess_smiles(self, smiles):
@@ -259,8 +259,7 @@ class ScoreMetrics:
         # Final cumsum
         if diverse:
             buffer.update_from_score_metrics(
-                df=tdf.loc[called : tdf.index.max()], endpoint=endpoint
-            )
+                df=tdf[(tdf.index >= called) & (tdf.index <= tdf.index.max())], endpoint=endpoint            )
             for i, n in enumerate(top_n):
                 n_now = buffer.top_n(n)
                 # Compute AUC
