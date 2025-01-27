@@ -436,6 +436,11 @@ class MolScore:
             ].count()
             for i in range(len(self.batch_df))
         ]
+        # NOTE/TODO: How should we check or bypass validity for 3D (inorganic) molecules?
+        # For now, we assume all 3D molecules are valid
+        self.batch_df["valid"] = True
+        self.batch_df["valid_score"] = 1
+        
         self.batch_df["unique"] = unique
         self.batch_df["occurrences"] = occurrences
 
