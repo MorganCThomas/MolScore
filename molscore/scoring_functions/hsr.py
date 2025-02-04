@@ -1,15 +1,13 @@
 import logging
 import os
-import time
 from typing import Union
-import signal
 from openbabel import pybel as pb
 import numpy as np
 from functools import partial
-from molscore.scoring_functions.utils import Pool
+# from molscore.scoring_functions.utils import Pool
 import multiprocessing
+from multiprocessing import Pool
 from rdkit import Chem
-import hsr
 from hsr import pre_processing as pp
 from hsr import fingerprint as fp
 from hsr import similarity as sim
@@ -22,36 +20,32 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
-try:
-    from ccdc import io
-    from ccdc import conformer
-    from ccdc.molecule import Molecule as ccdcMolecule
-except Exception as ccdc_exception:
-    logger.error(
-        f"Unexpected error with CCDC module: {ccdc_exception}. "
-        "If you want to use the ccdc Python api, please ensure the CCDC package is correctly installed and licensed."
-    )
-    io = None
-    conformer = None
-    ccdcMolecule = None
+def import_ccdc():
+    """
+    Safely imports required modules from the CCDC library, handles exceptions, and returns None if import fails.
     
-class DummyPool:
-    def apply_async(self, func, args=()):
-        class Result:
-            def __init__(self, value):
-                self.value = value
+    :return: io, conformer, ccdcMolecule (or None for each if the import fails)
+    """
+    try:
+        # Attempt to import the necessary modules from the CCDC library
+        from ccdc import io
+        from ccdc import conformer
+        from ccdc.molecule import Molecule as ccdcMolecule
+        return io, conformer, ccdcMolecule
+    except ImportError as e:
+        # Handle ImportError if the module is not installed
+        logger.error(
+            f"ImportError: CCDC module not found. Please ensure the CCDC package is installed and licensed. {e}"
+        )
+    except Exception as ccdc_exception:
+        # Handle any other unexpected exceptions during import
+        logger.error(
+            f"Unexpected error with CCDC module: {ccdc_exception}. "
+            "If you want to use the CCDC Python API, ensure the package is correctly installed and licensed."
+        )
+    # Return None for all if import fails
+    return None, None, None
 
-            def get(self, timeout=None):
-                return self.value
-
-        return Result(func(*args))
-
-    def close(self):
-        pass
-
-    def join(self):
-        pass
-    
 def get_array_from_pybelmol(pybelmol):
     # Iterate over the atoms in the molecule
     atom_array = []
@@ -106,8 +100,9 @@ class HSR:
         self.timeout = timeout
         self.save_files = save_files
         if self.generator == 'ccdc':
+            self.io, self.conformer, self.ccdcMolecule = import_ccdc()
             #Read molecule from file 
-            ref_mol = io.MoleculeReader(ref_molecule)[0]
+            ref_mol = self.io.MoleculeReader(ref_molecule)[0]
             ref_mol_array = get_array_from_ccdcmol(ref_mol)
             self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
         elif self.generator == 'obabel':
@@ -115,13 +110,13 @@ class HSR:
             ref_mol = next(pb.readfile("sdf", ref_molecule))
             ref_mol_array = get_array_from_pybelmol(ref_mol)
             self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
-        elif self.generator == 'rdkit' or self.generator is None:
+        elif self.generator == 'rdkit' or self.generator == 'None':
             self.ref_molecule = pp.read_mol_from_file(ref_molecule)
             if self.ref_molecule is None:
                 raise ValueError("Reference molecule is None. Check if the extension of the file is managed by HSR")
             self.ref_mol_fp = fp.generate_fingerprint_from_molecule(self.ref_molecule, PROTON_FEATURES)
         else:   
-            raise ValueError(f"Generator '{self.generator}' not supported. Please choose between 'rdkit', 'obabel', 'ccdc' or None")
+            raise ValueError(f"Generator '{self.generator}' not supported. Please choose between 'rdkit', 'obabel', 'ccdc' or 'None'")
             
             
     def save_mols_to_file(self, results: dict, directory: str, file_names: list):
@@ -156,8 +151,8 @@ class HSR:
                 mol_3d.localopt()
                 mol_sdf = mol_3d.write("sdf")
             elif self.generator == "ccdc":
-                conformer_generator = conformer.ConformerGenerator()
-                mol = ccdcMolecule.from_string(smile)
+                conformer_generator = self.conformer.ConformerGenerator()
+                mol = self.ccdcMolecule.from_string(smile)
                 conf = conformer_generator.generate(mol)
                 mol_3d = conf.hits[0].molecule
                 mol_sdf = mol_3d.to_string("sdf")
@@ -174,13 +169,12 @@ class HSR:
             
         return mol_3d, mol_sdf
 
-    def score_mol(self, mol: Union[str, pb.Molecule, Chem.Mol, np.ndarray,]):
+    def score_mol(self, mol: Union[str, pb.Molecule, Chem.Mol, np.ndarray]):
         """
         Calculate the HSR similarity score for a molecule
         :param mol: SMILES string, rdkit molecule or numpy array
         :return: dict with the HSR similarity score
         """
-        start_time = time.time()
         # Generate 3D coordinates
         try:
             #Check what object the molecule is:
@@ -197,7 +191,7 @@ class HSR:
                     mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 elif isinstance(molecule, Chem.Mol):
                     mol_fp = fp.generate_fingerprint_from_molecule(molecule, PROTON_FEATURES)
-                elif isinstance(molecule, ccdcMolecule):
+                elif isinstance(molecule, self.ccdcMolecule):
                     mol_array = get_array_from_ccdcmol(molecule)
                     mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
@@ -224,8 +218,8 @@ class HSR:
                 result = {"molecule": mol}
                 mol_fp = fp.generate_fingerprint_from_data(mol)
             
-            #The molecule is a ccdc molecule 
-            elif isinstance(mol, ccdcMolecule):
+            #The molecule is a ccdc molecule (and ccdc is available)
+            elif self.ccdcMolecule and isinstance(mol, self.ccdcMolecule):
                 result = {"molecule": mol}
                 mol_sdf = mol.to_string("sdf")
                 mol_array = get_array_from_ccdcmol(mol)
@@ -273,10 +267,8 @@ class HSR:
         # Score individual smiles
         n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
         
-        # pool = Pool(n_processes)
-        
-        pool = Pool(n_processes) if n_processes > 1 else DummyPool()
-        try:
+        with Pool(n_processes) as pool:
+        # try:
             results = []
             # Submit tasks with apply_async and set a timeout for each scoring
             async_results = []
@@ -306,10 +298,7 @@ class HSR:
                         f'{self.prefix}_HSR_score': 0.0,
                     }
                 results.append(result)
-        finally:
-            pool.close()
-            pool.join()
-  
+
         # Save mols
         # Check if in results there is the key '3d_mol' (we are not using ndarray, 
         # from which we cannot retrieve the 3D coordinates) 
