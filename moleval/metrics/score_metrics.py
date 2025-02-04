@@ -34,13 +34,14 @@ class ScoreMetrics:
         unique=True,
         n_jobs=1,
         benchmark=None,
+        mols_in_3d=False,
     ):
         # Pre-process scores
         self.n_jobs = check_env_jobs(n_jobs)
         self.total = len(scores)
         self.budget = budget if budget else self.total
         self.scores = self._preprocess_scores(
-            scores.copy(deep=True), valid=valid, unique=unique, budget=budget
+            scores.copy(deep=True), valid=valid, unique=unique, budget=budget, mols_in_3d=mols_in_3d,
         )
         self.benchmark = benchmark
         # Set up reference smiles and chemistry filter
@@ -127,7 +128,7 @@ class ScoreMetrics:
         else:
             return self.scores
 
-    def _preprocess_scores(self, scores, valid=True, unique=True, budget=None):
+    def _preprocess_scores(self, scores, valid=True, unique=True, budget=None, mols_in_3d=False):
         if budget:
             scores = scores.iloc[:budget]
         # Valid
@@ -150,11 +151,12 @@ class ScoreMetrics:
         self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
         if unique:
             scores = scores.loc[scores.unique == unique_value]
-        # Add scaffold column if not present
-        if "scaffold" not in scores.columns:
-            get_scaff = partial(compute_scaffold, min_rings=1)
-            scaffs = mapper(self.n_jobs)(get_scaff, scores.smiles.tolist())
-            scores.loc[:,"scaffold"] = scaffs
+        if not mols_in_3d:
+            # Add scaffold column if not present
+            if "scaffold" not in scores.columns:
+                get_scaff = partial(compute_scaffold, min_rings=1)
+                scaffs = mapper(self.n_jobs)(get_scaff, scores.smiles.tolist())
+                scores.loc[:,"scaffold"] = scaffs
         return scores
 
     def _preprocess_smiles(self, smiles):
@@ -549,6 +551,40 @@ class ScoreMetrics:
             "Top-100 AUC (Exp)": top_aucs[2],
         }
         return metrics
+    
+    # TODO: Replace 3D_benhmark with the name of the benchmark
+    def bennchmark_3d_score(self, endpoint): 
+        # Calculate Score
+        task = self.scores.task.unique()[0]
+        tdf = self.scores.copy()
+        if any(
+            [
+                task.startswith(name)
+                for name in [
+                    "Test_1",
+                    "Test_2",
+                    "Test_3",
+                    "Test_4",]
+                ]
+            ):
+            top1, top10 = self.top_avg(
+                scores=tdf,
+                top_n=[1, 10],
+                endpoint=endpoint,
+            ).values()
+            score = np.mean([top1, top10])
+        else:
+            print(f"Unknown 3D_benchmark task {task}, returning uniform specification")
+            top1, top10= self.top_avg(
+                scores=tdf,
+                top_n=[1, 10],
+                endpoint=endpoint,
+            ).values()
+            score = np.mean([top1, top10])
+        metrics = {
+            "3D_Benchmark_Score": score,
+        }
+        return metrics
 
     def add_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
@@ -562,6 +598,8 @@ class ScoreMetrics:
             benchmark_metrics.update(self.guacamol_score(endpoint=endpoint))
         elif self.benchmark == "LibINVENT_Exp1":
             benchmark_metrics.update(self.libinvent_score(endpoint=endpoint))
+        elif self.benchmark == "3D_Benchmark":
+            benchmark_metrics.update(self.bennchmark_3d_score(endpoint=endpoint))
         else:
             print(
                 f"Benchmark specific metrics for {self.benchmark} have not been defined yet. Nothing further to add."
@@ -579,6 +617,7 @@ class ScoreMetrics:
         run_synthesizability=False,
         run_purchasability=False,
         extrapolate=True,
+        mols_in_3d=False,
     ):
         # NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
 
@@ -685,73 +724,74 @@ class ScoreMetrics:
                     )
                 # Yield ('Hits' / 'Budget')
                 try:
-                    threshold = thresholds[i]
-                    process_list.append(
-                        (
-                            self.tyield,
+                    if not mols_in_3d:
+                        threshold = thresholds[i]
+                        process_list.append(
                             (
-                                filtered_scores,
-                                self.budget,
-                                endpoint,
-                                threshold,
+                                self.tyield,
+                                (
+                                    filtered_scores,
+                                    self.budget,
+                                    endpoint,
+                                    threshold,
+                                    False,
+                                    prefix,
+                                    queue,
+                                ),
                                 False,
-                                prefix,
-                                queue,
-                            ),
-                            False,
+                            )
                         )
-                    )
-                    process_list.append(
-                        (
-                            self.tyield,
+                        process_list.append(
                             (
-                                filtered_scores,
-                                self.budget,
-                                endpoint,
-                                threshold,
-                                True,
-                                prefix,
-                                queue,
-                            ),
-                            False,
+                                self.tyield,
+                                (
+                                    filtered_scores,
+                                    self.budget,
+                                    endpoint,
+                                    threshold,
+                                    True,
+                                    prefix,
+                                    queue,
+                                ),
+                                False,
+                            )
                         )
-                    )
-                    process_list.append(
-                        (
-                            self.tyield_auc,
+                        process_list.append(
                             (
-                                filtered_scores,
-                                self.budget,
-                                endpoint,
-                                threshold,
-                                100,
-                                True,
+                                self.tyield_auc,
+                                (
+                                    filtered_scores,
+                                    self.budget,
+                                    endpoint,
+                                    threshold,
+                                    100,
+                                    True,
+                                    False,
+                                    False,
+                                    prefix,
+                                    queue,
+                                ),
                                 False,
-                                False,
-                                prefix,
-                                queue,
-                            ),
-                            False,
+                            )
                         )
-                    )
-                    process_list.append(
-                        (
-                            self.tyield_auc,
+                        process_list.append(
                             (
-                                filtered_scores,
-                                self.budget,
-                                endpoint,
-                                threshold,
-                                100,
-                                True,
-                                True,
+                                self.tyield_auc,
+                                (
+                                    filtered_scores,
+                                    self.budget,
+                                    endpoint,
+                                    threshold,
+                                    100,
+                                    True,
+                                    True,
+                                    False,
+                                    prefix,
+                                    queue,
+                                ),
                                 False,
-                                prefix,
-                                queue,
-                            ),
-                            False,
+                            )
                         )
-                    )
                 except IndexError:
                     pass
 
@@ -770,67 +810,68 @@ class ScoreMetrics:
                         metrics.update(target(*args[:-1]))
                     
 
-            # ----- Target related
-            gen_smiles = filtered_scores.smiles.tolist()
-            gen_smiles, gen_scaffolds = self._preprocess_smiles(gen_smiles)
-            if target_smiles:
-                # Rediscovery rate and ratio
-                rediscovered_smiles, rediscovered_scaffolds = self.targets_rediscovered(
-                    gen_smiles, target_smiles, gen_scaffolds, target_scaffolds
-                )
-                metrics.update(
-                    {
-                        prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
-                        prefix + "Rediscovered Ratio": rediscovered_smiles
-                        / len(target_smiles),
-                    }
-                )
-                if rediscovered_scaffolds:
+            # ----- Target related (Only for 2D molecules)
+            if not mols_in_3d:
+                gen_smiles = filtered_scores.smiles.tolist()
+                gen_smiles, gen_scaffolds = self._preprocess_smiles(gen_smiles)
+                if target_smiles:
+                    # Rediscovery rate and ratio
+                    rediscovered_smiles, rediscovered_scaffolds = self.targets_rediscovered(
+                        gen_smiles, target_smiles, gen_scaffolds, target_scaffolds
+                    )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
-                            / self.budget,
-                            prefix
-                            + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
-                            / len(target_scaffolds),
+                            prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                            prefix + "Rediscovered Ratio": rediscovered_smiles
+                            / len(target_smiles),
                         }
                     )
-                # Fingerprint analogues
-                gen_ans, ref_ans = FingerprintAnaloguesMetric(n_jobs=self.n_jobs)(
-                    gen=gen_smiles, ref=target_smiles
-                )
-                metrics.update(
-                    {
-                        prefix + "Analogue Rate": gen_ans,
-                        prefix + "Analogue Ratio": ref_ans,
-                    }
-                )
+                    if rediscovered_scaffolds:
+                        metrics.update(
+                            {
+                                prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
+                                / self.budget,
+                                prefix
+                                + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
+                                / len(target_scaffolds),
+                            }
+                        )
+                    # Fingerprint analogues
+                    gen_ans, ref_ans = FingerprintAnaloguesMetric(n_jobs=self.n_jobs)(
+                        gen=gen_smiles, ref=target_smiles
+                    )
+                    metrics.update(
+                        {
+                            prefix + "Analogue Rate": gen_ans,
+                            prefix + "Analogue Ratio": ref_ans,
+                        }
+                    )
 
-            # ----- Property related
-            if len(gen_smiles) >= 1000:
-                metrics[prefix + "Diversity (SEDiv@1k)"] = se_diversity(
-                    gen_smiles, k=1000, n_jobs=self.n_jobs
-                )
+                # ----- Property related
+                if len(gen_smiles) >= 1000:
+                    metrics[prefix + "Diversity (SEDiv@1k)"] = se_diversity(
+                        gen_smiles, k=1000, n_jobs=self.n_jobs
+                    )
 
-        # ----- Further property related
-        # MCF filters
-        metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
-        if chemistry_filter_target:
-            metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.budget
-            metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.budget
-        # Predicted synthesizability (RAScore > 0.5?)
-        if run_synthesizability:
-            metrics["Predicted Synthesizability"] = np.mean(
-                [
-                    r["RAScore_pred_proba"] > 0.5
-                    for r in self.RAscorer(self.scores.smiles.to_list())
-                ]
-            )
-        # Purchasability (MolBloom)
-        if run_purchasability:
-            metrics["Predicted Purchasability"] = np.mean(
-                mapper(self.n_jobs)(buy, self.scores.smiles.tolist())
-            )
+                # ----- Further property related
+                # MCF filters
+                metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
+                if chemistry_filter_target:
+                    metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.budget
+                    metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.budget
+                # Predicted synthesizability (RAScore > 0.5?)
+                if run_synthesizability:
+                    metrics["Predicted Synthesizability"] = np.mean(
+                        [
+                            r["RAScore_pred_proba"] > 0.5
+                            for r in self.RAscorer(self.scores.smiles.to_list())
+                        ]
+                    )
+                # Purchasability (MolBloom)
+                if run_purchasability:
+                    metrics["Predicted Purchasability"] = np.mean(
+                        mapper(self.n_jobs)(buy, self.scores.smiles.tolist())
+                    )
 
         # ----- Add any benchmark related metrics
         if self.benchmark:

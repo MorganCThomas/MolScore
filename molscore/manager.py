@@ -1173,6 +1173,8 @@ class MolScore:
         reference_smiles=None,
         benchmark=None,
         recalculate=False,
+        mols_in_3d=False,
+        diversity_check=True,
     ):
         """
         Compute a suite of metrics
@@ -1184,6 +1186,8 @@ class MolScore:
         :n_jobs: Number of jobs to use for parallelisation
         :reference_smiles: List of target smiles to compute metrics in reference to
         :recalculate: Whether to recompute metrics
+        :mols_in_3d: Whether the molecules are in 3D (and not SMILES)
+        :diversity_check: Whether to check for diversity in the main dataframe when calculating metrics
         """
         if self.metrics and not recalculate:
             return self.metrics
@@ -1200,11 +1204,15 @@ class MolScore:
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
                 benchmark=benchmark,
+                mols_in_3d=mols_in_3d,
             )
             results = SM.get_metrics(
                 endpoints=endpoints,
                 thresholds=thresholds,
                 chemistry_filter_basic=chemistry_filter_basic,
+                diverse=diversity_check,
+                mols_in_3d=mols_in_3d,
+                
             )
             # Change the name of the default score to "Score"
             results = {
@@ -1236,6 +1244,7 @@ class MolScoreBenchmark:
         ),
         "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
+        "3D_Benchmark": resources.files("molscore.configs.3D_Benchmark"),
     }
 
     def __init__(
@@ -1365,6 +1374,8 @@ class MolScoreBenchmark:
         chemistry_filter_basic=True,
         n_jobs=1,
         reference_smiles=None,
+        mols_in_3d=False,
+        diversity_check=True,
     ):
         """
         For each result, compute metrics and summary of all results
@@ -1384,6 +1395,8 @@ class MolScoreBenchmark:
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
                 benchmark=self.benchmark,
+                mols_in_3d=mols_in_3d,
+                diversity_check=diversity_check,
             )
             metrics.update(
                 {
