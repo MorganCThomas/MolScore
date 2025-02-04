@@ -6,4 +6,6 @@ try:
     from .posecheck import PoseCheck
 
 except Exception as e:
-    logger.warning(f"PoseCheck metrics: currently unavailable due to the following: {e}")
+    # logger.warning(f"PoseCheck metrics: currently unavailable due to the following: {e}")
+    pass
+    
