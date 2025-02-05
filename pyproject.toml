@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "MolScore"
-version = "1.8.4"
+version = "1.9.0"
 authors = [
   { name="Morgan Thomas", email="morganthomas263@gmail.com" },
 ]
