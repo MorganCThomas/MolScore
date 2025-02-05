@@ -1,5 +1,5 @@
 {
-  "task": "AP",
+  "task": "BACE1_1",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -14,17 +14,13 @@
       }
     },
     {
-      "name": "MolecularSimilarity",
+      "name": "LevenshteinSimilarity",
       "run": true,
       "parameters": {
-        "prefix": "AP",
+        "prefix": "BACE1",
         "ref_smiles": [
-          "CN1CCN(CCCN2c3ccccc3Sc3ccc(Cl)cc32)CC1",
-          "CN1CCN2c3c(cccc31)[C@@H]1CN(CCCC(=O)c3ccc(F)cc3)CC[C@@H]12"
+          "NC1=NC(c2cccc(-c3cncnc3)c2)(c2ccnc(C(F)F)c2)c2cccc(F)c21"
         ],
-        "fp": "ECFP4",
-        "bits": 1024,
-        "similarity_measure": "Tanimoto",
         "method": "max",
         "n_jobs": 1,
         "timeout": 60
@@ -34,7 +30,7 @@
   "scoring": {
     "metrics": [
       {
-        "name": "AP_Sim",
+        "name": "BACE1_Sim",
         "filter": false,
         "weight": 1.0,
         "modifier": "raw",
@@ -44,16 +40,6 @@
     "method": "single"
   },
   "diversity_filter": {
-    "run": true,
-    "name": "CompoundSimilarity",
-    "parameters": {
-      "nbmax": 10,
-      "minscore": 0.6,
-      "minsimilarity": 0.6,
-      "radius": 2,
-      "useFeatures": false,
-      "bits": 2048,
-      "outputmode": "linear"
-    }
+    "run": false
   }
 }

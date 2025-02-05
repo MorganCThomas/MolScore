@@ -21,7 +21,7 @@
         "ref_smiles": [
           "CN1CCN(CCCN2c3ccccc3Sc3ccc(Cl)cc32)CC1"
         ],
-        "fp": "ECFP4",
+        "fp": "ECFP4c",
         "bits": 1024,
         "similarity_measure": "Tanimoto",
         "method": "max",

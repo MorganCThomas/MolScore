@@ -21,7 +21,7 @@
         "ref_smiles": [
           "C=CC(=O)Nc1cc(Nc2nccc(-n3cc(CN(C)C)c(-c4ccccc4)n3)n2)c(OC)cc1N1CCOCC1"
         ],
-        "fp": "ECFP4",
+        "fp": "ECFP4c",
         "bits": 1024,
         "similarity_measure": "Tanimoto",
         "method": "max",

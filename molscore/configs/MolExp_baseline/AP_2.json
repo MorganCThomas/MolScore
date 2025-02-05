@@ -19,9 +19,9 @@
       "parameters": {
         "prefix": "AP",
         "ref_smiles": [
-          "CN1CCN2c3c(cccc31)[C@@H]1CN(CCCC(=O)c3ccc(F)cc3)CC[C@@H]12"
+          "CN1CCN2c3c(cccc31)C1CN(CCCC(=O)c3ccc(F)cc3)CCC12"
         ],
-        "fp": "ECFP4",
+        "fp": "ECFP4c",
         "bits": 1024,
         "similarity_measure": "Tanimoto",
         "method": "max",

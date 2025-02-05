@@ -727,7 +727,7 @@ class ScoreMetrics:
                                 threshold,
                                 100,
                                 True,
-                                False,
+                                False, # Scaffold
                                 False,
                                 prefix,
                                 queue,
@@ -745,7 +745,7 @@ class ScoreMetrics:
                                 threshold,
                                 100,
                                 True,
-                                True,
+                                True, # Scaffold
                                 False,
                                 prefix,
                                 queue,

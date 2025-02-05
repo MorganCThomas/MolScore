@@ -22,18 +22,16 @@ from molscore.gui import monitor_path
 logger = logging.getLogger("molscore")
 logger.setLevel(logging.WARNING)
 
-
-class MolScore:
-    """
-    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
-    """
-
-    presets = {
-        "Misc": resources.files("molscore.configs"),
+PRESETS = {
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
         "MolExp": resources.files("molscore.configs.MolExp"),
+        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
+        "MolExpL": resources.files("molscore.configs.MolExpL"),
+        "MolExpL_baseline": resources.files("molscore.configs.MolExpL_baseline"),
+        "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
+        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
         "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
         "5HT2A_Selectivity": resources.files(
             "molscore.configs.5HT2A.PIDGIN_Selectivity"
@@ -44,6 +42,13 @@ class MolScore:
         "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
     }
+
+
+class MolScore:
+    """
+    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
+    """
+    presets = PRESETS
 
     preset_tasks = {
         k:[p.name.strip(".json") for p in v.glob("*.json")] 
@@ -70,6 +75,7 @@ class MolScore:
         termination_threshold: int = None,
         termination_patience: int = None,
         termination_exit: bool = False,
+        score_invalids: bool = False,
         replay_size: int = None,
         replay_purge: bool = True,
         **kwargs,
@@ -109,20 +115,22 @@ class MolScore:
         )
         self.termination_counter = 0
         self.termination_exit = termination_exit
+        self.score_invalids = score_invalids
         self.replay_size = replay_size
         self.replay_purge = replay_purge
         self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.finished = False
         self.init_time = time.time()
-        self.results_df = None
+        self.results_df = None # TODO make empty df ... 
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.main_df = None
         self.monitor_app = None
         self.diversity_filter = None
         self.call2score_warning = True
         self.metrics = None
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
+        self.temp_parameters = {} # Temp parameters to write out each iteration in scores.csv for comparative purposes
 
         # Setup save directory
         if not run_name:
@@ -140,21 +148,24 @@ class MolScore:
             self.save_dir = os.path.abspath(self.cfg["output_dir"])
         if add_run_dir:
             self.save_dir = os.path.join(self.save_dir, self.run_name)
+        
         # Check to see if we're loading from previous results
         if self.cfg["load_from_previous"]:
             assert os.path.exists(
                 self.cfg["previous_dir"]
             ), "Previous directory does not exist"
             self.save_dir = self.cfg["previous_dir"]
+            
+        # Create save directory
         else:
-            if os.path.exists(self.save_dir):
+            if os.path.exists(self.save_dir) and add_run_dir:
                 print(
                     "Found existing directory, appending current time to distinguish"
                 )  # Not set up logging yet
                 self.save_dir = self.save_dir + time.strftime(
                     "_%H_%M_%S", time.localtime()
                 )
-            os.makedirs(self.save_dir)
+            os.makedirs(self.save_dir, exist_ok=True)
             os.makedirs(os.path.join(self.save_dir, "iterations"))
 
         # Setup log file
@@ -357,13 +368,14 @@ class MolScore:
                 "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
             )
 
-    def parse_smiles(self, smiles: list, step: int):
+    def parse_smiles(self, smiles: list, step: int, canonicalize: bool = True):
         """
         Create batch_df object from initial list of SMILES and calculate validity and
         intra-batch uniqueness
 
         :param smiles: List of smiles taken from generative model
         :param step: current generative model step
+        :param canonicalize: Whether to canonicalize smiles before scoring
         """
         # Initialize df for batch
         self.batch_df = pd.DataFrame(index=range(len(smiles)))
@@ -375,14 +387,20 @@ class MolScore:
         for i, smi in enumerate(smiles):
             try:
                 can_smi = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
-                parsed_smiles.append(can_smi)
+                if canonicalize:
+                    parsed_smiles.append(can_smi)
+                else:
+                    parsed_smiles.append(smi)
                 valid.append("true")
             except TypeError:
                 try:
                     mol = Chem.MolFromSmiles(smi)
                     Chem.SanitizeMol(mol)  # Try to catch invalid molecules and sanitize
                     can_smi = Chem.MolToSmiles(mol)
-                    parsed_smiles.append(can_smi)
+                    if canonicalize:
+                        parsed_smiles.append(can_smi)
+                    else:
+                        parsed_smiles.append(smi)
                     valid.append("sanitized")
                 except Exception:
                     parsed_smiles.append(smi)
@@ -854,7 +872,7 @@ class MolScore:
 
         # Clean up class
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.results_df = None
         return scores
 
@@ -863,9 +881,12 @@ class MolScore:
         smiles: list,
         step: int = None,
         flt: bool = False,
+        canonicalize: bool = True,
         recalculate: bool = False,
+        check_uniqueness: bool = True,
         score_only: bool = False,
-        additional_formats=None,
+        additional_formats: dict = None,
+        additional_keys: dict = None,
         **kwargs,
     ):
         """
@@ -875,10 +896,14 @@ class MolScore:
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
+        :param canonicalize: Whether to canonicalize smiles before scoring
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
-          (default False i.e. use existing scores for duplicated molecules)
+         (default False i.e. use existing scores for duplicated molecules and renormalize/penalize if necessary)
+        :param check_uniqueness: Whether to check for uniqueness against cache of molecules in main_df
         :param score_only: Whether to log molecule data or simply score and return
+        :param additional_formats: Additional formats to be passed to scoring functions
+        :param additional_keys: Additional keys to store in the scores.csv file as new columns
         :return: Scores (either float list or np.array)
         """
         if score_only:
@@ -894,12 +919,29 @@ class MolScore:
         logger.info(f"    Received: {len(smiles)} SMILES")
 
         # Parse smiles and initiate batch df
-        self.parse_smiles(smiles=smiles, step=self.step)
+        self.parse_smiles(smiles=smiles, step=self.step, canonicalize=canonicalize)
         logger.debug(f"    Pre-processed: {len(self.batch_df)} SMILES")
         logger.info(f'    Invalids found: {(self.batch_df.valid == "false").sum()}')
 
+        # Add temp parameters or additional keys to batch_df
+        if self.temp_parameters:
+            for k, v in self.temp_parameters.items():
+                if k in self.batch_df.columns:
+                    logger.warning(
+                        f"    Overwriting existing column {k} with temp parameter"
+                    )
+                self.batch_df[k] = v
+            self.temp_parameters = {}
+        if additional_keys is not None:
+            for k, v in additional_keys.items():
+                if k in self.batch_df.columns:
+                    logger.warning(
+                        f"    Overwriting existing column {k} with additional key"
+                    )
+                self.batch_df[k] = v
+
         # If a main df exists check if some molecules have already been sampled
-        if isinstance(self.main_df, pd.core.frame.DataFrame):
+        if isinstance(self.main_df, pd.core.frame.DataFrame) and check_uniqueness:
             self.check_uniqueness()
             logger.debug(f"    Uniqueness updated: {len(self.batch_df)} SMILES")
         logger.info(
@@ -907,24 +949,38 @@ class MolScore:
         )
 
         # Subset only unique and valid smiles
-        if recalculate:
-            smiles_to_process = self.batch_df.loc[
-                self.batch_df.valid.isin(["true", "sanitized"]), "smiles"
-            ].tolist()
-            smiles_to_process_index = self.batch_df.loc[
-                self.batch_df.valid.isin(["true", "sanitized"]), "batch_idx"
-            ].tolist()
+        if self.score_invalids:
+            if recalculate:
+                smiles_to_process = self.batch_df.loc[:, "smiles"].tolist()
+                smiles_to_process_index = self.batch_df.loc[:, "batch_idx"].tolist()
+            else:
+                smiles_to_process = self.batch_df.loc[
+                    (self.batch_df.unique == "true"),
+                    "smiles",
+                ].tolist()
+                smiles_to_process_index = self.batch_df.loc[
+                    (self.batch_df.unique == "true"),
+                    "batch_idx",
+                ].tolist()
         else:
-            smiles_to_process = self.batch_df.loc[
-                (self.batch_df.valid.isin(["true", "sanitized"]))
-                & (self.batch_df.unique == "true"),
-                "smiles",
-            ].tolist()
-            smiles_to_process_index = self.batch_df.loc[
-                (self.batch_df.valid.isin(["true", "sanitized"]))
-                & (self.batch_df.unique == "true"),
-                "batch_idx",
-            ].tolist()
+            if recalculate:
+                smiles_to_process = self.batch_df.loc[
+                    self.batch_df.valid.isin(["true", "sanitized"]), "smiles"
+                ].tolist()
+                smiles_to_process_index = self.batch_df.loc[
+                    self.batch_df.valid.isin(["true", "sanitized"]), "batch_idx"
+                ].tolist()
+            else:
+                smiles_to_process = self.batch_df.loc[
+                    (self.batch_df.valid.isin(["true", "sanitized"]))
+                    & (self.batch_df.unique == "true"),
+                    "smiles",
+                ].tolist()
+                smiles_to_process_index = self.batch_df.loc[
+                    (self.batch_df.valid.isin(["true", "sanitized"]))
+                    & (self.batch_df.unique == "true"),
+                    "batch_idx",
+                ].tolist()
         if len(smiles_to_process) == 0:
             # If no smiles to process then instead submit 10 (scoring function should handle invalid)
             logger.info("    No smiles to score so submitting first 10 SMILES")
@@ -1025,7 +1081,7 @@ class MolScore:
         # Clean up class
         self.evaluate_finished()
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.results_df = None
 
         return scores
@@ -1035,9 +1091,11 @@ class MolScore:
         smiles: list,
         step: int = None,
         flt: bool = False,
+        canonicalize: bool = True,
         recalculate: bool = False,
         score_only: bool = False,
-        additional_formats=None,
+        additional_formats: dict = None,
+        additional_keys: dict = None,
     ):
         """
         Calling MolScore will result in the primary function of scoring smiles and logging data in
@@ -1046,19 +1104,24 @@ class MolScore:
         :param smiles: A list of smiles for scoring.
         :param step: Step of generative model for logging, and indexing. This could equally be iterations/epochs etc.
         :param flt: Whether to return a list of floats (default False i.e. return np.array of type np.float32)
+        :param canonicalize: Whether to canonicalize smiles before scoring
         :param recalculate: Whether to recalculate scores for duplicated values,
          in case scoring function may be somewhat stochastic.
           (default False i.e. use existing scores for duplicated molecules)
         :param score_only: Whether to log molecule data or simply score and return
+        :param additional_formats: Additional formats to be passed to scoring functions
+        :param additional_keys: Additional keys to store in the scores.csv file as new columns
         :return: Scores (either float list or np.array)
         """
         return self.score(
             smiles=smiles,
             step=step,
             flt=flt,
+            canonicalize=canonicalize,
             recalculate=recalculate,
             score_only=score_only,
             additional_formats=additional_formats,
+            additional_keys=additional_keys,
         )
 
     # ----- Additional methods only run if called directly -----
@@ -1126,27 +1189,7 @@ class MolScore:
 
 
 class MolScoreBenchmark:
-    presets = {
-        "GuacaMol": resources.files("molscore.configs.GuacaMol"),
-        "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
-        "MolOpt": resources.files("molscore.configs.MolOpt"),
-        "MolExp": resources.files("molscore.configs.MolExp"),
-        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
-        "MolExp-DF_baseline": resources.files("molscore.configs.MolExp-DF_baseline"),
-        "MolExp-DF": resources.files("molscore.configs.MolExp-DF"),
-        "MolExp-DF2": resources.files("molscore.configs.MolExp-DF2"),
-        "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
-        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
-        "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
-        "5HT2A_Selectivity": resources.files(
-            "molscore.configs.5HT2A.PIDGIN_Selectivity"
-        ),
-        "5HT2A_Docking": resources.files(
-            "molscore.configs.5HT2A.Docking_Selectivity_rDock"
-        ),
-        "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
-        "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
-    }
+    presets = PRESETS
 
     def __init__(
         self,
@@ -1162,6 +1205,7 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        score_invalids=False,
         **kwargs,
     ):
         """
@@ -1192,6 +1236,7 @@ class MolScoreBenchmark:
         self.replay_purge = replay_purge
         self.configs = []
         self.results = []
+        self.score_invalids = score_invalids
         self.next = 0
         atexit.register(self._summarize)
 
@@ -1259,6 +1304,7 @@ class MolScoreBenchmark:
                 output_dir=self.output_dir,
                 budget=self.budget,
                 termination_exit=False,
+                score_invalids=self.score_invalids,
                 replay_size=self.replay_size,
                 replay_purge=self.replay_purge,
             )

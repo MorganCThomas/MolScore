@@ -23,7 +23,7 @@
           "CC(C)(C)CC(=O)Nc1c(cc(cc1F)C(=O)Nc2nccs2)F",
           "Cc1cc(cc(n1)Cl)c2c(nc(nn2)N)c3ccc(cc3)F"
         ],
-        "fp": "ECFP4",
+        "fp": "ECFP4c",
         "bits": 1024,
         "similarity_measure": "Tanimoto",
         "method": "max",

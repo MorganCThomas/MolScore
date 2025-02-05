@@ -19,9 +19,9 @@
       "parameters": {
         "prefix": "BACE1",
         "ref_smiles": [
-          "NC1=N[C@@]2(c3cc(NC(=O)c4ccc(F)cn4)ccc3F)COC[C@H]2CS1"
+          "NC1=NC2(c3cc(NC(=O)c4ccc(F)cn4)ccc3F)COCC2CS1"
         ],
-        "fp": "ECFP4",
+        "fp": "ECFP4c",
         "bits": 1024,
         "similarity_measure": "Tanimoto",
         "method": "max",

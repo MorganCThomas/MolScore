@@ -1,5 +1,5 @@
 {
-  "task": "A2A",
+  "task": "A2A_3",
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -14,18 +14,13 @@
       }
     },
     {
-      "name": "MolecularSimilarity",
+      "name": "LevenshteinSimilarity",
       "run": true,
       "parameters": {
         "prefix": "A2A",
         "ref_smiles": [
-          "CCCN1c2c([nH]c(n2)c3ccc(cc3)OCC(=O)NCCN)C(=O)N(C1=O)CCC",
-          "CC(C)(C)CC(=O)Nc1c(cc(cc1F)C(=O)Nc2nccs2)F",
           "Cc1cc(cc(n1)Cl)c2c(nc(nn2)N)c3ccc(cc3)F"
         ],
-        "fp": "ECFP4",
-        "bits": 1024,
-        "similarity_measure": "Tanimoto",
         "method": "max",
         "n_jobs": 1,
         "timeout": 60
@@ -45,16 +40,6 @@
     "method": "single"
   },
   "diversity_filter": {
-    "run": true,
-    "name": "CompoundSimilarity",
-    "parameters": {
-      "nbmax": 10,
-      "minscore": 0.6,
-      "minsimilarity": 0.6,
-      "radius": 2,
-      "useFeatures": false,
-      "bits": 2048,
-      "outputmode": "linear"
-    }
+    "run": false
   }
 }
