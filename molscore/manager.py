@@ -1367,6 +1367,7 @@ class MolScoreBenchmark:
     def __len__(self):
         return len(self.configs)
 
+    # NOTE/TODO: Remove default metrics, add option to include/exclude metrics
     def summarize(
         self,
         endpoints=None,
@@ -1386,7 +1387,7 @@ class MolScoreBenchmark:
         for MS in self.results:
             if MS.main_df is None:
                 print(f"Skipping summary of {MS.cfg['task']} as no results found")
-                continue
+                continue 
             metrics = MS.compute_metrics(
                 endpoints=endpoints,
                 thresholds=thresholds,
