@@ -1171,10 +1171,9 @@ class MolScore:
         budget=None,
         n_jobs=1,
         reference_smiles=None,
+        include=['Valid', 'Unique'],
         benchmark=None,
         recalculate=False,
-        mols_in_3d=False,
-        diversity_check=True,
     ):
         """
         Compute a suite of metrics
@@ -1182,12 +1181,12 @@ class MolScore:
         :param endpoints: List of endpoints to compute metrics for e.g., 'amean', 'docking_score' etc.
         :param thresholds: List of thresholds to compute metrics for
         :param chemistry_filter_basic: Whether to apply basic chemistry filters
-        :budget: Budget to compute metrics for
-        :n_jobs: Number of jobs to use for parallelisation
-        :reference_smiles: List of target smiles to compute metrics in reference to
-        :recalculate: Whether to recompute metrics
-        :mols_in_3d: Whether the molecules are in 3D (and not SMILES)
-        :diversity_check: Whether to check for diversity in the main dataframe when calculating metrics
+        :param budget: Budget to compute metrics for
+        :param n_jobs: Number of jobs to use for parallelisation
+        :param reference_smiles: List of target smiles to compute metrics in reference to
+        :param include: List of metrics to run
+        :param benchmark: Benchmark to run (i.e., preset metrics)
+        :param recalculate: Whether to recompute metrics if they've already been computed
         """
         if self.metrics and not recalculate:
             return self.metrics
@@ -1204,15 +1203,12 @@ class MolScore:
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
                 benchmark=benchmark,
-                mols_in_3d=mols_in_3d,
             )
             results = SM.get_metrics(
                 endpoints=endpoints,
                 thresholds=thresholds,
                 chemistry_filter_basic=chemistry_filter_basic,
-                diverse=diversity_check,
-                mols_in_3d=mols_in_3d,
-                
+                include=include,                
             )
             # Change the name of the default score to "Score"
             results = {
@@ -1367,16 +1363,14 @@ class MolScoreBenchmark:
     def __len__(self):
         return len(self.configs)
 
-    # NOTE/TODO: Remove default metrics, add option to include/exclude metrics
     def summarize(
         self,
         endpoints=None,
         thresholds=None,
         chemistry_filter_basic=True,
         n_jobs=1,
+        include=['Valid', 'Unique'],
         reference_smiles=None,
-        mols_in_3d=False,
-        diversity_check=True,
     ):
         """
         For each result, compute metrics and summary of all results
@@ -1395,9 +1389,8 @@ class MolScoreBenchmark:
                 budget=self.budget,
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
+                include=include,
                 benchmark=self.benchmark,
-                mols_in_3d=mols_in_3d,
-                diversity_check=diversity_check,
             )
             metrics.update(
                 {
