@@ -1144,6 +1144,7 @@ class MolScore:
         budget=None,
         n_jobs=1,
         reference_smiles=None,
+        include=['Valid', 'Unique'],
         benchmark=None,
         recalculate=False,
     ):
@@ -1178,6 +1179,7 @@ class MolScore:
                 endpoints=endpoints,
                 thresholds=thresholds,
                 chemistry_filter_basic=chemistry_filter_basic,
+                include=include
             )
             # Change the name of the default score to "Score"
             results = {
@@ -1321,6 +1323,7 @@ class MolScoreBenchmark:
         chemistry_filter_basic=True,
         n_jobs=1,
         reference_smiles=None,
+        include=['Valid', 'Unique'],
     ):
         """
         For each result, compute metrics and summary of all results
@@ -1340,6 +1343,7 @@ class MolScoreBenchmark:
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
                 benchmark=self.benchmark,
+                include=include
             )
             metrics.update(
                 {
