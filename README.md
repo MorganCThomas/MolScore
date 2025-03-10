@@ -1,4 +1,7 @@
 # MolScore: A scoring, evaluation and benchmarking framework for de novo drug design
+
+[![DOI](https://zenodo.org/badge/311350553.svg)](https://doi.org/10.5281/zenodo.14998608)
+
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
 ## Overview
 
