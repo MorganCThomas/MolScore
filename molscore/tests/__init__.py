@@ -25,4 +25,7 @@ test_files = {
     "chemprop_model": os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "data", "chemprop_model"
     ),
+    "boltz_input": os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data", "boltz_ubiq.yaml"
+    ),
 }

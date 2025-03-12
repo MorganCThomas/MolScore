@@ -1,0 +1,9 @@
+name: boltz
+dependencies:
+  - python=3.9.7
+  - flask
+  - yaml
+  - pip
+  - pip:
+    - boltz
+  

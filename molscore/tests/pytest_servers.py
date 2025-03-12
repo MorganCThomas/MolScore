@@ -178,5 +178,29 @@ class TestMolSkill(BaseTests.TestScoringFunction):
         cls.inst._kill_server()
 
 
+class TestBoltz(BaseTests.TestScoringFunction):
+    @classmethod
+    def setUpClass(cls):
+        from molscore.scoring_functions.boltz import Boltz
+        cls.obj = Boltz
+        cls.inst = Boltz(
+            prefix="TEST",
+            env_engine="mamba",
+            input_path=test_files["boltz_input"],
+            diffusion_samples=2,
+        )
+        mg = MockGenerator(seed_no=123)
+        cls.input = mg.sample(5)
+        file_names = [str(i) for i in range(len(cls.input))]
+        cls.output = cls.inst(
+            smiles=cls.input, directory=cls.output_directory, file_names=file_names
+        )
+        print(f"Boltz Model Output:\n{json.dumps(cls.output, indent=2)}\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inst._kill_server()
+
+
 if __name__ == "__main__":
     unittest.main()

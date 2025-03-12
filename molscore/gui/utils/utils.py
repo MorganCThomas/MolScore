@@ -1,6 +1,7 @@
 import gzip
 import os
 import re
+import zipfile
 import warnings
 from glob import glob
 from itertools import cycle
@@ -49,6 +50,7 @@ def load(input_dir: os.PathLike, latest_idx: int = 0):
     # Add run and dock_path as columns
     df["run"] = [os.path.basename(input_dir)] * len(df)
     df["dock_path"] = [check_dock_paths(input_dir)] * len(df)
+    df["fold_path"] = [check_fold_paths(input_dir)] * len(df)
 
     return df, latest_idx
 
@@ -103,6 +105,16 @@ def check_dock_paths(input_path):
             dock_paths.append(os.path.join(input_path, subd))
     if dock_paths:
         return dock_paths
+    
+    
+def check_fold_paths(input_path):
+    subdirectories = [x for x in os.walk(os.path.abspath(input_path))][0][1]
+    fold_paths = []
+    for subd in subdirectories:
+        if re.search("BoltzFold", subd):
+            fold_paths.append(os.path.join(input_path, subd))
+    if fold_paths:
+        return fold_paths
 
 
 # ----- Plotting molecules -----
@@ -187,7 +199,7 @@ def display_selected_data(
                     )
                     if show_3D:
                         # Grab best variants
-                        file_paths, _ = find_sdfs([midx], main_df)
+                        file_paths, _ = find_structure_files([midx], main_df)
                         for p in file_paths:
                             viewer.add_ligand(path=p)
 
@@ -195,19 +207,19 @@ def display_selected_data(
                     if col.button(
                         label="Send2PyMol", key=f"{key} {legend} pymol_button"
                     ):
-                        file_paths, names = find_sdfs([midx], main_df)
+                        file_paths, names = find_structure_files([midx], main_df)
                         for p, n in zip(file_paths, names):
                             send2pymol(name=n, path=p, pymol=pymol)
 
         if dock_path:
             if viewer is not None:
                 if st.button("ShowAll3D", key=f"All3D_{key}"):
-                    paths, names = find_sdfs(match_idx, main_df)
+                    paths, names = find_structure_files(match_idx, main_df)
                     for p in paths:
                         viewer.add_ligand(path=p)
             if pymol is not None:
                 if st.button("SendAll2Pymol", key=f"AllPymol_{key}"):
-                    paths, names = find_sdfs(match_idx, main_df)
+                    paths, names = find_structure_files(match_idx, main_df)
                     for p, n in zip(paths, names):
                         send2pymol(name=n, path=p, pymol=pymol)
 
@@ -222,8 +234,10 @@ def send2pymol(name, path, pymol, col=None):
     if path.endswith("gz"):
         with gzip.open(path) as f:
             mol = next(Chem.ForwardSDMolSupplier(f, removeHs=False))
-    else:
+    elif path.endswith("sdf") or path.endswith("sd"):
         mol = next(Chem.ForwardSDMolSupplier(path, removeHs=False))
+    else:
+        st.write(f"Unknown file format for {path}")
     # Save it to tempfile
     if mol:
         with NamedTemporaryFile(mode="w+t", suffix=".sdf") as tfile:
@@ -232,7 +246,7 @@ def send2pymol(name, path, pymol, col=None):
             writer.flush()
             writer.close()
             pymol(f"load {tfile.name}, {name}")
-            sleep(0.1)  # Give PyMol one hot 100th
+            sleep(0.1)  # Give PyMol one hot 10th
     else:
         if col is not None:
             col.write("RDKit error parsing molecule")
@@ -267,9 +281,37 @@ def _find_sdf(query_dir, step, batch_idx):
             return possible_files[0]
     if len(possible_files) == 1:
         return possible_files[0]
+    
+
+def _find_cpx(query_dir, step, batch_idx):
+    if query_dir is None:
+        return
+    step = int(step)
+    batch_idx = int(batch_idx)
+    if query_dir.endswith("BoltzFold"):
+        # Search for a cif file
+        possible_files = sorted(glob(
+            os.path.join(query_dir, str(step), "boltz_results_inputs", "predictions", f"{step}_{batch_idx}", f"{step}_{batch_idx}*.cif")
+        ))
+        if len(possible_files) >= 1:
+            if len(possible_files) > 1: 
+                print(f"Ambiguous file {possible_files}")
+            return possible_files[0]
+        # Search for a pdb file
+        possible_files = sorted(glob(
+            os.path.join(query_dir, str(step), "boltz_results_inputs", "predictions", f"{step}_{batch_idx}", f"{step}_{batch_idx}*.pdb")
+        ))
+        if len(possible_files) >= 1:
+            if len(possible_files) > 1: 
+                print(f"Ambiguous file {possible_files}")
+            return possible_files[0]
+        # No files found
+        print("No .cif or .pdb files found for {step}_{batch_idx}")
+    else:
+        print(f"Unknown path structure for {query_dir}")
 
 
-def find_sdfs(match_idxs, main_df):
+def find_structure_files(match_idxs, main_df):
     # Drop duplicate smiles per run
     sel_smiles = (
         main_df.loc[match_idxs, ["run", "smiles"]]
@@ -290,7 +332,7 @@ def find_sdfs(match_idxs, main_df):
         first_idx = (
             main_df.loc[
                 (main_df.run == run) & (main_df["smiles"] == smi),
-                ["run", "step", "batch_idx", "dock_path"],
+                ["run", "step", "batch_idx", "dock_path", "fold_path"],
             ]
             .drop_duplicates(subset=["run", "step", "batch_idx"])
             .to_records(index=False)
@@ -300,11 +342,17 @@ def find_sdfs(match_idxs, main_df):
     # Get file paths
     file_paths = []
     names = []
-    for (_, s, bi, dps), (_, _, og_s, og_b) in zip(first_idxs, idx_names):
-        for dp in dps:
-            file_paths.append(_find_sdf(query_dir=dp, step=s, batch_idx=bi))
-            dock_path_prefix = os.path.basename(dp).split("_")[0]
-            names.append(f"Mol: {og_s}_{og_b} - {dock_path_prefix}")
+    for (_, s, bi, dps, fps), (_, _, og_s, og_b) in zip(first_idxs, idx_names):
+        if dps:
+            for dp in dps:
+                file_paths.append(_find_sdf(query_dir=dp, step=s, batch_idx=bi))
+                dock_path_prefix = os.path.basename(dp).split("_")[0]
+                names.append(f"Mol: {og_s}_{og_b} - {dock_path_prefix}")
+        if fps:
+            for fp in fps:
+                file_paths.append(_find_cpx(query_dir=fp, step=s, batch_idx=bi))
+                fold_path_prefix = os.path.basename(fp).split("_")[0]
+                names.append(f"Cpx_{og_s}_{og_b}-{fold_path_prefix}")
     return file_paths, names
 
 
@@ -332,7 +380,15 @@ def save_sdf(mol_paths, mol_names, out_file):
             st.write(f"No path found for {name}")
     writer.flush()
     writer.close()
-
+    
+def save_cif(in_paths, names, out_file):
+    with zipfile.ZipFile(out_file, 'w') as zipf:
+        for path, name in zip(in_paths, names):
+            if path and path.endswith(".cif"):
+                # Add the file to the ZIP archive
+                zipf.write(path, arcname=f"{name}.cif")
+            else:
+                st.write(f"Unsupported file format or no path found for {name}")
 
 # ----- Plotting -----
 def plotly_plot(
