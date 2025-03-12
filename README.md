@@ -1,19 +1,20 @@
 # MolScore: A scoring, evaluation and benchmarking framework for de novo drug design
-
 [![DOI](https://zenodo.org/badge/311350553.svg)](https://doi.org/10.5281/zenodo.14998608)
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
 ## Overview
+
+[Paper](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w) | 
+[Tutorials](tutorials) | 
+[Examples](https://github.com/MorganCThomas/MolScore_examples) |
+[Demo](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/molscore_demo.gif)
 
 MolScore contains code to score *de novo* compounds in the context of generative *de novo* design by generative models via the subpackage `molscore`, as well as, facilitate downstream evaluation via the subpackage `moleval`. An objective is defined via a JSON file which can be shared to propose new multi-parameter objectives for drug design. MolScore can be used in several ways:
 1. To implement a multi-parameter objective to for prospective drug design.
 2. To benchmark objectives/generative models/optimization using benchmark mode (MolScoreBenchmark).
 3. To implement a sequence of objectives using curriculum mode (MolScoreCurriculum).
 
-Generative models with MolScore already integrated can be found [here](https://github.com/MorganCThomas/MolScore_examples). 
-
 Contributions and/or ideas for added functionality are welcomed!
-
 
 ## Installation
 MolScore can be installed by cloning this repository and setting up an environment using your favourite environment manager (I recommend [mamba](https://github.com/conda-forge/miniforge#mambaforge)).
