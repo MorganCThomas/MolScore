@@ -27,7 +27,7 @@
           "CC(C)(C1=CC=C(C=C1)C(CCCN2CCC(CC2)C(C3=CC=CC=C3)(C4=CC=CC=C4)O)O)C(=O)O"
         ],
         "fp": "AP",
-        "bits": 1024,
+        "bits": null,
         "similarity_measure": "Tanimoto",
         "method": "mean",
         "n_jobs": 1
@@ -71,7 +71,7 @@
         "parameters": {
           "objective": "maximize",
           "mu": 90.0,
-          "sigma": 2.0
+          "sigma": 10.0
         }
       },
       {
@@ -81,7 +81,7 @@
         "parameters": {
           "objective": "minimize",
           "mu": 4.0,
-          "sigma": 2.0
+          "sigma": 1.0
         }
       },
       {

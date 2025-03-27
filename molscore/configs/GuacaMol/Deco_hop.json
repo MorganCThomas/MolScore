@@ -53,7 +53,7 @@
           "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
         ],
         "fp": "PHCO",
-        "bits": 1024,
+        "bits": null,
         "similarity_measure": "Tanimoto",
         "method": "mean",
         "n_jobs": 1
@@ -87,9 +87,9 @@
         "modifier": "lin_thresh",
         "parameters": {
           "objective": "maximize",
-          "upper": 0.75,
+          "upper": 0.85,
           "lower": 0.0,
-          "buffer": 0.75
+          "buffer": 0.85
         }
       }
     ]

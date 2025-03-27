@@ -27,7 +27,7 @@
           "CC12CCC3C(C1CCC2(C#C)O)CCC4=C3C=CC(=C4)OC"
         ],
         "fp": "AP",
-        "bits": 1024,
+        "bits": null,
         "similarity_measure": "Tanimoto",
         "method": "mean",
         "n_jobs": 1
