@@ -519,19 +519,24 @@ class Fingerprints:
     @staticmethod
     def ECFP4(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=2, nBits=nBits
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=2, nBits=nBits
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=2, nBits=nBits
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=2)
 
     @staticmethod
     def ECFP4c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=True)
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
@@ -544,19 +549,26 @@ class Fingerprints:
     @staticmethod
     def FCFP4(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=2, nBits=nBits, useFeatures=True
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=2, nBits=nBits, useFeatures=True
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=2, nBits=nBits, useFeatures=True
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(
+                    mol, radius=2, useFeatures=True
+                )
 
     @staticmethod
     def FCFP4c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(
                 mol, radius=2, useCounts=True, useFeatures=True
             )
@@ -573,19 +585,24 @@ class Fingerprints:
     @staticmethod
     def ECFP6(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=3, nBits=nBits
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=3, nBits=nBits
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=3, nBits=nBits
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=3)
 
     @staticmethod
     def ECFP6c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=True)
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
@@ -598,19 +615,26 @@ class Fingerprints:
     @staticmethod
     def FCFP6(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=3, nBits=nBits, useFeatures=True
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=3, nBits=nBits, useFeatures=True
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=3, nBits=nBits, useFeatures=True
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(
+                    mol, radius=3, useFeatures=True
+                )
 
     @staticmethod
     def FCFP6c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(
                 mol, radius=3, useCounts=True, useFeatures=True
             )
@@ -628,8 +652,10 @@ class Fingerprints:
     @staticmethod
     def Avalon(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(pyAvalonTools.GetAvalonFP(mol, nBits=nBits))
         else:
+            assert nBits, "Number of bits must be specified for Avalon FP"
             return pyAvalonTools.GetAvalonFP(mol, nBits=nBits)
 
     @staticmethod
@@ -643,6 +669,7 @@ class Fingerprints:
     @staticmethod
     def AP(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10)
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
@@ -654,7 +681,9 @@ class Fingerprints:
 
     @staticmethod
     def hashAP(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for hashed AP FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
             )
@@ -665,7 +694,9 @@ class Fingerprints:
 
     @staticmethod
     def hashTT(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for hashed TT FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(
                     mol, nBits=nBits
@@ -678,7 +709,9 @@ class Fingerprints:
 
     @staticmethod
     def RDK5(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for RDK FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
             )
@@ -687,7 +720,9 @@ class Fingerprints:
 
     @staticmethod
     def RDK6(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for RDK FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
             )
@@ -696,7 +731,9 @@ class Fingerprints:
 
     @staticmethod
     def RDK7(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for RDK FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
             )
