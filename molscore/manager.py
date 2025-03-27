@@ -524,10 +524,14 @@ class MolScore:
                 ignore_index=True,
                 sort=False,
             )
+            
+        # Drop duplicate columns except primary key
+        columns_to_drop = [col for col in self.results_df.columns if col in self.batch_df.columns and col != "mol_id"]
+        self.results_df = self.results_df.drop(columns=columns_to_drop, axis=1)
 
         # Merge with batch_df
         logger.debug("    Merging results to batch df")
-        self.batch_df = self.batch_df.merge(self.results_df, on='mol_id', how="left", sort=False)
+        self.batch_df = self.batch_df.merge(self.results_df, on="mol_id", how="left", sort=False)
         self.batch_df.fillna(0.0, inplace=True)
 
     def update_maxmin(self, df):
