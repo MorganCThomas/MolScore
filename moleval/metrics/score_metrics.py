@@ -60,7 +60,6 @@ class ScoreMetrics:
         unique=True,
         n_jobs=1,
         benchmark=None,
-        mols_in_3d=False,
     ):
         """This class facilitates the calculation of metrics (and benchmark metrics) 
         from the scores dataframe returned from MolScore. Additionally contains functions
@@ -79,7 +78,7 @@ class ScoreMetrics:
         self.total = len(scores)
         self.budget = budget if budget else self.total
         self.scores = self._preprocess_scores(
-            scores.copy(deep=True), valid=valid, unique=unique, budget=budget, mols_in_3d=mols_in_3d,
+            scores.copy(deep=True), valid=valid, unique=unique, budget=budget,
         )
         self.benchmark = benchmark
         
