@@ -14,17 +14,14 @@
       }
     },
     {
-      "name": "MolecularSimilarity",
+      "name": "LevenshteinSimilarity",
       "run": true,
       "parameters": {
         "prefix": "AP",
         "ref_smiles": [
           "CN1CCN(CCCN2c3ccccc3Sc3ccc(Cl)cc32)CC1",
-          "CN1CCN2c3c(cccc31)[C@@H]1CN(CCCC(=O)c3ccc(F)cc3)CC[C@@H]12"
+          "CN1CCN2c3c(cccc31)C1CN(CCCC(=O)c3ccc(F)cc3)CCC12"
         ],
-        "fp": "ECFP4",
-        "bits": 1024,
-        "similarity_measure": "Tanimoto",
         "method": "max",
         "n_jobs": 1,
         "timeout": 60
@@ -44,11 +41,6 @@
     "method": "single"
   },
   "diversity_filter": {
-    "run": true,
-    "name": "Occurrence",
-    "parameters": {
-      "tolerance": 1,
-      "buffer": 5
-    }
+    "run": false
   }
 }

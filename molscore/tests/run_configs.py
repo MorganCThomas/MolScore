@@ -17,12 +17,13 @@ def main(configs: list):
             model_name="test",
             task_config=config,
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
+            score_invalids=False,
             replay_size=0,
         )
-        with ms:
+        with ms as scoring_function:
             # Score 5 smiles 5 times
             for i in tqdm(range(5)):
-                _ = ms(mg.sample(5))
+                _ = scoring_function(mg.sample(5))
         print(f"Output:\n{ms.main_df.head(10)}\n")
     return
 

@@ -19,9 +19,9 @@
       "parameters": {
         "prefix": "EGFR",
         "ref_smiles": [
-          "C=CC(=O)N1CC[C@@H](Oc2nc(Nc3ccc(N4CCC(N5CCN(C)CC5)CC4)cc3)c(C(N)=O)nc2CC)C1"
+          "C=CC(=O)N1CCC(Oc2nc(Nc3ccc(N4CCC(N5CCN(C)CC5)CC4)cc3)c(C(N)=O)nc2CC)C1"
         ],
-        "fp": "ECFP4",
+        "fp": "ECFP4c",
         "bits": 1024,
         "similarity_measure": "Tanimoto",
         "method": "max",

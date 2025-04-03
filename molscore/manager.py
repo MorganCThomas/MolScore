@@ -22,18 +22,16 @@ from molscore.gui import monitor_path
 logger = logging.getLogger("molscore")
 logger.setLevel(logging.WARNING)
 
-
-class MolScore:
-    """
-    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
-    """
-
-    presets = {
-        "Misc": resources.files("molscore.configs"),
+PRESETS = {
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
         "MolExp": resources.files("molscore.configs.MolExp"),
+        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
+        "MolExpL": resources.files("molscore.configs.MolExpL"),
+        "MolExpL_baseline": resources.files("molscore.configs.MolExpL_baseline"),
+        "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
+        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
         "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
         "5HT2A_Selectivity": resources.files(
             "molscore.configs.5HT2A.PIDGIN_Selectivity"
@@ -44,6 +42,13 @@ class MolScore:
         "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
     }
+
+
+class MolScore:
+    """
+    Central manager class that, when called, takes in a list of SMILES and returns respective scores.
+    """
+    presets = PRESETS
 
     preset_tasks = {
         k:[p.name.strip(".json") for p in v.glob("*.json")] 
@@ -70,6 +75,7 @@ class MolScore:
         termination_threshold: int = None,
         termination_patience: int = None,
         termination_exit: bool = False,
+        score_invalids: bool = False,
         replay_size: int = None,
         replay_purge: bool = True,
         **kwargs,
@@ -110,21 +116,23 @@ class MolScore:
         )
         self.termination_counter = 0
         self.termination_exit = termination_exit
+        self.score_invalids = score_invalids
         self.replay_size = replay_size
         self.replay_purge = replay_purge
         self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.finished = False
         self.init_time = time.time()
-        self.results_df = None
+        self.results_df = None # TODO make empty df ... 
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.main_df = None
         self.monitor_app = None
         self.diversity_filter = None
         self.call2score_warning = True
         self.metrics = None
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
+        self.temp_parameters = {} # Temp parameters to write out each iteration in scores.csv for comparative purposes
 
         # Setup save directory
         if not run_name:
@@ -142,21 +150,24 @@ class MolScore:
             self.save_dir = os.path.abspath(self.cfg["output_dir"])
         if add_run_dir:
             self.save_dir = os.path.join(self.save_dir, self.run_name)
+        
         # Check to see if we're loading from previous results
         if self.cfg["load_from_previous"]:
             assert os.path.exists(
                 self.cfg["previous_dir"]
             ), "Previous directory does not exist"
             self.save_dir = self.cfg["previous_dir"]
+            
+        # Create save directory
         else:
-            if os.path.exists(self.save_dir):
+            if os.path.exists(self.save_dir) and add_run_dir:
                 print(
                     "Found existing directory, appending current time to distinguish"
                 )  # Not set up logging yet
                 self.save_dir = self.save_dir + time.strftime(
                     "_%H_%M_%S", time.localtime()
                 )
-            os.makedirs(self.save_dir)
+            os.makedirs(self.save_dir, exist_ok=True)
             os.makedirs(os.path.join(self.save_dir, "iterations"))
 
         # Setup log file
@@ -927,7 +938,7 @@ class MolScore:
 
         # Clean up class
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.results_df = None
         return scores
 
@@ -939,6 +950,7 @@ class MolScore:
         flt: bool = False,
         canonicalise_smiles: bool = True,
         recalculate: bool = False,
+        check_uniqueness: bool = True,
         score_only: bool = False,
         **molecular_inputs,
     ):
@@ -1154,7 +1166,7 @@ class MolScore:
         # ----- Clean up class -----
         self.evaluate_finished()
         self.batch_df = None
-        self.exists_df = None
+        self.exists_df = pd.DataFrame()
         self.results_df = None
 
         return scores
@@ -1230,28 +1242,7 @@ class MolScore:
 
 
 class MolScoreBenchmark:
-    presets = {
-        "GuacaMol": resources.files("molscore.configs.GuacaMol"),
-        "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
-        "MolOpt": resources.files("molscore.configs.MolOpt"),
-        "MolExp": resources.files("molscore.configs.MolExp"),
-        "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
-        "MolExp-DF_baseline": resources.files("molscore.configs.MolExp-DF_baseline"),
-        "MolExp-DF": resources.files("molscore.configs.MolExp-DF"),
-        "MolExp-DF2": resources.files("molscore.configs.MolExp-DF2"),
-        "MolOpt-CF": resources.files("molscore.configs.MolOpt-CF"),
-        "MolOpt-DF": resources.files("molscore.configs.MolOpt-DF"),
-        "5HT2A_PhysChem": resources.files("molscore.configs.5HT2A.PhysChem"),
-        "5HT2A_Selectivity": resources.files(
-            "molscore.configs.5HT2A.PIDGIN_Selectivity"
-        ),
-        "5HT2A_Docking": resources.files(
-            "molscore.configs.5HT2A.Docking_Selectivity_rDock"
-        ),
-        "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
-        "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
-        "3D_Benchmark": resources.files("molscore.configs.3D_Benchmark"),
-    }
+    presets = PRESETS
 
     def __init__(
         self,
@@ -1267,6 +1258,7 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        score_invalids=False,
         **kwargs,
     ):
         """
@@ -1433,6 +1425,7 @@ class MolScoreBenchmark:
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
                 benchmark=self.benchmark,
+                include=include
             )
             metrics = SM.get_metrics(
                 endpoints=endpoints,

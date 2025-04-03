@@ -1,79 +1,180 @@
 # MolScore: A scoring, evaluation and benchmarking framework for de novo drug design
+[![PyPI version](https://badge.fury.io/py/MolScore.svg)](https://badge.fury.io/py/MolScore)
+[![PyPI Downloads](https://static.pepy.tech/badge/molscore)](https://pepy.tech/projects/molscore)
+[![DOI](https://zenodo.org/badge/311350553.svg)](https://doi.org/10.5281/zenodo.14998608)
+
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
 ## Overview
+
+[Paper](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w) | 
+[Tutorials](tutorials) | 
+[Examples](https://github.com/MorganCThomas/MolScore_examples) |
+[Demo](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/molscore_demo.gif)
 
 MolScore contains code to score *de novo* compounds in the context of generative *de novo* design by generative models via the subpackage `molscore`, as well as, facilitate downstream evaluation via the subpackage `moleval`. An objective is defined via a JSON file which can be shared to propose new multi-parameter objectives for drug design. MolScore can be used in several ways:
 1. To implement a multi-parameter objective to for prospective drug design.
 2. To benchmark objectives/generative models/optimization using benchmark mode (MolScoreBenchmark).
 3. To implement a sequence of objectives using curriculum mode (MolScoreCurriculum).
 
-Generative models with MolScore already integrated can be found [here](https://github.com/MorganCThomas/MolScore_examples). 
-
 Contributions and/or ideas for added functionality are welcomed!
 
-
 ## Installation
-MolScore can be installed by cloning this repository and setting up an environment using your favourite environment manager (I recommend [mamba](https://github.com/conda-forge/miniforge#mambaforge)).
-
-    git clone https://github.com/MorganCThomas/MolScore.git
-    cd MolScore
-    mamba env create -f environment.yml
-    mamba activate molscore
-    pip install ./
-
-**Note:** You can use `pip install -e ./` to install in develop mode.
-
-Alternatively, MolScore is available via the Python Package Index.
+Install MolScore with PyPI (recommended):
 
     pip install molscore --upgrade
 
-**Installation time**: Installation of molscore in the environment should complete in less than 5 minutes (tested using mamba).
+or directly from GitHub:
 
-## Functionality
-Scoring functionality present in **molscore**, some scoring functions require external softwares and necessary licenses.  
+    git clone https://github.com/MorganCThomas/MolScore.git
+    cd MolScore ; pip install -e .
 
-|Type|Method|
-|---|---|
-|Docking|Glide, Smina, OpenEye, GOLD, PLANTS, rDock, Vina, Gnina|
-|Ligand preparation|RDKit->Epik, Moka->Corina, Ligprep, [Gypsum-DL](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3)|
-|3D Similarity|ROCS, Open3DAlign|
-|2D Similarity|Fingerprint similarity (any RDKit fingerprint and similarity measure), substructure match/filter, [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)|
-|Predictive models|Scikit-learn (classification/regression), [PIDGINv5](https://zenodo.org/record/7547691#.ZCcLyo7MIhQ)<sup>a</sup>, [ChemProp](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237), [ADMET-AI](https://www.biorxiv.org/content/10.1101/2023.12.28.573531v1)|
-|Synthesizability|[RAscore](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc05401a), [AiZynthFinder](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00472-1), SAscore, ReactionFilters (Scaffold decoration)|
-|Descriptors|RDKit, Maximum consecutive rotatable bonds, Penalized LogP, LinkerDescriptors (Fragment linking), [MolSkill](https://doi.org/10.1038/s41467-023-42242-1)|
-|Transformation methods|Linear, linear threshold, step threshold, Gaussian|
-|Aggregation methods|Arithmetic mean, geometric mean, weighted sum, product, weighted product, [auto-weighted sum/product, pareto front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)|
-|Diversity filters|Unique, Occurence, [memory assisted](https://github.com/tblaschke/reinvent-memory) + ScaffoldSimilarityECFP|
+> Note: I recommend mamba for environment handling
 
-<sup>a</sup> PIDGINv5 is a suite of pre-trained RF classifiers on ~2,300 ChEMBL31 targets
-  
-Performance metrics present in **moleval**, many of which are from [GuacaMol](https://pubs.acs.org/doi/10.1021/acs.jcim.8b00839) or [MOSES](https://www.frontiersin.org/articles/10.3389/fphar.2020.565644/full). 
-|Type|metric|
-|---|---|
-|Intrinsic property|Validity, Uniqueness, Scaffold uniqueness, Internal diversity (1 & 2), Sphere exclusion diversity<sup>b</sup>, Solow Polasky diversity<sup>g</sup>, Scaffold diversity, Functional group diversity<sup>c</sup>, Ring system diversity<sup>c</sup>, Filters (MCF & PAINS), Purchasability<sup>d</sup>|
-|Extrinsic property<sup>a</sup>|Novelty, FCD, Analogue similarity<sup>e</sup>, Analogue coverage<sup>b</sup>, Functional group similarity, Ring system similarity, Single nearest neighbour similarity, Fragment similarity, Scaffold similarity, Outlier bits (Silliness)<sup>f</sup>, Wasserstein distance (LogP, SA Score, NP score, QED, Weight)|
+## Scoring
 
-<sup>a</sup> In reference to a specified external dataset  
-<sup>b</sup> As in our previous work [here](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00516-0)  
-<sup>c</sup> Adaption based on [Zhang et al.](https://pubs.acs.org/doi/10.1021/acs.jcim.0c01328)  
-<sup>d</sup> Using [molbloom](https://github.com/whitead/molbloom)  
-<sup>e</sup> Similar to [Blaschke et al.](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0)  
-<sup>f</sup> Based on [SillyWalks](https://github.com/PatWalters/silly_walks) by Pat Walters  
-<sup>g</sup> Based on [Liu et al.](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
+Simplest integration of MolScore requires a config file, for example:
+```python
+from molscore import MolScore
+ms = MolScore(
+    model_name='test',
+    task_config='molscore/configs/QED.json',
+    budget=10000
+)
+while not ms.finished:
+    scores = ms.score(SMILES)
+```
 
+> Note: see [tutorial](tutorials/implementing_molscore.md#single-mode) for more detail
 
-## Usage
-For further details, we refer you to the [tutorials](tutorials). Here is a snapshot of using MolScore with the GUIs available.
+A GUI exists to help write the config file, which can be run with the following command.
 
-Here is a GIF demonstrating writing a config file with the help of the GUI, running MolScore in a mock example (scoring randomly sampled SMILES), and monitoring the output with another GUI.
+    molscore_config
 
-![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/molscore_demo.gif)
-
-Once `molscore` has been implemented into a generative model, the objective needs to be defined! Writing a JSON file is a pain though so instead a streamlit app is provided do help. Simply call `molscore_config` from the command line (a simple wrapper to `streamlit run molscore/gui/config.py`)
+> Note: see [tutorial](tutorials/defining_an_objective.md) for more detail
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/config_v1_albuterol.png?raw=True)
 
-Once the configuration file is saved, simply point to this file path and run *de novo* molecule optimization. If running with the monitor app you'll be able to investigate molecules as they're being generated. Simply call `molscore_monitor` from the command line (a wrapper to `streamlit run molscore/gui/monitor.py`).
+<details>
+  <summary><strong>Scoring functionality</strong></summary>
+  &nbsp; <!-- This adds a non-breaking space for some spacing -->
+  
+  **Scoring functions**
+  - **Descriptors**: RDKit, Maximum consecutive rotatable bonds, Penalized LogP, LinkerDescriptors (Fragment linking), 
+    - [MolSkill](https://doi.org/10.1038/s41467-023-42242-1): Extracting medicinal chemistry intuition via preference machine learning as available on Nature Communications.
+  - **Synthesizability**: [RAscore](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc05401a), [AiZynthFinder](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00472-1), SAscore, ReactionFilters (Scaffold decoration)
+  - **2D Similarity**: Fingerprint similarity (any RDKit fingerprint and similarity measure), substructure match/filter, [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)
+  - **3D Similarity**: ROCS, Open3DAlign
+  - **QSAR**: Scikit-learn (classification/regression), [ChemProp](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237)
+    - [PIDGINv5](https://zenodo.org/record/7547691#.ZCcLyo7MIhQ): Pre-trained RF classifiers for ~2,300 ChEMBL31 targets at different activity thresholds of 0.1 uM, 1 uM, 10 uM & 100 uM.
+    - [ADMET-AI](https://www.biorxiv.org/content/10.1101/2023.12.28.573531v1): Pre-trained predictive models of various ADMET endpoints.
+  - **Docking**: Glide<sup>a</sup>, Smina, OpenEye<sup>a</sup>, GOLD<sup>a</sup>, PLANTS, rDock, Vina, Gnina
+    - **Ligand preparation**: RDKit->Epik, Moka->Corina, Ligprep, [Gypsum-DL](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-019-0358-3)
+
+ > <sup>a</sup> Requires a license
+
+  **Transformation functions (transform values to [0-1])**
+  - Linear
+  - Linear threshold
+  - Step
+  - Step threshold
+  - Gaussian
+
+  **Aggregation functions (combine multiple scores into 1)**
+  - Arithmetic mean
+  - Geometric mean
+  - Weighted sum
+  - Weighted product
+  - [Auto-weighted sum/product](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
+  - [Pareto front](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
+
+  **Filters (applied to final aggregated score)**
+  - Any scoring function as a filter
+  - Diversity filters
+    - Unique
+    - [Occurence](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-022-00646-z)
+    - [Memory assisted](https://github.com/tblaschke/reinvent-memory)
+      - [ScaffoldSimilarityECFP](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-022-00646-z)
+
+</details>
+
+## Benchmarking
+
+Benchmarks are lists of objectives (configuration files) with metrics calculated upon exit. Re-implementations of existing benchmarks are available as presets.
+```python
+from molscore import MolScoreBenchmark
+
+msb = MolScoreBenchmark(
+    model_name='test',
+    output_dir='./',
+    benchmark='GuacaMol',
+    budget=10000
+)
+for task in msb:
+    while not task.finished:
+        scores = task.score(SMILES)
+```
+
+Current benchmarks available include: [GuacaMol](https://pubs.acs.org/doi/10.1021/acs.jcim.8b00839), [GuacaMol_Scaffold](https://arxiv.org/abs/2103.03864), [MolOpt](https://arxiv.org/pdf/2206.12411), [5HT2A_PhysChem, 5HT2A_Selectivity, '5HT2A_Docking'](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w), [LibINVENT Exp1&3](https://pubs.acs.org/doi/10.1021/acs.jcim.1c00469), [MolExp(L)](https://arxiv.org/abs/2501.19153)
+
+ > Note: inspect preset benchmarks with `MolScoreBenchmark.presets.keys()`
+
+ > Note: see [tutorial](tutorials/implementing_molscore.md#benchmark-mode) for more detail
+
+## Evaluation
+
+The `moleval` subpackage can be used to calculate metrics for an arbitrary set of molecules.
+
+```python
+from moleval.metrics.metrics import GetMetrics
+
+MetricEngine = GetMetrics(
+    test=TEST_SMILES, # Model training data subset
+    train=TRAIN_SMILES, # Model training data
+    target=TARGET_SMILES, # Exemplary target data
+)
+metrics = MetricEngine.calculate(
+    GEN_SMILES, # Generated data
+)
+```
+
+ > Note: see [tutorial](tutorials/evaluating_molecules.md) for more detail
+
+<details>
+  <summary><strong>Metrics available</strong></summary>
+  &nbsp; <!-- This adds a non-breaking space for some spacing -->
+
+  **Intrinsice metrics (generated molecules only)**
+  - Validity, Uniqueness, Scaffold uniqueness, Internal diversity (1 & 2), Scaffold diversity
+  - [Sphere exclusion diversity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00516-0): Measure of chemical space coverage at a specific Tanimoto similarity threshold. I.e., A score 0.5 indicates 50% of the sample size sufficiently describes the chemical space, therefore the higher the metric the more diverse the sample. Also see [here](https://pubs.acs.org/doi/10.1021/acs.jcim.4c00519)
+  - [Solow Polasky diversity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9) 
+  - [Functional group diversity](https://pubs.acs.org/doi/10.1021/acs.jcim.0c01328)
+  - [Ring system diversity](https://pubs.acs.org/doi/10.1021/acs.jcim.0c01328)
+  - [Filters](https://www.frontiersin.org/journals/pharmacology/articles/10.3389/fphar.2020.565644/full): Passing of a set of drug-like filters (MolWt, Rotatable bonds, LogP etc.), Medicinal Chemistry substructures and PAINS substructures.
+  - [Purchasability](https://github.com/whitead/molbloom): Molbloom prediction of presence in ZINC20
+
+  **Extrinsic metrics (comparison to reference molecules)**
+  - Novelty
+  - [FCD](https://pubs.acs.org/doi/10.1021/acs.jcim.8b00234)
+  - [Analogue similarity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00473-0): Proportion of generated molecules that are analogues to molecules in reference data.
+  - [Analogue coverage](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00516-0): Proportion of reference data that are analogues to generated data.
+  - Functional group similarity
+  - Ring system similarity
+  - Single nearest neighbour similarity
+  - Fragment similarity
+  - Scaffold similarity
+  - Outlier bits ([Silliness](https://github.com/PatWalters/silly_walks)): Average proportion of fingerprint bits (atomic environments) present in a generated molecule, not present anywhere in the reference data. The lower the silliness the better.
+  - Wasserstein distance (LogP, SA Score, NP score, QED, Weight)
+
+</details>
+
+## Additional functionality
+
+- Curriculum learning (see [tutorial](tutorials/implementing_molscore.md#curriculum-mode))
+- Experience replay buffers (see [tutorial](tutorials/implementing_molscore.md#using-a-replay-buffer))
+- Parallelisation (see [tutorial](tutorials/parallelisation.md))
+- A GUI for monitoring generated molecules (see below)
+
+    ```molscore_monitor```
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/monitor_v1_5HT2A_main.png?raw=True)
 

@@ -92,6 +92,8 @@ A benchmark mode is also available, that can be used to iterate over objectives 
 - [5HT2A_Docking](https://chemrxiv.org/engage/chemrxiv/article-details/65e63a4de9ebbb4db9e63fda)
 - [LibINVENT_Exp1](https://pubs.acs.org/doi/10.1021/acs.jcim.1c00469)
 - [LinkINVENT_Exp3](https://pubs.rsc.org/en/content/articlelanding/2023/dd/d2dd00115b)
+- [MolExp](https://arxiv.org/abs/2501.19153)
+- [MolExpL](https://arxiv.org/abs/2501.19153)
 
 These can also be found in the `presets` attribute of `MolScoreBenchmark`.
 
@@ -100,7 +102,7 @@ Here is an example to run a preset benchmark.
 from molscore import MolScoreBenchmark
 
 MolScoreBenchmark.presets.keys()
-> dict_keys(['GuacaMol', 'GuacaMol_Scaffold', 'MolOpt', '5HT2A_PhysChem', '5HT2A_Selectivity', '5HT2A_Docking', 'LibINVENT_Exp1', 'LinkINVENT_Exp3'])
+> dict_keys(['GuacaMol', 'GuacaMol_Scaffold', 'MolOpt', '5HT2A_PhysChem', '5HT2A_Selectivity', '5HT2A_Docking', 'LibINVENT_Exp1', 'LinkINVENT_Exp3', 'MolExp', 'MolExpL'])
 
 msb = MolScoreBenchmark(
   model_name='test',
