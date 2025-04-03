@@ -90,6 +90,7 @@ class MolScore:
         :param termination_threshold: Threshold for early stopping based on the score
         :param termination_patience: Number of steps with no improvement, or that a termination_threshold has been reached for
         :param termination_exit: Exit on termination of objective
+        :param score_invalids: Whether to force scoring of invalid molecules
         :param replay_size: Maximum size of the replay buffer
         :param replay_purge: Whether to purge the replay buffer, i.e., only allow molecules that pass the diversity filter
         """
@@ -1040,19 +1041,28 @@ class MolScore:
         if recalculate:
             # Pass all valid molecules to scoring functions
             if "valid" in self.batch_df.columns:
-                _process_batch_idxs = self.batch_df.loc[
-                    self.batch_df.valid, "batch_idx"
-                ].tolist()
+                if self.score_invalids:
+                    pass
+                else:
+                    _process_batch_idxs = self.batch_df.loc[
+                        self.batch_df.valid, "batch_idx"
+                    ].tolist()
         else:
             # Pass all valid and unique molecules to scoring functions
             # If valid column, there should be unique column
             if ("valid" in self.batch_df.columns) and (
                 "unique" in self.batch_df.columns
             ):
-                _process_batch_idxs = self.batch_df.loc[
-                    self.batch_df.valid & self.batch_df.unique,
-                    "batch_idx",
-                ].tolist()
+                if self.score_invalids:
+                    _process_batch_idxs = self.batch_df.loc[
+                        self.batch_df.unique,
+                        "batch_idx",
+                    ].tolist()
+                else:
+                    _process_batch_idxs = self.batch_df.loc[
+                        self.batch_df.valid & self.batch_df.unique,
+                        "batch_idx",
+                    ].tolist()
             # But unique can exist without valid
             elif "unique" in self.batch_df.columns:
                 _process_batch_idxs = self.batch_df.loc[
@@ -1251,6 +1261,7 @@ class MolScoreBenchmark:
         budget: int,
         replay_size: int = None,
         replay_purge: bool = True,
+        score_invalids=False,
         add_benchmark_dir: bool = True,
         model_parameters: dict = {},
         benchmark: str = None,
@@ -1258,7 +1269,6 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
-        score_invalids=False,
         **kwargs,
     ):
         """
@@ -1268,6 +1278,7 @@ class MolScoreBenchmark:
         :param budget: Budget number of molecules to run MolScore task for
         :param replay_size: Size of replay buffer to store top scoring molecules
         :param replay_purge: Whether to purge replay buffer based on diversity filter
+        :param score_invalids: Whether to force scoring of invalid molecules
         :param add_benchmark_dir: Whether to add benchmark directory to output directory
         :param model_parameters: Parameters of the model for record
         :param benchmark: Name of benchmark to run
@@ -1290,6 +1301,7 @@ class MolScoreBenchmark:
         self.configs = []
         self.results = []
         self.score_paths = []
+        self.score_invalids = score_invalids
         self.next = 0
 
         # Process configs and tasks to run
@@ -1367,6 +1379,7 @@ class MolScoreBenchmark:
             termination_exit=False,
             replay_size=self.replay_size,
             replay_purge=self.replay_purge,
+            score_invalids=self.score_invalids,
         )
         try:
             with MS as scoring_function:
@@ -1443,7 +1456,7 @@ class MolScoreBenchmark:
                 os.path.join(self.output_dir, "results.csv"), index=False
             )
             # Print results
-            print(f"Preview of Results:\n{pd.DataFrame(pd.DataFrame(self.results))}")
+            print(f"Preview of Results:\n{(pd.DataFrame(self.results))}")
 
 
 class MolScoreCurriculum(MolScore):
@@ -1460,6 +1473,7 @@ class MolScoreCurriculum(MolScore):
         termination_patience: int = None,
         replay_size: int = None,
         replay_purge: bool = True,
+        score_invalids: bool = False,
         reset_replay_buffer: bool = False,
         benchmark: str = None,
         custom_benchmark: os.PathLike = None,
@@ -1480,6 +1494,7 @@ class MolScoreCurriculum(MolScore):
         :param termination_patience: Number of steps to wait before terminating MolScore task
         :param replay_size: Size of replay buffer to store top scoring molecules
         :param replay_purge: Whether to purge replay buffer based on diversity filter
+        :param score_invalids: Whether to force scoring of invalid molecules
         :param reset_replay_buffer: Whether to reset replay buffer between tasks
         :param benchmark: Name of benchmark to run
         :param custom_benchmark: Path to custom benchmark directory containing configs
@@ -1506,6 +1521,7 @@ class MolScoreCurriculum(MolScore):
         self.include = include
         self.exclude = exclude
         self.configs = []
+        self.score_invalids = score_invalids
 
         # Process configs and tasks to run
         if self.benchmark:
@@ -1574,6 +1590,7 @@ class MolScoreCurriculum(MolScore):
             termination_exit=False,
             replay_size=self.replay_size,
             replay_purge=self.replay_purge,
+            score_invalids=self.score_invalids,
         )
 
     def score(self, *args, **kwargs):
