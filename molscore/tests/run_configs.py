@@ -19,11 +19,10 @@ def main(configs: list):
             output_dir=os.path.join(os.path.dirname(__file__), "test_out"),
             replay_size=0,
         )
-        # Score 5 smiles 5 times
-        for i in tqdm(range(5)):
-            _ = ms(mg.sample(5))
-        ms.write_scores()
-        ms.kill_monitor()
+        with ms:
+            # Score 5 smiles 5 times
+            for i in tqdm(range(5)):
+                _ = ms(mg.sample(5))
         print(f"Output:\n{ms.main_df.head(10)}\n")
     return
 

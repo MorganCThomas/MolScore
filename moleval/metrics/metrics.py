@@ -476,7 +476,7 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
 
 
 def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
-                 dist_threshold=0.65, normalize=True):
+                 dist_threshold=0.65, normalize=True, force=False):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
      Tanimoto distance on the first k molecules.
@@ -496,11 +496,15 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     if k is not None:
         if len(gen) < k:
             warnings.warn(
-                f"Can't compute SEDiv@{k/1000:.0f} "
+                f"Can't compute SEDiv@{k/1000:.0f}k "
                 f"gen contains only {len(gen)} molecules"
             )
-        np.random.seed(123)
-        idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+        if force and (len(gen) < k):
+            idxs = list(range(len(gen)))
+        else:
+            np.random.seed(123)
+            idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+            
         if isinstance(gen[0], (rdkit.Chem.rdchem.Mol, str)): 
             gen = [gen[i] for i in idxs]
         else: 

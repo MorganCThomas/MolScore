@@ -25,24 +25,39 @@ Implementing `molscore` is as simple as importing it, instantiating it (pointing
 ```python
 from molscore import MolScore
 
-ms = MolScore(model_name='test', task_config='molscore/configs/QED.json')
-scores = ms.score(SMILES)
+ms = MolScore(
+  model_name='test',
+  task_config='molscore/configs/QED.json'
+)
+with ms as scoring_function:
+  scores = scoring_function.score(SMILES)
 ```
+> Note entering a MolScore context via `with` ensures automated cleanup.
 
 Alternatively, a `budget` can be set to specify the maximum number of molecules to score, after the budget is reached, the attribute `finished` will be set to `True` which can be used to decide when to exit an optimization loop. For example,
 ```python
 from molscore import MolScore
-ms = MolScore(model_name='test', task_config='molscore/configs/QED.json', budget=10000)
-while not ms.finished:
-    scores = ms.score(SMILES)
+ms = MolScore(
+  model_name='test',
+  task_config='molscore/configs/QED.json',
+  budget=10000
+)
+with ms as scoring_function:
+  while not scoring_function.finished:
+      scores = scoring_function.score(SMILES)
 ```
 
 Moreover, single tasks can be run by name if they already exist as a preset in MolScore configs (such as [Benchmark tasks](#using-a-preset-benchmark)). For this, you must specify the group/category and name of the config file omitting the .json. suffix. If the .json suffix is specified, a path to a file is assumed. See example below,
 ```python
 from molscore import MolScore
-ms = MolScore(model_name='test', task_config='GuacaMol:Albuterol_similarity', budget=10000)
-while not ms.finished:
-    scores = ms.score(SMILES)
+ms = MolScore(
+  model_name='test',
+  task_config='GuacaMol:Albuterol_similarity',
+  budget=10000
+)
+with ms as scoring_function:
+  while not scoring_function.finished:
+      scores = scoring_function.score(SMILES)
 ```
 
 A list of available configuration files can found here by running the following code snippet,
@@ -87,11 +102,19 @@ from molscore import MolScoreBenchmark
 MolScoreBenchmark.presets.keys()
 > dict_keys(['GuacaMol', 'GuacaMol_Scaffold', 'MolOpt', '5HT2A_PhysChem', '5HT2A_Selectivity', '5HT2A_Docking', 'LibINVENT_Exp1', 'LinkINVENT_Exp3'])
 
-msb = MolScoreBenchmark(model_name='test', output_dir='./', benchmark='GuacaMol', budget=10000)
-for task in msb:
-    while not task.finished:
-        scores = task.score(SMILES)
+msb = MolScoreBenchmark(
+  model_name='test',
+  output_dir='./',
+  benchmark='GuacaMol',
+  budget=10000
+)
+with msb as benchmark: # Open benchmark context
+  for task in benchmark: # Iterated benchmark tasks
+    with task as scoring_function: # Open task context
+      while not scoring_function.finished: # Run until finished
+          scores = scoring_function.score(SMILES) # Score and optimize
 ```
+> Note both context usage is **required** here to ensure smooth automated running of the benchmark and automatic saving of the results.
 
 ### Defining a custom benchmark
 Want to run your own benchmark, sure why not!
@@ -99,7 +122,12 @@ Want to run your own benchmark, sure why not!
 Simply write the config files that define each individual objective, put them in a directory, and MolScore will run all configs in that directory. The only difference here supplying the path to `custom_benchmark` instead.
 ```python
 from molscore import MolScoreBenchmark
-msb = MolScoreBenchmark(model_name='test', output_dir='./', custom_benchmark='path_to_dir', budget=10000)
+msb = MolScoreBenchmark(
+  model_name='test',
+  output_dir='./',
+  custom_benchmark='path_to_dir',
+  budget=10000
+)
 ```
 
 ### Controlling objectives in your benchmark
@@ -111,7 +139,8 @@ msb = MolScoreBenchmark(
     benchmark='GuacaMol',
     custom_benchmark='path_to_dir',
     exclude=['albuterol_similarity']
-    budget=10000)
+    budget=10000
+  )
 ```
 
 Or if I only want to run specific objectives, I can use include.
@@ -121,7 +150,8 @@ msb = MolScoreBenchmark(
     model_name='test',
     benchmark='MolOpt',
     include=['albuterol_similarity', 'qed']
-    budget=10000)
+    budget=10000
+  )
 ```
 
 ## Curriculum mode
@@ -152,9 +182,11 @@ MSC = MolScoreCurriculum(
         termination_threshold=None,
         termination_patience=None,
     )
-while not MSC.finished:
-    MSC.score(smiles)
+with MSC as scoring_function:
+  while not scoring_function.finished:
+      scoring_function.score(smiles)
 ```
+> Note MolScoreCurriculum behaves like MolScore, opening the context results in automated cleanup.
 
 Ah, but what are the criteria... well we can utilise 3 parameters to control this in order of precedence, specifically:
 

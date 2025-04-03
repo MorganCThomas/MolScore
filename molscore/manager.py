@@ -1,4 +1,3 @@
-import atexit
 import json
 import logging
 import os
@@ -8,6 +7,7 @@ import subprocess
 import sys
 import time
 from typing import Optional, Union
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -243,11 +243,18 @@ class MolScore:
                 self.replay_buffer.load(
                     os.path.join(self.save_dir, "replay_buffer.csv")
                 )
-
-        # Registor write_scores and kill_monitor at close
-        atexit.register(self.write_scores)
-        atexit.register(self.kill_monitor)
         logger.info("MolScore initiated")
+        
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        """ Context teardown """
+        self.write_scores()
+        self.kill_monitor()
+        if exc_type:
+            print(f"Handled exception: {exc_value}")
+        return False
 
     def _set_objective(
         self,
@@ -644,6 +651,8 @@ class MolScore:
         df[self.cfg["scoring"]["method"]] = (
             df[self.cfg["scoring"]["method"]] * df["filter"]
         )
+        # Copy to an obvious Score column
+        df['Score'] = df[self.cfg["scoring"]["method"]].copy()
 
         return df
 
@@ -706,6 +715,8 @@ class MolScore:
                 for b, a in zip(df[self.cfg["scoring"]["method"]], filtered_scores)
             ]
             df[f"filtered_{self.cfg['scoring']['method']}"] = filtered_scores
+            # Copy to obvious score column
+            df['Score (reshaped)'] = filtered_scores
             df.fillna(1e-6)
         return df
 
@@ -902,9 +913,9 @@ class MolScore:
         # Apply diversity filter if specified
         if self.diversity_filter is not None:
             self.results_df = self.run_diversity_filter(self.results_df)
-            score_col = f"filtered_{self.cfg['scoring']['method']}"
+            score_col = "Score (reshaped)"
         else:
-            score_col = self.cfg["scoring"]["method"]
+            score_col = "Score"
             
         # Fetch scores
         scores = self.results_df.loc[:, score_col].tolist()
@@ -1106,7 +1117,7 @@ class MolScore:
         if self.replay_size:
             self.replay_buffer.update(
                 self.batch_df,
-                endpoint_key=self.cfg["scoring"]["method"],
+                endpoint_key="Score",
                 using_DF=bool(self.diversity_filter),
                 **molecular_inputs
             )
@@ -1118,10 +1129,10 @@ class MolScore:
         # ----- Fetch score ------
         if self.diversity_filter is not None:
             scores = self.batch_df.loc[
-                :, f"filtered_{self.cfg['scoring']['method']}"
+                :, "Score (reshaped)"
             ].tolist()
         else:
-            scores = self.batch_df.loc[:, self.cfg["scoring"]["method"]].tolist()
+            scores = self.batch_df.loc[:, "Score"].tolist()
         if not flt:
             scores = np.array(scores, dtype=np.float32)
         logger.debug(f"    Returning: {len(scores)} scores")
@@ -1164,7 +1175,7 @@ class MolScore:
         :return: List of SMILES and scores
         """
         return self.replay_buffer.sample(
-            n=n, endpoint_key=self.cfg["scoring"]["method"], molecule_key=molecule_key, augment=augment
+            n=n, endpoint_key="Score", molecule_key=molecule_key, augment=augment
         )
 
     def compute_metrics(
@@ -1196,7 +1207,7 @@ class MolScore:
             return self.metrics
         else:
             if endpoints is None:
-                endpoints = [self.cfg["scoring"]["method"]]
+                endpoints = ["Score"]
             else:
                 assert all([ep in self.main_df.columns for ep in endpoints])
             if thresholds is None:
@@ -1214,11 +1225,6 @@ class MolScore:
                 chemistry_filter_basic=chemistry_filter_basic,
                 include=include,                
             )
-            # Change the name of the default score to "Score"
-            results = {
-                k.replace(self.cfg["scoring"]["method"], "Score"): v
-                for k, v in results.items()
-            }
             self.metrics = results
             return self.metrics
 
@@ -1291,8 +1297,8 @@ class MolScoreBenchmark:
         self.replay_purge = replay_purge
         self.configs = []
         self.results = []
+        self.score_paths = []
         self.next = 0
-        atexit.register(self._summarize)
 
         # Process configs and tasks to run
         if self.benchmark:
@@ -1348,21 +1354,52 @@ class MolScoreBenchmark:
                 self.output_dir,
                 f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}",
             )
-
+            
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Context Teardown"""
+        self._write_results()
+        if exc_type:
+            print(f"Handled exception: {exc_value}")
+        return False
+    
+    @contextmanager
+    def _managed_task(self, config_path):
+        MS = MolScore(
+            model_name=self.model_name,
+            task_config=config_path,
+            output_dir=self.output_dir,
+            budget=self.budget,
+            termination_exit=False,
+            replay_size=self.replay_size,
+            replay_purge=self.replay_purge,
+        )
+        try:
+            with MS as scoring_function:
+                yield scoring_function
+        finally:
+            if MS.main_df is None:
+                print(f"Skipping summary of {MS.cfg['task']} as no results found")
+            else: 
+                metrics = MS.compute_metrics(
+                    budget=self.budget,
+                    benchmark=self.benchmark,
+                )
+                metrics.update(
+                    {
+                        "model_name": self.model_name,
+                        "model_parameters": self.model_parameters,
+                        "task": MS.cfg["task"],
+                    }
+                )
+                self.results.append(metrics)
+                self.score_paths.append(os.path.join(MS.save_dir, 'scores.csv'))
+                    
     def __iter__(self):
         for config_path in self.configs:
-            # Instantiate MolScore
-            MS = MolScore(
-                model_name=self.model_name,
-                task_config=config_path,
-                output_dir=self.output_dir,
-                budget=self.budget,
-                termination_exit=False,
-                replay_size=self.replay_size,
-                replay_purge=self.replay_purge,
-            )
-            self.results.append(MS)
-            yield MS
+            yield self._managed_task(config_path)
 
     def __len__(self):
         return len(self.configs)
@@ -1375,52 +1412,45 @@ class MolScoreBenchmark:
         n_jobs=1,
         include=['Valid', 'Unique'],
         reference_smiles=None,
+        overwrite=True,
     ):
         """
-        For each result, compute metrics and summary of all results
+        Manually summarize benchmark and write results
         """
         print("Calculating summary metrics")
-        results = []
+        if endpoints is None:
+            endpoints = ['Score']
+        self.results = []
         # Compute results
-        for MS in self.results:
-            if MS.main_df is None:
-                print(f"Skipping summary of {MS.cfg['task']} as no results found")
-                continue 
-            metrics = MS.compute_metrics(
-                endpoints=endpoints,
-                thresholds=thresholds,
-                chemistry_filter_basic=chemistry_filter_basic,
+        for score_path in self.score_paths:
+            if not os.path.exists(score_path):
+                print(f"Skipping summary of {score_path} as no results found")
+                continue
+            scores = pd.read_csv(score_path, index_col=0)
+            SM = ScoreMetrics(
+                scores=scores,
                 budget=self.budget,
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
-                include=include,
                 benchmark=self.benchmark,
             )
-            metrics.update(
-                {
-                    "model_name": self.model_name,
-                    "model_parameters": self.model_parameters,
-                    "task": MS.cfg["task"],
-                }
+            metrics = SM.get_metrics(
+                endpoints=endpoints,
+                thresholds=thresholds,
+                chemistry_filter_basic=chemistry_filter_basic,
+                include=include,                
             )
-            results.append(metrics)
-        # Save results
-        pd.DataFrame(results).to_csv(
-            os.path.join(self.output_dir, "results.csv"), index=False
-        )
-        # Print results
-        print(f"Preview of Results:\n{pd.DataFrame(results)}")
-        return results
-
-    def _summarize(self):
-        """
-        If results aren't saved, save just incase
-        """
-        if not os.path.exists(os.path.join(self.output_dir, "results.csv")):
-            results = self.summarize()
-            pd.DataFrame(results).to_csv(
+            self.results.append(metrics)
+        self._write_results(overwrite=overwrite)
+    
+    def _write_results(self, overwrite=False):
+        if not os.path.exists(os.path.join(self.output_dir, "results.csv")) or overwrite:
+            # Save results
+            pd.DataFrame(self.results).to_csv(
                 os.path.join(self.output_dir, "results.csv"), index=False
             )
+            # Print results
+            print(f"Preview of Results:\n{pd.DataFrame(pd.DataFrame(self.results))}")
 
 
 class MolScoreCurriculum(MolScore):

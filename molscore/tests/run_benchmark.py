@@ -13,12 +13,13 @@ def main(benchmark):
     MSB = MolScoreBenchmark(
         model_name="test", output_dir=output_directory, budget=10, benchmark=benchmark
     )
-    mg = MockGenerator(augment_invalids=True, augment_duplicates=True)
-    for task in tqdm(MSB, desc="Benchmark Objectives"):
-        while not task.finished:
-            smiles = mg.sample(10)
-            task.score(smiles)
-
+    with MSB as benchmark:
+        mg = MockGenerator(augment_invalids=True, augment_duplicates=True)
+        for task in tqdm(benchmark, desc="Benchmark Objectives"):
+            with task as scoring_function:
+                while not scoring_function.finished:
+                    smiles = mg.sample(10)
+                    scoring_function.score(smiles)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

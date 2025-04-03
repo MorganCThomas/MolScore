@@ -206,6 +206,7 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
             )
 
         if not pinfo["optional"] or add_optional:
+            st.write(pinfo)
             # No default
             if pinfo["default"] is None:
                 # If no type either, print warning and use text input
@@ -227,12 +228,15 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                             index=0,
                             key=f"{key_i}: {obj.__name__}_{p}_type",
                         )
-                    result_dict[p] = type2widget(
-                        pinfo["type"],
-                        key=f"{key_i}: {obj.__name__}_{p}",
-                        label=label,
-                        options=pinfo["options"],
-                    )
+                    if pinfo["type"] is None:
+                        result_dict[p] = None
+                    else:
+                        result_dict[p] = type2widget(
+                            pinfo["type"],
+                            key=f"{key_i}: {obj.__name__}_{p}",
+                            label=label,
+                            options=pinfo["options"],
+                        )
                     if pinfo["type"] == int:
                         result_dict[p] = int(result_dict[p])
 
@@ -249,13 +253,16 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                                 index=0,
                                 key=f"{key_i}: {obj.__name__}_{p}_type",
                             )
-                        result_dict[p] = type2widget(
-                            pinfo["type"],
-                            key=f"{key_i}: {obj.__name__}_{p}",
-                            default=pinfo["default"],
-                            label=label,
-                            options=pinfo["options"],
-                        )
+                        if pinfo["type"] is type(None):
+                            result_dict[p] = None
+                        else:
+                            result_dict[p] = type2widget(
+                                pinfo["type"],
+                                key=f"{key_i}: {obj.__name__}_{p}",
+                                default=pinfo["default"],
+                                label=label,
+                                options=pinfo["options"],
+                            )
                         # if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
 
                 # Otherwise use type of default
