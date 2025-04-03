@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import time
+import shutil
 from typing import Optional, Union
 from contextlib import contextmanager
 
@@ -740,6 +741,7 @@ class MolScore:
         Write final dataframe to file.
         """
         if self.main_df is not None:
+            # Save scores.csv
             if len(self.logged_parameters) > 0:
                 temp = self.main_df.copy()
                 for p, v in self.logged_parameters.items():
@@ -753,6 +755,10 @@ class MolScore:
                 self.main_df.to_csv(
                     os.path.join(self.save_dir, "scores.csv")
                 )  # save main csv
+            
+            # Delete iterations dir to help cleanup
+            if os.path.exists(os.path.join(self.save_dir, "iterations")):
+                shutil.rmtree(os.path.join(self.save_dir, "iterations"))
 
         if (self.diversity_filter is not None) and (
             isinstance(self.diversity_filter, scaffold_memory.ScaffoldMemory)
