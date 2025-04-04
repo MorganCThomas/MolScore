@@ -670,7 +670,7 @@ class MolScore:
                 "unique" in df.columns
             ), "Unique column not found in dataframe, cannot apply unique diversity filter"
             df[f"filtered_{self.cfg['scoring']['method']}"] = [
-                s if u == "true" else 0.0
+                s if u else 0.0
                 for u, s in zip(df["unique"], df[self.cfg["scoring"]["method"]])
             ]
             df["passes_diversity_filter"] = [
