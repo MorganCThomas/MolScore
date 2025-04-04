@@ -127,7 +127,7 @@ class MolScore:
         self.init_time = time.time()
         self.results_df = None # TODO make empty df ... 
         self.batch_df = None
-        self.exists_df = pd.DataFrame()
+        self.exists_map = {}
         self.main_df = None
         self.monitor_app = None
         self.diversity_filter = None
@@ -385,6 +385,7 @@ class MolScore:
         mol_ids: Optional[list] = None,
         smiles: Optional[list] = None,
         canonicalise_smiles: bool = True,
+        check_uniqueness: bool = True,
         **molecular_inputs,
     ):
         """
@@ -395,6 +396,7 @@ class MolScore:
         :param mol_ids: List of molecular identifiers, otherwise the numeric index will be used.
         :param smiles: List of smiles from a generative model
         :param canonicalise_smiles: Whether to canonicalise smiles using RDKit
+        :param check_uniqueness: Whether to check for uniqueness 
         """
         # Initialize df for batch
         _batch_size = len(smiles) if smiles else len(list(molecular_inputs.values())[0])
@@ -446,43 +448,27 @@ class MolScore:
                 self.batch_df["valid"] = valid
                 self.batch_df["valid_score"] = [1 if v else 0 for v in valid]
                 logger.debug(f"    Invalid molecules: {(~self.batch_df.valid).sum()}")
+                
+        else:
+            # NOTE/TODO: How should we check or bypass validity for 3D (inorganic) molecules?
+            # For now, we assume all 3D molecules are valid
+            self.batch_df["valid"] = True
+            self.batch_df["valid_score"] = 1
             
+        # Check for duplicates and count occurrences
+        if check_uniqueness:
+            self.batch_df["unique"] = True
+            self.batch_df["occurrences"] = 0
 
-        # Check for duplicates and count occurences
-        unique = list(~self.batch_df.mol_id.duplicated())
-        occurrences = [
-            self.batch_df.mol_id.iloc[:i][
-                self.batch_df.mol_id.iloc[:i] == self.batch_df.mol_id.iloc[i]
-            ].count()
-            for i in range(len(self.batch_df))
-        ]
-        # NOTE/TODO: How should we check or bypass validity for 3D (inorganic) molecules?
-        # For now, we assume all 3D molecules are valid
-        self.batch_df["valid"] = True
-        self.batch_df["valid_score"] = 1
-        
-        self.batch_df["unique"] = unique
-        self.batch_df["occurrences"] = occurrences
+            for idx, mol_id in zip(self.batch_df.index, self.batch_df["mol_id"]):
+                if mol_id in self.exists_map:
+                    self.batch_df.at[idx, "unique"] = False
+                    self.batch_df.at[idx, "occurrences"] = self.exists_map[mol_id]["count"]
+                    # Update exists_map
+                    self.exists_map[mol_id]["count"] += 1
+                else:
+                    self.exists_map[mol_id] = {"first_idx": idx, "count": 1}
 
-    def check_uniqueness(self):
-        """
-        Check batch_df smiles against main_df of any previously sampled smiles
-        :param mol_ids: If provided will check by mol_id.
-        """
-        # Pull duplicated mol_ids from the main_df
-        self.exists_df = self.main_df[
-            self.main_df.mol_id.isin(self.batch_df.mol_id.tolist())
-        ]
-
-        # Update unique and occurence columns
-        if len(self.exists_df) > 0:
-            for id in self.batch_df.mol_id.unique():
-                tdf = self.exists_df[self.exists_df.mol_id == id]
-                if len(tdf) > 0:
-                    self.batch_df.loc[self.batch_df.mol_id == id, "unique"] = False
-                    self.batch_df.loc[
-                        self.batch_df.mol_id == id, "occurrences"
-                    ] += len(tdf)
 
     def run_scoring_functions(
         self, batch_index: list, file_names: list,  mol_ids: Optional[list] = None, **molecular_inputs,):
@@ -518,7 +504,9 @@ class MolScore:
         Merge results_df with batch_df. Only used for the first step/batch.
         """
         logger.debug("    Merging results to batch df")
-        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False)
+        original_index = self.batch_df.index
+        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False).infer_objects()
+        self.batch_df.index = original_index
         self.batch_df.fillna(0.0, inplace=True)
 
     def concurrent_update(self):
@@ -526,32 +514,39 @@ class MolScore:
         Merge results_df with batch_df and look up duplicated entries to avoid re-calculating.
         :param mol_ids: If provided will check by mol_id.
         """
-        # Update results_df with prexisting scores for duplicates
-        if len(self.exists_df) > 0:
-            self.exists_df = self.exists_df.drop_duplicates(subset="mol_id")
-            self.exists_df = self.exists_df.loc[:, self.results_df.columns]
-                
-            # Check duplicated values in exists and results df
-            dup_idx = self.exists_df.loc[
-                self.exists_df.mol_id.isin(self.results_df.mol_id), :
-            ].index.tolist()
-            if len(dup_idx) > 0:
-                self.exists_df.drop(index=dup_idx, inplace=True)
-            # Append to results, assuming no duplicates in results_df...
+        # Get duplicated entries
+        duplicate_mol_ids = set(self.batch_df.loc[~self.batch_df["unique"], "mol_id"].unique())
+        results_mol_ids = set(self.results_df["mol_id"].unique())
+        duplicate_mol_ids = duplicate_mol_ids - results_mol_ids
+        results_columns = self.results_df.columns
+        
+        if len(duplicate_mol_ids) > 0:
+            # Get main idxs of duplicates mol_ids
+            dup_idxs = [self.exists_map[mol_id]["first_idx"] for mol_id in duplicate_mol_ids]
+            
+            # Get main data and merge with results
+            exists_df = self.main_df.loc[dup_idxs, results_columns]
             self.results_df = pd.concat(
-                [self.results_df, self.exists_df],
+                [self.results_df, exists_df],
                 axis=0,
                 ignore_index=True,
                 sort=False,
             )
-            
-        # Drop duplicate columns except primary key
-        columns_to_drop = [col for col in self.results_df.columns if col in self.batch_df.columns and col != "mol_id"]
-        self.results_df = self.results_df.drop(columns=columns_to_drop, axis=1)
-
-        # Merge with batch_df
+        
+        # Drop overlapping columns before merge (except mol_id)
+        columns_to_drop = [
+            col for col in results_columns
+            if col in self.batch_df.columns and col != "mol_id"
+        ]
+        self.results_df.drop(columns=columns_to_drop, axis=1, inplace=True)
+        
+        # Merge into batch_df
         logger.debug("    Merging results to batch df")
-        self.batch_df = self.batch_df.merge(self.results_df, on="mol_id", how="left", sort=False)
+        original_index = self.batch_df.index
+        self.batch_df = self.batch_df.merge(
+            self.results_df, on="mol_id", how="left", sort=False
+        ).infer_objects()
+        self.batch_df.index = original_index
         self.batch_df.fillna(0.0, inplace=True)
 
     def update_maxmin(self, df):
@@ -785,7 +780,6 @@ class MolScore:
                     os.path.join(self.save_dir, f"replay_buffer_{step}.csv")
                 )
             self.batch_df.to_csv(os.path.join(self.save_dir, f"batch_df_{step}.csv"))
-            self.exists_df.to_csv(os.path.join(self.save_dir, f"exists_df_{step}.csv"))
             self.results_df.to_csv(
                 os.path.join(self.save_dir, f"results_df_{step}.csv")
             )
@@ -912,7 +906,7 @@ class MolScore:
         _batch_size = [len(v) for v in molecular_inputs.values()][0]
         logger.info(f"   Scoring: {_batch_size} molecular inputs")
         
-        # Parse inputs to scoring function
+        # Pass inputs to scoring function
         _process_batch_idxs = list(range(_batch_size))
         file_names = [f"{self.step}_{i}" for i in _process_batch_idxs]
         self.run_scoring_functions(
@@ -921,7 +915,7 @@ class MolScore:
             **molecular_inputs,
         )
         logger.info(
-            f"    Score returned for {len(self.results_df)} SMILES in {time.time() - batch_start:.02f}s"
+            f"    Score returned for {len(self.results_df)} mols in {time.time() - batch_start:.02f}s"
         )
         
         # Compute final fitness score
@@ -945,7 +939,6 @@ class MolScore:
 
         # Clean up class
         self.batch_df = None
-        self.exists_df = pd.DataFrame()
         self.results_df = None
         return scores
 
@@ -973,6 +966,7 @@ class MolScore:
         :param recalculate: Whether to pass duplicated mol_ids to the scoring functions again,
           may be desirable if the scoring function is somewhat stochastic.
           (default False i.e. re-use existing scores for duplicated molecules to save)
+        :param check_uniqueness: Whether to check for uniqueness of the input molecules
         :param score_only: Whether to cache molecular data or simply score inputs and return scores
         :param molecular_inputs: Score accepts arbitrary keyword arguments of molecular representations that will be passed to scoring functions
         :return: Scores (either float list or np.array)
@@ -1029,17 +1023,13 @@ class MolScore:
             mol_ids=mol_ids,
             step=self.step,
             canonicalise_smiles=canonicalise_smiles,
+            check_uniqueness=check_uniqueness,
             **molecular_inputs,
         )
         # Maybe update molecular inputs with canonical SMILES
         if smiles and canonicalise_smiles:
             molecular_inputs["smiles"] = self.batch_df["smiles"].tolist()
         logger.debug(f"    Pre-processed: {len(self.batch_df)} molecular inputs")
-
-        # ----- Check if molecules have already been sampled -----
-        if isinstance(self.main_df, pd.core.frame.DataFrame):
-            self.check_uniqueness()
-            logger.debug(f"    Uniqueness updated: {len(self.batch_df)} molecular inputs")
 
         # ----- Subset only the required molecular inputs to pass to scoring functions ----
         # Update batch indices
@@ -1182,7 +1172,6 @@ class MolScore:
         # ----- Clean up class -----
         self.evaluate_finished()
         self.batch_df = None
-        self.exists_df = pd.DataFrame()
         self.results_df = None
 
         return scores

@@ -180,31 +180,37 @@ class ScoreMetrics:
         len_all = len(scores)
         
         # Truncate to valid only molecules and calculate valid ratio
-        if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
-            valid_value = "true" # Back compatability
-        elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
-            valid_value = True
+        if 'valid' in scores.columns:
+            if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
+                valid_value = "true" # Back compatability
+            elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
+                valid_value = True
+            else:
+                raise ValueError("Valid column has un unrecognised dtype")
+            if valid:
+                scores = scores.loc[scores.valid == valid_value]
+                self.valid_ratio = len(scores) / len_all
+            else:
+                self.valid_ratio = (scores.valid == valid_value).sum() / len_all
         else:
-            raise ValueError("Valid column has un unrecognised dtype")
-        if valid:
-            scores = scores.loc[scores.valid == valid_value]
-            self.valid_ratio = len(scores) / len_all
-        else:
-            self.valid_ratio = (scores.valid == valid_value).sum() / len_all
+            self.valid_ratio = np.NaN
         len_valid = len(scores)
             
         # Truncate to unique only molecules and calculate unique ratio
-        if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
-            unique_value = "true" # Back compatability
-        elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
-            unique_value = True
+        if 'unique' in scores.columns:
+            if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
+                unique_value = "true" # Back compatability
+            elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
+                unique_value = True
+            else:
+                raise ValueError("Unique column has un unrecognised dtype")
+            if unique:
+                scores = scores.loc[scores.unique == unique_value]
+                self.unique_ratio = len(scores) / len_valid
+            else:
+                self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
         else:
-            raise ValueError("Unique column has un unrecognised dtype")
-        if unique:
-            scores = scores.loc[scores.unique == unique_value]
-            self.unique_ratio = len(scores) / len_valid
-        else:
-            self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
+            self.unique_ratio = np.NaN
             
         # Add scaffold column if not present
         if "smiles" in scores.columns:

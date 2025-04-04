@@ -23,8 +23,8 @@ def main(configs: list):
         with ms as scoring_function:
             # Score 5 smiles 5 times
             for i in tqdm(range(5)):
-                _ = scoring_function(mg.sample(5))
-        print(f"Output:\n{ms.main_df.head(10)}\n")
+                _ = scoring_function(mg.sample(10))
+        print(f"Output:\n{ms.main_df.head(15)}\n")
     return
 
 
