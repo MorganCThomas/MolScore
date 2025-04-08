@@ -4,7 +4,13 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from molbloom import buy
+try:
+    from molbloom import buy
+    _has_molbloom = True
+except (ImportError, TypeError) as e:
+    print(f"Molbloom incompatible, skipping purchasability score: {e}")
+    _has_molbloom = False
+    
 from rdkit import DataStructs
 
 from moleval.metrics.chemistry_filters import ChemistryBuffer, ChemistryFilter
@@ -945,7 +951,7 @@ class ScoreMetrics:
                 ]
             )
         # Purchasability (MolBloom)
-        if ("Predicted Purchasability" in include) and ("Predicted Purchasability" not in metrics):
+        if ("Predicted Purchasability" in include) and ("Predicted Purchasability" not in metrics) and _has_molbloom:
             metrics["Predicted Purchasability"] = np.mean(
                 mapper(self.n_jobs)(buy, self.scores.smiles.tolist())
             )
