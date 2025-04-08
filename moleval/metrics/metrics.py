@@ -13,7 +13,12 @@ from scipy.stats import wasserstein_distance
 from scipy import linalg
 from rdkit.Chem import DataStructs
 
-from molbloom import buy
+try:
+    from molbloom import buy
+    _has_molbloom = True
+except (ImportError, TypeError) as e:
+    print(f"Molbloom incompatible, skipping purchasability score: {e}")
+    _has_molbloom = False
 
 from moleval.utils import disable_rdkit_log, enable_rdkit_log
 from moleval.metrics.fcd_torch import FCD as FCDMetric
@@ -269,8 +274,9 @@ class GetMetrics(object):
         add_metric('Filters', fraction_passes_filters(mols, self.pool, normalize=self.normalize))
 
         # Calculate purchasability
-        purchasable = mapper(self.pool)(buy, gen)
-        add_metric('Purchasable_ZINC20', np.mean(purchasable) if self.normalize else np.sum(purchasable))
+        if _has_molbloom:
+            purchasable = mapper(self.pool)(buy, gen)
+            add_metric('Purchasable_ZINC20', np.mean(purchasable) if self.normalize else np.sum(purchasable))
 
         # ---- PoseCheck metrics ----
         if self.target_structure and _posecheck_available:
