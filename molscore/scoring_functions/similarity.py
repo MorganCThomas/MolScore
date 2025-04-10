@@ -41,7 +41,7 @@ class MolecularSimilarity:
         thresh: float = None,
         method: str = "mean",
         n_jobs: int = 1,
-        timeout: int = 60,
+        timeout: int = None,
         **kwargs,
     ):
         """
@@ -167,7 +167,10 @@ class MolecularSimilarity:
         :param kwargs: Ignored
         :return: List of dicts i.e. [{'smiles': smi, 'metric': 'value', ...}, ...]
         """
-        tfunc = timedFunc2(self._score, timeout=self.timeout)
+        if self.timeout:
+            tfunc = timedFunc2(self._score, timeout=self.timeout)
+        else:
+            tfunc = self._score
         results = tfunc(smiles)
         if results is None:
             logger.warning(
