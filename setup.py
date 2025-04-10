@@ -31,6 +31,7 @@ setup(
         #"scikit-learn == 1.1.3",
         "torch",
         #"zenodo-client",
+        "scipy",
         "levenshtein",
         "streamlit-plotly-events == 0.0.6",
         "streamlit >= 1.11.0",
