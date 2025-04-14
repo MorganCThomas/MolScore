@@ -122,6 +122,7 @@ class MolScore:
 
         # Here are attributes used
         self.model_name = model_name.replace(" ", "_")
+        self.name = self.cfg["task"].replace(" ", "_")
         self.step = 0
         self.current_idx = 0
         self.budget = budget
