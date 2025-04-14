@@ -187,9 +187,10 @@ class ScoreMetrics:
         
         # Truncate to valid only molecules and calculate valid ratio
         if 'valid' in scores.columns:
-            if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
+            # NOTE: np.issubdtype has broader version compatibility
+            if np.issubdtype(scores.valid.dtype, np.object_):
                 valid_value = "true" # Back compatability
-            elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
+            elif np.issubdtype(scores.valid.dtype, np.bool_):
                 valid_value = True
             else:
                 raise ValueError("Valid column has un unrecognised dtype")
@@ -204,9 +205,9 @@ class ScoreMetrics:
             
         # Truncate to unique only molecules and calculate unique ratio
         if 'unique' in scores.columns:
-            if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
+            if np.issubdtype(scores.unique.dtype, np.object_):
                 unique_value = "true" # Back compatability
-            elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
+            if np.issubdtype(scores.unique.dtype, np.bool_):
                 unique_value = True
             else:
                 raise ValueError("Unique column has un unrecognised dtype")
