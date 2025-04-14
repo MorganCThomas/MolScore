@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 import shutil
-from typing import Optional, Union
+from typing import Optional, Union, List
 from contextlib import contextmanager
 
 import numpy as np
@@ -57,13 +57,25 @@ class MolScore:
         }
     
     @staticmethod
-    def load_config(task_config):
+    def load_config(task_config: os.PathLike):
         assert os.path.exists(
             task_config
         ), f"Configuration file {task_config} doesn't exist"
         with open(task_config, "r") as f:
             configs = f.read().replace("\r", "").replace("\n", "").replace("\t", "")
         return json.loads(configs)
+    
+    @staticmethod
+    def parse_path(path: Union[os.PathLike, List[str]]) -> os.PathLike:
+        "Convert path or resource-like path to absolute path"
+        if isinstance(path, list):
+            # It's a resource type
+            assert len(path) == 2, f"Path {path} is not a valid resource-like path containing two items"
+            return str(resources.files(path[0]).joinpath(path[1]))
+        else:
+            # It's path like
+            assert os.path.exists(path), f"Path {path} doesn't exist"
+            return os.path.abspath(path)
 
     def __init__(
         self,
@@ -107,7 +119,7 @@ class MolScore:
             self.cfg = self.load_config(task_config)
 
         # Here are attributes used
-        self.model_name = model_name
+        self.model_name = model_name.replace(" ", "_")
         self.step = 0
         self.current_idx = 0
         self.budget = budget
@@ -133,6 +145,7 @@ class MolScore:
         self.diversity_filter = None
         self.call2score_warning = True
         self.metrics = None
+        self.starting_population = self.parse_path(self.cfg.get("starting_population", None))
         self.logged_parameters = {}  # Extra parameters to write out in scores.csv for comparative purposes
         self.temp_parameters = {} # Temp parameters to write out each iteration in scores.csv for comparative purposes
 
@@ -141,9 +154,9 @@ class MolScore:
             run_name = self.cfg["task"].replace(" ", "_")
         self.run_name = "_".join(
             [
-                time.strftime("%Y_%m_%d", time.localtime()),
                 self.model_name,
                 run_name,
+                time.strftime("%Y_%m_%d", time.localtime()),
             ]
         )
         if output_dir is not None:
@@ -309,6 +322,9 @@ class MolScore:
                 pass
         if len(self.scoring_functions) == 0:
             logger.warning("No scoring functions assigned")
+            
+        # Set / reset
+        self.starting_population = self.parse_path(self.cfg.get("starting_population", None))
 
         # Setup aggregation/mpo methods
         for func in utils.all_score_methods:
@@ -413,12 +429,22 @@ class MolScore:
         # Add indexes
         self.batch_df["batch_idx"] = _batch_idx
         self.batch_df["mol_id"] = mol_ids if mol_ids else _running_idx
+        
+        # NOTE/TODO: How should we check or bypass validity for 3D (inorganic) molecules?
+        # For now, we assume all 3D molecules are valid
+        self.batch_df["valid"] = True
+        self.batch_df["valid_score"] = 1
 
         # Parse SMILES if present
         if smiles:
             parsed_smiles = []
             valid = []
             for smi in smiles:
+                if not smi: # If None or empty string
+                    parsed_smiles.append(None)
+                    valid.append(False)
+                    continue
+                    
                 if canonicalise_smiles:
                     try:
                         can_smi = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
@@ -438,22 +464,16 @@ class MolScore:
 
                 else:
                     parsed_smiles.append(smi)
+                    valid.append(True) # Assume valid
 
             self.batch_df["smiles"] = parsed_smiles
             # Maybe set mol_id as canonical SMILES
             if smiles and canonicalise_smiles and not mol_ids:
                 self.batch_df["mol_id"] = self.batch_df["smiles"].copy()
-            # Check for SMILES validity
-            if valid:
-                self.batch_df["valid"] = valid
-                self.batch_df["valid_score"] = [1 if v else 0 for v in valid]
-                logger.debug(f"    Invalid molecules: {(~self.batch_df.valid).sum()}")
-                
-        else:
-            # NOTE/TODO: How should we check or bypass validity for 3D (inorganic) molecules?
-            # For now, we assume all 3D molecules are valid
-            self.batch_df["valid"] = True
-            self.batch_df["valid_score"] = 1
+            # Update for SMILES validity
+            self.batch_df["valid"] = valid
+            self.batch_df["valid_score"] = [1 if v else 0 for v in valid]
+            logger.debug(f"    Invalid molecules: {(~self.batch_df.valid).sum()}")
             
         # Check for duplicates and count occurrences
         if check_uniqueness:
@@ -518,11 +538,14 @@ class MolScore:
         duplicate_mol_ids = set(self.batch_df.loc[~self.batch_df["unique"], "mol_id"].unique())
         results_mol_ids = set(self.results_df["mol_id"].unique())
         duplicate_mol_ids = duplicate_mol_ids - results_mol_ids
+        # Get results columns
         results_columns = self.results_df.columns
         
         if len(duplicate_mol_ids) > 0:
             # Get main idxs of duplicates mol_ids
             dup_idxs = [self.exists_map[mol_id]["first_idx"] for mol_id in duplicate_mol_ids]
+            # Drop any idxs equal or above self.current_idx not in main_df yet, these will be populated in merge
+            dup_idxs = [idx for idx in dup_idxs if idx < self.current_idx]  
             
             # Get main data and merge with results
             exists_df = self.main_df.loc[dup_idxs, results_columns]
@@ -1349,10 +1372,18 @@ class MolScoreBenchmark:
 
         # Add benchmark directory
         if add_benchmark_dir:
-            self.output_dir = os.path.join(
-                self.output_dir,
-                f"{time.strftime('%Y_%m_%d', time.localtime())}_{self.model_name}_benchmark{time.strftime('_%H_%M_%S', time.localtime())}",
-            )
+            if self.benchmark:
+                self.output_dir = os.path.join(
+                    self.output_dir,
+                    f"{benchmark}_{self.model_name}_{time.strftime('%Y_%m_%d-%H_%M_%S', time.localtime())}",
+                )
+            else:
+                self.output_dir = os.path.join(
+                    self.output_dir,
+                    f"Benchmark_{self.model_name}_{time.strftime('%Y_%m_%d-%H_%M_%S', time.localtime())}",
+                )
+                
+        os.makedirs(self.output_dir, exist_ok=True)
             
     def __enter__(self):
         return self

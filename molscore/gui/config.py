@@ -578,6 +578,22 @@ config["monitor_app"] = st.checkbox(
     key="monitor_app",
 )
 
+# ------ Starting population ------
+config["starting_population"] = None
+specify_starting_population = st.checkbox(
+    label="Specify a starting population",
+    value=False,
+    help="File path to the starting population. This file path will be made available to the algorithm via the MolScore.starting_population.",
+    key="starting_population_optional",
+)
+if specify_starting_population:
+    config["starting_population"] = st_file_selector(
+        label="Select a file",
+        st_placeholder=st.empty(),
+        path="./",
+        key="starting_population_path",
+    )
+
 # ------ Termination criteria ------
 st.markdown("#")  # Add spacing
 st.subheader("Termination criteria")

@@ -1,5 +1,6 @@
 {
   "task": "Ranolazine_MPO",
+  "starting_population": ["molscore.configs.GuacaMol", "Ranolazine.smi"],
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
