@@ -706,7 +706,6 @@ class MolScore:
                     df[f"filtered_{self.cfg['scoring']['method']}"],
                 )
             ]
-            df.fillna(1e-6)
 
         elif self.diversity_filter == "Occurrence":
             assert (
@@ -749,9 +748,11 @@ class MolScore:
                 for b, a in zip(df[self.cfg["scoring"]["method"]], filtered_scores)
             ]
             df[f"filtered_{self.cfg['scoring']['method']}"] = filtered_scores
-            # Copy to obvious score column
-            df['Score (reshaped)'] = filtered_scores
-            df.fillna(1e-6)
+        
+        # Copy to obvious score column
+        df['Score (reshaped)'] = df[f"filtered_{self.cfg['scoring']['method']}"].copy()
+        df.fillna(1e-6)
+        
         return df
 
     def log_parameters(self, parameters: dict):
@@ -877,6 +878,8 @@ class MolScore:
         task_df = self.main_df.loc[self.main_df.task == self.cfg["task"]]
 
         # Based on budget
+        # TODO Only account for valid / unique (budget_invalid=False, budget_duplicate=False)
+        # TODO update score metrics to account for this.
         if self.budget and (len(task_df) >= self.budget):
             self.finished = True
             return
