@@ -114,7 +114,7 @@ def mpo_plot(main_df, SS, dock_path=False):
             max_value=int(main_df.step.max()),
             value=int(main_df.step.max()),
         )
-    tdf = main_df.loc[(main_df.valid == "true") & (main_df.unique == True), :].copy()
+    tdf = main_df.loc[(main_df.valid == True) & (main_df.unique == True), :].copy()
 
     # Plot graph
     selection = plotly_mpo_events(tdf[tdf.step == step_idx], x_variables, step=step_idx)

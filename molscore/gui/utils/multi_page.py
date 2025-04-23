@@ -26,7 +26,7 @@ def multi_plot(main_df, SS):
 
     tdf = main_df
     if valid_only:
-        tdf = tdf.loc[tdf.valid == "true", :]
+        tdf = tdf.loc[tdf.valid == True, :]
     if unique_only:
         tdf = tdf.loc[tdf.unique == True, :]
 
