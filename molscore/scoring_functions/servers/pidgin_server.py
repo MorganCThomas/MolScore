@@ -114,7 +114,7 @@ def compute():
     # Return early if there's no results
     if len(fps) == 0:
         for r in results:
-            r.update({"{name}": 0.0 for name in model.model_names})
+            r.update({f"{name}": 0.0 for name in model.model_names})
             r.update({"pred_proba": 0.0})
         return jsonify(results)
 
