@@ -43,7 +43,7 @@ class Model:
         self.uniprots = uniprots
         self.thresh = thresh
         self.full_thresh = re.sub("01", "0.1", thresh)
-        self.full_thresh = thresh[:-2] + " " + thresh[-2:]
+        self.full_thresh = self.full_thresh[:-2] + " " + self.full_thresh[-2:]
         self.binarise = binarise
         self.n_jobs = n_jobs
         self.mapper = Pool(self.n_jobs, return_map=True)

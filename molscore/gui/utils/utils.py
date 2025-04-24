@@ -339,7 +339,6 @@ def plotly_plot(
     y, main_df, size=(1000, 500), x="step", trendline="median", trendline_only=False
 ):
     if y in ["valid", "unique"]:
-        st.write(f"Plotting {y} as ratio")
         if x == "index":
             x = "idx"
             main_df = main_df.copy()
