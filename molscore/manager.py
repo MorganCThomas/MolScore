@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import shutil
+from pathlib import Path
 from typing import Optional, Union, List
 from contextlib import contextmanager
 
@@ -52,7 +53,7 @@ class MolScore:
     presets = PRESETS
 
     preset_tasks = {
-        k:[p.name.strip(".json") for p in v.glob("*.json")] 
+        k:[p.stem for p in v.glob("*.json")] 
         for k, v in presets.items()
         }
     
@@ -1353,8 +1354,8 @@ class MolScoreBenchmark:
         if self.include:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.include) or (name.strip(".json") in self.include):
+                name = Path(config).stem
+                if (name in self.include) or (name in self.include):
                     continue
                 else:
                     exclude.append(config)
@@ -1364,8 +1365,8 @@ class MolScoreBenchmark:
         if self.exclude:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.exclude) or (name.strip(".json") in self.exclude):
+                name = Path(config).stem
+                if (name in self.exclude) or (name in self.exclude):
                     exclude.append(config)
             for config in exclude:
                 self.configs.remove(config)
@@ -1580,8 +1581,8 @@ class MolScoreCurriculum(MolScore):
         if self.include:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.include) or (name.strip(".json") in self.include):
+                name = Path(config).stem
+                if (name in self.include) or (name in self.include):
                     continue
                 else:
                     exclude.append(config)
@@ -1591,8 +1592,8 @@ class MolScoreCurriculum(MolScore):
         if self.exclude:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.exclude) or (name.strip(".json") in self.exclude):
+                name = Path(config).stem
+                if (name in self.exclude) or (name in self.exclude):
                     exclude.append(config)
             for config in exclude:
                 self.configs.remove(config)
