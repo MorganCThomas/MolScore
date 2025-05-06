@@ -42,6 +42,7 @@ PRESETS = {
         ),
         "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
+        "3D_Benchmark": resources.files("molscore.configs.3D_Benchmark"),    
     }
 
 
