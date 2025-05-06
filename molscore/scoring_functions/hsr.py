@@ -4,14 +4,16 @@ from typing import Union
 from openbabel import pybel as pb
 import numpy as np
 from functools import partial
-# from molscore.scoring_functions.utils import Pool
 import multiprocessing
 from multiprocessing import Pool
 from rdkit import Chem
 from hsr import pre_processing as pp
 from hsr import fingerprint as fp
 from hsr import similarity as sim
-from hsr.utils import PROTON_FEATURES
+from hsr.utils import PROTON_FEATURES, extract_proton_number, extract_formal_charge
+import importlib.resources as pkg_resources
+import molscore.configs
+
 
 logger = logging.getLogger("HSR")
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -19,6 +21,42 @@ logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 logger.addHandler(ch)
+
+MOLSCORE_PATH = str(pkg_resources.files(molscore.configs))
+
+P_Q_FEATURES = {
+    'protons' : extract_proton_number,
+    'formal_charges' : extract_formal_charge
+    }
+
+def component_of_interest(molecule):
+    components = molecule.components
+    properties = []
+    
+    for comp in components:
+        is_organometallic = comp.is_organometallic
+        molecular_weight = sum(atom.atomic_weight for atom in comp.atoms)
+        atom_count = len(comp.atoms)
+        
+        properties.append({
+            "component": comp,
+            "is_organometallic": is_organometallic,
+            "molecular_weight": molecular_weight,
+            "atom_count": atom_count
+        })
+    
+    heaviest_component = max(properties, key=lambda x: x["molecular_weight"])
+    most_atoms_component = max(properties, key=lambda x: x["atom_count"])
+    
+    for prop in properties:
+        criteria_met = sum([
+            prop["is_organometallic"],
+            prop["component"] == heaviest_component["component"],
+            prop["component"] == most_atoms_component["component"]
+        ])
+        if criteria_met >= 2 and prop["atom_count"] >= 5:
+            return prop["component"]
+    return None
 
 def import_ccdc():
     """
@@ -46,26 +84,6 @@ def import_ccdc():
     # Return None for all if import fails
     return None, None, None
 
-def get_array_from_pybelmol(pybelmol):
-    # Iterate over the atoms in the molecule
-    atom_array = []
-    for atom in pybelmol.atoms:
-        # Append the coordinates and the atomic number of the atom (on each row)
-        atom_array.append([atom.coords[0], atom.coords[1], atom.coords[2], atom.atomicnum])    
-    # Centering the data
-    atom_array -= np.mean(atom_array, axis=0)
-    return atom_array
-
-def get_array_from_ccdcmol(ccdcmol):
-    # Iterate over the atoms in the molecule
-    atom_array = []
-    for atom in ccdcmol.atoms:
-        # Append the coordinates and the atomic number of the atom (on each row)
-        atom_array.append([atom.coordinates[0], atom.coordinates[1], atom.coordinates[2], atom.atomic_number])    
-    # Centering the data
-    atom_array -= np.mean(atom_array, axis=0)
-    return atom_array
-
 class HSR:
     """
     HSR (Hypershape Recognition) similarity method
@@ -80,7 +98,9 @@ class HSR:
         generator: str,  
         n_jobs: int = 1,    
         timeout: int = 10,
-        save_files: bool = False 
+        save_files: bool = False, 
+        use_charges_in_fp: bool = False
+
     ):
         """
         Initialize HSR similarity measure
@@ -91,33 +111,144 @@ class HSR:
         :param n_jobs: Number of parralel jobs (number of molecules to score in parallel)
         :param timeout: Timeout value for the 3D generation process (in seconds)
         :param save_files: Save the 3D coordinates of the molecules in a file
+        :param use_charges_in_fp: Considers also the formal charge of the atoms to construct the fingerprint
         """
         
         self.prefix = prefix.strip().replace(" ", "_")
-        
         self.generator = generator
         self.n_jobs = n_jobs
         self.timeout = timeout
         self.save_files = save_files
+        self.use_charges = use_charges_in_fp
+        self.feature_set = P_Q_FEATURES if self.use_charges else PROTON_FEATURES
+
+        
         if self.generator == 'ccdc':
             self.io, self.conformer, self.ccdcMolecule = import_ccdc()
-            #Read molecule from file 
-            ref_mol = self.io.MoleculeReader(ref_molecule)[0]
-            ref_mol_array = get_array_from_ccdcmol(ref_mol)
-            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
+        
+        # Resolve absolute or relative paths
+        if isinstance(ref_molecule, str):
+            if os.path.isabs(ref_molecule):
+                self.ref_molecule_path = ref_molecule  # Absolute path, use directly
+            else:
+                self.ref_molecule_path = os.path.join(MOLSCORE_PATH, ref_molecule)  # Resolve relative path
+        else:
+            self.ref_molecule_path = ref_molecule  # Keep as is if not a string
+
+        # Check if ref_molecule exists and determine initialization method
+        if isinstance(ref_molecule, str) and os.path.exists(self.ref_molecule_path):
+            if self.ref_molecule_path.endswith(".txt"):
+                self._initialize_from_txt(self.ref_molecule_path)  # Handle Benchmark case
+            else:
+                self._initialize_from_3d_file(self.ref_molecule_path)  # Handle 3D molecule file
+        elif isinstance(ref_molecule, str) and ":" in ref_molecule:
+            # If the input contains ":", assume it's a SMILES (SMILES can't be a valid file path)
+            self._initialize_from_smiles(ref_molecule)
+        elif isinstance(ref_molecule, str) and not os.path.exists(self.ref_molecule_path):
+            raise FileNotFoundError(
+                f"Reference molecule file '{self.ref_molecule_path}' does not exist."
+            )
+        else:
+            # Provide detailed error message based on issue type
+            if not isinstance(ref_molecule, (str, os.PathLike)):
+                raise TypeError(
+                    f"Reference molecule must be a string (SMILES or file path) or a valid file path. Got: {type(ref_molecule)}"
+                )
+            elif self.generator not in ["rdkit", "obabel", "ccdc", "None"]:
+                raise ValueError(
+                    f"Invalid generator '{self.generator}'. Supported options: 'rdkit', 'obabel', 'ccdc', or 'None'."
+                )
+            else:
+                raise ValueError(
+                    f"Reference molecule '{ref_molecule}' is not recognized. "
+                    "Ensure it is a valid SMILES, a properly formatted .txt benchmark file, or a supported 3D file (.sdf, .mol, .pdb, etc.)."
+                )
+    def get_array_from_ccdcmol(self, ccdcmol):
+        atom_array = []
+        for atom in ccdcmol.atoms:
+            coords = [atom.coordinates[0], atom.coordinates[1], atom.coordinates[2], np.sqrt(atom.atomic_number)]
+            if self.use_charges:
+                coords.append(atom.formal_charge)
+            atom_array.append(coords)
+        atom_array = np.array(atom_array)
+        atom_array -= np.mean(atom_array, axis=0)
+        return atom_array
+
+    def get_array_from_pybelmol(self, pybelmol):
+        atom_array = []
+        for atom in pybelmol.atoms:
+            coords = [atom.coords[0], atom.coords[1], atom.coords[2], np.sqrt(atom.atomicnum)]
+            if self.use_charges:
+                coords.append(atom.formalcharge)
+            atom_array.append(coords)
+        atom_array = np.array(atom_array)
+        atom_array -= np.mean(atom_array, axis=0)
+        return atom_array
+             
+    def _initialize_from_smiles(self, smiles):
+        if self.generator == 'ccdc':
+            raise ValueError("CCDC generator does not support SMILES input directly.")
         elif self.generator == 'obabel':
-            #Read molecule from file (sdf)
-            ref_mol = next(pb.readfile("sdf", ref_molecule))
-            ref_mol_array = get_array_from_pybelmol(ref_mol)
-            self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
-        elif self.generator == 'rdkit' or self.generator == 'None':
-            self.ref_molecule = pp.read_mol_from_file(ref_molecule)
-            if self.ref_molecule is None:
-                raise ValueError("Reference molecule is None. Check if the extension of the file is managed by HSR")
-            self.ref_mol_fp = fp.generate_fingerprint_from_molecule(self.ref_molecule, PROTON_FEATURES)
-        else:   
-            raise ValueError(f"Generator '{self.generator}' not supported. Please choose between 'rdkit', 'obabel', 'ccdc' or 'None'")
+            ref_mol = pb.readstring("smi", smiles)
+            ref_mol.addh()
+            ref_mol.make3D()
+            ref_mol.localopt()
+            ref_mol_array = self.get_array_from_pybelmol(ref_mol)
+        else:  # RDKit
+            mol = Chem.MolFromSmiles(smiles)
+            mol = Chem.AddHs(mol)
+            Chem.AllChem.EmbedMolecule(mol)
+            Chem.AllChem.MMFFOptimizeMolecule(mol)
+            ref_mol_array = pp.molecule_to_ndarray(mol, self.feature_set)
+        
+        self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
+    
+    def _initialize_from_txt(self, txt_file):
+        with open(txt_file, 'r') as f:
+            raw = f.readline().strip()
             
+        fields = raw.split()
+        csd_entry, smiles = fields[:2]           
+        fp_string = " ".join(fields[2:]).strip("[]")
+        # Remove dependency on CCDC for the targets
+        if self.ccdcMolecule is None:
+            self.ref_mol_fp = [float(x) for x in fp_string.split(",")]
+            return
+
+        if self.generator == 'ccdc':
+            ref_mol = component_of_interest(self.io.EntryReader('CSD').entry(csd_entry).molecule)
+            ref_mol_array = self.get_array_from_ccdcmol(ref_mol)
+        elif self.generator == 'obabel':
+            ref_mol = pb.readstring("smi", smiles)
+            ref_mol.addh()
+            ref_mol.make3D()
+            ref_mol.localopt()
+            ref_mol_array = self.get_array_from_pybelmol(ref_mol)
+        else:  # RDKit
+            mol = Chem.MolFromSmiles(smiles)
+            mol = Chem.AddHs(mol)
+            Chem.AllChem.EmbedMolecule(mol)
+            Chem.AllChem.MMFFOptimizeMolecule(mol)
+            ref_mol_array = fp.generate_fingerprint_from_molecule(mol, self.feature_set)
+        
+        self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
+    
+    def _initialize_from_3d_file(self, file_path):
+        ext = os.path.splitext(file_path)[-1].lower()
+        
+        if self.generator == 'ccdc':
+            ref_mol = self.io.MoleculeReader(file_path)[0]
+            ref_mol_array = self.get_array_from_ccdcmol(ref_mol)
+        elif self.generator == 'obabel':
+            ref_mol = next(pb.readfile(ext[1:], file_path))
+            ref_mol_array = self.get_array_from_pybelmol(ref_mol)
+        else:  # RDKit
+            ref_mol = pp.read_mol_from_file(file_path)
+            if ref_mol is None:
+                raise ValueError("Invalid file format for RDKit parser.")
+            ref_mol_array = fp.generate_fingerprint_from_molecule(ref_mol, self.feature_set)
+        
+        self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
             
     def save_mols_to_file(self, results: dict, directory: str, file_names: list):
         """
@@ -187,12 +318,12 @@ class HSR:
                     raise ValueError(f"Error generating 3D coordinates for {mol}")
                 result.update({f'3d_mol': mol_sdf})
                 if isinstance(molecule, pb.Molecule):
-                    mol_array = get_array_from_pybelmol(molecule)
+                    mol_array = self.get_array_from_pybelmol(molecule)
                     mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 elif isinstance(molecule, Chem.Mol):
-                    mol_fp = fp.generate_fingerprint_from_molecule(molecule, PROTON_FEATURES)
+                    mol_fp = fp.generate_fingerprint_from_molecule(molecule, self.feature_set)
                 elif isinstance(molecule, self.ccdcMolecule):
-                    mol_array = get_array_from_ccdcmol(molecule)
+                    mol_array = self.get_array_from_ccdcmol(molecule)
                     mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
             #The molecule is a rdkit molecule (already in 3D)
@@ -204,13 +335,13 @@ class HSR:
                     raise Exception("Molecule is not 3D")
                 mol_sdf = Chem.MolToMolBlock(mol)
                 result.update({f'3d_mol': mol_sdf})
-                mol_fp = fp.generate_fingerprint_from_molecule(mol, PROTON_FEATURES)
+                mol_fp = fp.generate_fingerprint_from_molecule(mol, self.feature_set)
                 
             #The molecule is a pybel molecule (obabel)
             elif isinstance(mol, pb.Molecule):
                 result = {"molecule": mol}
                 result.update({f'3d_mol': mol.write("sdf")})
-                mol_array = get_array_from_pybelmol(mol)
+                mol_array = self.get_array_from_pybelmol(mol)
                 mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
             #The molecule is an np.array
@@ -222,7 +353,7 @@ class HSR:
             elif self.ccdcMolecule and isinstance(mol, self.ccdcMolecule):
                 result = {"molecule": mol}
                 mol_sdf = mol.to_string("sdf")
-                mol_array = get_array_from_ccdcmol(mol)
+                mol_array = self.get_array_from_ccdcmol(mol)
                 mol_fp = fp.generate_fingerprint_from_data(mol_array)
                 
         except Exception as e:
@@ -260,44 +391,54 @@ class HSR:
             os.path.abspath(directory), f"{self.prefix}_HSR", step
         )
         os.makedirs(directory, exist_ok=True)
-        # Prepare function for parallelization
         
-        pfunc = partial(self.score_mol,)
+        # Check if CCDC is available
+        ccdc_available = self.ccdcMolecule is not None
+        # Check if all molecules are CCDC **only if CCDC is available**
+        all_ccdc = ccdc_available and all(isinstance(mol, self.ccdcMolecule) for mol in molecules)
+                
+        results = []
         
-        # Score individual smiles
-        n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
-        
-        with Pool(n_processes) as pool:
-        # try:
-            results = []
-            # Submit tasks with apply_async and set a timeout for each scoring
-            async_results = []
+        if all_ccdc:
+            logger.info("Processing CCDC molecules sequentially")
             for mol in molecules:
-                async_result = pool.apply_async(pfunc, args=(mol,))
-                async_results.append(async_result)
+                results.append(self.score_mol(mol))
+        else:    
+            # Prepare function for parallelization
+            pfunc = partial(self.score_mol,)
+            
+            # Score individual smiles
+            n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
+            
+            with Pool(n_processes) as pool:
+                # Submit tasks with apply_async and set a timeout for each scoring
+                async_results = []
+                for mol in molecules:
+                    async_result = pool.apply_async(pfunc, args=(mol,))
+                    async_results.append(async_result)
 
-            # Collect results, applying timeout and handling it gracefully
-            for i, async_result in enumerate(async_results):
-                try:
-                    # Try to get the result with a timeout equal to the specified time limit
-                    result = async_result.get(timeout=self.timeout)
-                except multiprocessing.TimeoutError:
-                    # Handle the timeout scenario by using default values
-                    # logger.error(f"Timeout occurred for molecule: {molecules[i]}")
-                    result = {
-                        "molecule": molecules[i],
-                        f'3d_mol': 0.0,
-                        f'{self.prefix}_HSR_score': 0.0,
-                    }
-                except Exception as e:
-                    # Handle any other exception
-                    logger.error(f"Error processing molecule {molecules[i]}: {e}")
-                    result = {
-                        "molecule": molecules[i],
-                        f'3d_mol': 0.0,
-                        f'{self.prefix}_HSR_score': 0.0,
-                    }
-                results.append(result)
+                # Collect results, applying timeout and handling it gracefully
+                for i, async_result in enumerate(async_results):
+                    try:
+                        # Try to get the result with a timeout equal to the specified time limit
+                        result = async_result.get(timeout=self.timeout)
+                    except multiprocessing.TimeoutError:
+                        # Handle the timeout scenario by using default values
+                        # logger.error(f"Timeout occurred for molecule: {molecules[i]}")
+                        result = {
+                            "molecule": molecules[i],
+                            f'3d_mol': 0.0,
+                            f'{self.prefix}_HSR_score': 0.0,
+                        }
+                    except Exception as e:
+                        # Handle any other exception
+                        logger.error(f"Error processing molecule {molecules[i]}: {e}")
+                        result = {
+                            "molecule": molecules[i],
+                            f'3d_mol': 0.0,
+                            f'{self.prefix}_HSR_score': 0.0,
+                        }
+                    results.append(result)
 
         # Save mols
         # Check if in results there is the key '3d_mol' (we are not using ndarray, 

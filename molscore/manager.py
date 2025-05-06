@@ -68,6 +68,8 @@ class MolScore:
     @staticmethod
     def parse_path(path: Union[os.PathLike, List[str]]) -> os.PathLike:
         "Convert path or resource-like path to absolute path"
+        if path in (None, ""):
+            return None
         if isinstance(path, list):
             # It's a resource type
             assert len(path) == 2, f"Path {path} is not a valid resource-like path containing two items"

@@ -1,0 +1,41 @@
+{
+    "task": "13_ABOBUP",
+    "output_dir": "./",
+    "starting_population": [
+        "molscore.configs.3D_Benchmark.starting_populations",
+        "13_ABOBUP_init_pop.txt"
+    ],
+    "load_from_previous": false,
+    "logging": false,
+    "monitor_app": false,
+    "termination_exit": false,
+    "scoring_functions": [
+        {
+            "name": "HSR",
+            "run": true,
+            "parameters": {
+                "prefix": "ABOBUP",
+                "ref_molecule": "configs/3D_Benchmark/targets/13_ABOBUP.txt",
+                "generator": "obabel",
+                "n_jobs": 8,
+                "timeout": 10,
+                "save_files": false
+            }
+        }
+    ],
+    "scoring": {
+        "metrics": [
+            {
+                "name": "ABOBUP_HSR_score",
+                "filter": false,
+                "weight": 1.0,
+                "modifier": "raw",
+                "parameters": {}
+            }
+        ],
+        "method": "single"
+    },
+    "diversity_filter": {
+        "run": false
+    }
+}
