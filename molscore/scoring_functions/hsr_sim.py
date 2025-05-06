@@ -7,10 +7,12 @@ from functools import partial
 import multiprocessing
 from multiprocessing import Pool
 from rdkit import Chem
+import importlib
 from hsr import pre_processing as pp
 from hsr import fingerprint as fp
 from hsr import similarity as sim
 from hsr.utils import PROTON_FEATURES, extract_proton_number, extract_formal_charge
+
 import importlib.resources as pkg_resources
 import molscore.configs
 
