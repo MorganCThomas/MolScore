@@ -544,7 +544,6 @@ class MolScore:
         """
         Merge results_df with batch_df. Only used for the first step/batch.
         """
-        import pdb; pdb.set_trace()
         logger.debug("    Merging results to batch df")
         # Store original index
         original_index = self.batch_df.index
