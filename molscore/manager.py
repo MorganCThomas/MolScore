@@ -544,9 +544,10 @@ class MolScore:
         """
         Merge results_df with batch_df. Only used for the first step/batch.
         """
+        import pdb; pdb.set_trace()
         logger.debug("    Merging results to batch df")
         original_index = self.batch_df.index
-        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False).infer_objects()
+        self.batch_df = self.batch_df.merge(self.results_df, on='mol_id', how="left", sort=False).infer_objects()
         self.batch_df.index = original_index
         self.batch_df.fillna(0.0, inplace=True)
 
