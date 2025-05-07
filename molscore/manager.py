@@ -545,8 +545,17 @@ class MolScore:
         Merge results_df with batch_df. Only used for the first step/batch.
         """
         logger.debug("    Merging results to batch df")
+        # Store original index
         original_index = self.batch_df.index
-        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False).infer_objects()
+        # Drop overlapping columns before merge (except mol_id)
+        columns_to_drop = [
+            col for col in self.results_df.columns
+            if col in self.batch_df.columns and col != "mol_id"
+        ]
+        self.results_df.drop(columns=columns_to_drop, axis=1, inplace=True)
+        # Merge into batch_df
+        self.batch_df = self.batch_df.merge(self.results_df, on='mol_id', how="left", sort=False).infer_objects()
+        # Reassign original index
         self.batch_df.index = original_index
         self.batch_df.fillna(0.0, inplace=True)
 
