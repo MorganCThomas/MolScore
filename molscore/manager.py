@@ -58,13 +58,28 @@ class MolScore:
         }
     
     @staticmethod
-    def load_config(task_config: os.PathLike):
+    def load_config(task_config: os.PathLike, diversity_filter: str = None) -> dict:
         assert os.path.exists(
             task_config
         ), f"Configuration file {task_config} doesn't exist"
         with open(task_config, "r") as f:
             configs = f.read().replace("\r", "").replace("\n", "").replace("\t", "")
-        return json.loads(configs)
+        configs = json.loads(configs)
+        if diversity_filter is not None:
+            df_presets = resources.files("molscore.configs._diversity_filters").glob("*.json")
+            df_config = None
+            for p in df_presets:
+                name = p.stem
+                if diversity_filter == name:
+                    with open(p, "r") as f:
+                        df_config = json.load(f)
+                    configs["diversity_filter"] = df_config
+                    break
+            if df_config is None:
+                raise ValueError(
+                    f"Could not find diversity filter {diversity_filter} in {df_presets}"
+                )
+        return configs
     
     @staticmethod
     def parse_path(path: Union[os.PathLike, List[str]] = None) -> os.PathLike:
@@ -94,6 +109,7 @@ class MolScore:
         score_invalids: bool = False,
         replay_size: int = None,
         replay_purge: bool = True,
+        diversity_filter: str = None,
         **kwargs,
     ):
         """
@@ -109,17 +125,18 @@ class MolScore:
         :param score_invalids: Whether to force scoring of invalid molecules
         :param replay_size: Maximum size of the replay buffer
         :param replay_purge: Whether to purge the replay buffer, i.e., only allow molecules that pass the diversity filter
+        :param diversity_filter: Name a diversity filter to add/overide the one in the config
         """
         # Load in configuration file (json)
         if task_config.endswith(".json"):
-            self.cfg = self.load_config(task_config)
+            self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
         else:
             assert ":" in task_config, "Preset task must be in format 'category:task'"
             cat, task = task_config.split(":", maxsplit=1)
             assert cat in self.presets.keys(), f"Preset category {cat} not found"
             task_config = self.presets[cat] / f"{task}.json"
             assert task_config.exists(), f"Preset task {task} not found in {cat}"
-            self.cfg = self.load_config(task_config)
+            self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
 
         # Here are attributes used
         self.model_name = model_name.replace(" ", "_")
@@ -1294,6 +1311,7 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        diversity_filter: str = None,
         **kwargs,
     ):
         """
@@ -1311,6 +1329,7 @@ class MolScoreBenchmark:
         :param custom_tasks: List of custom tasks to run
         :param include: List of tasks to only include
         :param exclude: List of tasks to exclude
+        :param diversity_filter: Diversity filter to use, will replace any defined in configs
         """
         self.model_name = model_name
         self.model_parameters = model_parameters
@@ -1328,6 +1347,7 @@ class MolScoreBenchmark:
         self.score_paths = []
         self.score_invalids = score_invalids
         self.next = 0
+        self.diversity_filter = diversity_filter
 
         # Process configs and tasks to run
         if self.benchmark:
@@ -1413,6 +1433,7 @@ class MolScoreBenchmark:
             replay_size=self.replay_size,
             replay_purge=self.replay_purge,
             score_invalids=self.score_invalids,
+            diversity_filter=self.diversity_filter,
         )
         try:
             with MS as scoring_function:
