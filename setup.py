@@ -19,7 +19,9 @@ setup(
             'metrics/wehi_pains.csv',
             'metrics/quality_filters/alert_collection.csv',
             'metrics/quality_filters/guacamol_rules.json',
-            'metrics/NP_Score/publicnp.model.gz']},
+            'metrics/NP_Score/publicnp.model.gz',
+            'metrics/SA_Score/fpscores.pkl.gz',
+            'metrics/fcd_torch/ChemNet_v0.13_pretrained.pt']},
     install_requires=[
         "numpy",
         "pandas",
