@@ -1419,7 +1419,7 @@ class MolScoreBenchmark:
             else: 
                 metrics = MS.compute_metrics(
                     budget=self.budget,
-                    benchmark=self.benchmark,
+                    benchmark=self.benchmark,          
                 )
                 metrics.update(
                     {
@@ -1461,13 +1461,15 @@ class MolScoreBenchmark:
                 print(f"Skipping summary of {score_path} as no results found")
                 continue
             scores = pd.read_csv(score_path, index_col=0)
+            
+            task_name = scores["task"].iloc[0]
+            
             SM = ScoreMetrics(
                 scores=scores,
                 budget=self.budget,
                 n_jobs=n_jobs,
                 reference_smiles=reference_smiles,
                 benchmark=self.benchmark,
-                include=include
             )
             metrics = SM.get_metrics(
                 endpoints=endpoints,
@@ -1475,6 +1477,7 @@ class MolScoreBenchmark:
                 chemistry_filter_basic=chemistry_filter_basic,
                 include=include,                
             )
+            metrics["task"] = task_name
             self.results.append(metrics)
         self._write_results(overwrite=overwrite)
     
