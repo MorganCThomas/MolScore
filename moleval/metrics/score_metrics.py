@@ -704,7 +704,7 @@ class ScoreMetrics:
     def run_metrics(
         self,
         endpoints=[],
-        thresholds=[], 
+        thresholds=None, 
         target_smiles=[],
         include=["Valid", "Unique"],
         chemistry_filter_basic=False,
@@ -720,6 +720,7 @@ class ScoreMetrics:
         :param chemistry_filter_target: bool, whether to filter by target chemistry
         :param extrapolate: bool, whether to extrapolate metrics to the budget if fewer molecules exist due to invalid or non-uniqueness
         """
+        
 
         # Setup parallelisation for internal async processes
         mp = get_multiprocessing_context()
@@ -836,6 +837,8 @@ class ScoreMetrics:
                     
                 # Yield (Check a corresponding threshold has been provided)
                 try:
+                    if thresholds is None:
+                        thresholds = []
                     threshold = thresholds[i]
                 except IndexError:
                     threshold = False
@@ -1037,7 +1040,9 @@ class ScoreMetrics:
         :param chemistry_filter_target: bool, whether to filter by target chemistry
         :param extrapolate: bool, whether to extrapolate metrics to the budget if fewer molecules exist due to invalid or non-uniqueness
         """
-        
+        if 'smiles' not in self.scores.columns and chemistry_filter_basic:
+           chemistry_filter_basic = False
+           
         metrics = {}
         
         for endpoint in endpoints:
