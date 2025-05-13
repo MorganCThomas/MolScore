@@ -123,6 +123,8 @@ class HSR:
         self.save_files = save_files
         self.use_charges = use_charges_in_fp
         self.feature_set = P_Q_FEATURES if self.use_charges else PROTON_FEATURES
+        
+        self.io = self.conformer = self.ccdcMolecule = None
 
         
         if self.generator == 'ccdc':
