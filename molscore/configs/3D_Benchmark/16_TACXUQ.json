@@ -2,8 +2,8 @@
     "task": "16_TACXUQ",
     "output_dir": "./",
     "starting_population": [
-        "molscore.configs.3D_Benchmark.starting_populations",
-        "16_TACXUQ_init_pop.txt"
+        "molscore.configs.3D_Benchmark",
+        "starting_populations/16_TACXUQ_init_pop.txt"
     ],
     "load_from_previous": false,
     "logging": false,
@@ -15,7 +15,7 @@
             "run": true,
             "parameters": {
                 "prefix": "TACXUQ",
-                "ref_molecule": "configs/3D_Benchmark/targets/16_TACXUQ.txt",
+                "ref_molecule": "3D_Benchmark/targets/16_TACXUQ.txt",
                 "generator": "obabel",
                 "n_jobs": 8,
                 "timeout": 10,

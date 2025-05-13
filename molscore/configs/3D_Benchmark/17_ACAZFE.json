@@ -2,8 +2,8 @@
     "task": "17_ACAZFE",
     "output_dir": "./",
     "starting_population": [
-        "molscore.configs.3D_Benchmark.starting_populations",
-        "17_ACAZFE_init_pop.txt"
+        "molscore.configs.3D_Benchmark",
+        "starting_populations/17_ACAZFE_init_pop.txt"
     ],
     "load_from_previous": false,
     "logging": false,
@@ -15,7 +15,7 @@
             "run": true,
             "parameters": {
                 "prefix": "ACAZFE",
-                "ref_molecule": "configs/3D_Benchmark/targets/17_ACAZFE.txt",
+                "ref_molecule": "3D_Benchmark/targets/17_ACAZFE.txt",
                 "generator": "obabel",
                 "n_jobs": 8,
                 "timeout": 10,

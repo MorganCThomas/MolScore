@@ -2,8 +2,8 @@
     "task": "6_ABEKIE",
     "output_dir": "./",
     "starting_population": [
-        "molscore.configs.3D_Benchmark.starting_populations",
-        "6_ABEKIE_init_pop.txt"
+        "molscore.configs.3D_Benchmark",
+        "starting_populations/6_ABEKIE_init_pop.txt"
     ],
     "load_from_previous": false,
     "logging": false,
@@ -15,7 +15,7 @@
             "run": true,
             "parameters": {
                 "prefix": "ABEKIE",
-                "ref_molecule": "configs/3D_Benchmark/targets/6_ABEKIE.txt",
+                "ref_molecule": "3D_Benchmark/targets/6_ABEKIE.txt",
                 "generator": "obabel",
                 "n_jobs": 8,
                 "timeout": 10,
