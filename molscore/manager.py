@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import shutil
+from pathlib import Path
 from typing import Optional, Union, List
 from contextlib import contextmanager
 
@@ -53,23 +54,38 @@ class MolScore:
     presets = PRESETS
 
     preset_tasks = {
-        k:[p.name.strip(".json") for p in v.glob("*.json")] 
+        k:[p.stem for p in v.glob("*.json")] 
         for k, v in presets.items()
         }
     
     @staticmethod
-    def load_config(task_config: os.PathLike):
+    def load_config(task_config: os.PathLike, diversity_filter: str = None) -> dict:
         assert os.path.exists(
             task_config
         ), f"Configuration file {task_config} doesn't exist"
         with open(task_config, "r") as f:
             configs = f.read().replace("\r", "").replace("\n", "").replace("\t", "")
-        return json.loads(configs)
+        configs = json.loads(configs)
+        if diversity_filter is not None:
+            df_presets = resources.files("molscore.configs._diversity_filters").glob("*.json")
+            df_config = None
+            for p in df_presets:
+                name = p.stem
+                if diversity_filter == name:
+                    with open(p, "r") as f:
+                        df_config = json.load(f)
+                    configs["diversity_filter"] = df_config
+                    break
+            if df_config is None:
+                raise ValueError(
+                    f"Could not find diversity filter {diversity_filter} in {df_presets}"
+                )
+        return configs
     
     @staticmethod
-    def parse_path(path: Union[os.PathLike, List[str]]) -> os.PathLike:
+    def parse_path(path: Union[os.PathLike, List[str]] = None) -> os.PathLike:
         "Convert path or resource-like path to absolute path"
-        if path in (None, ""):
+        if path is None:
             return None
         if isinstance(path, list):
             # It's a resource type
@@ -94,6 +110,7 @@ class MolScore:
         score_invalids: bool = False,
         replay_size: int = None,
         replay_purge: bool = True,
+        diversity_filter: str = None,
         **kwargs,
     ):
         """
@@ -109,20 +126,22 @@ class MolScore:
         :param score_invalids: Whether to force scoring of invalid molecules
         :param replay_size: Maximum size of the replay buffer
         :param replay_purge: Whether to purge the replay buffer, i.e., only allow molecules that pass the diversity filter
+        :param diversity_filter: Name a diversity filter to add/overide the one in the config
         """
         # Load in configuration file (json)
         if task_config.endswith(".json"):
-            self.cfg = self.load_config(task_config)
+            self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
         else:
             assert ":" in task_config, "Preset task must be in format 'category:task'"
             cat, task = task_config.split(":", maxsplit=1)
             assert cat in self.presets.keys(), f"Preset category {cat} not found"
             task_config = self.presets[cat] / f"{task}.json"
             assert task_config.exists(), f"Preset task {task} not found in {cat}"
-            self.cfg = self.load_config(task_config)
+            self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
 
         # Here are attributes used
         self.model_name = model_name.replace(" ", "_")
+        self.name = self.cfg["task"].replace(" ", "_")
         self.step = 0
         self.current_idx = 0
         self.budget = budget
@@ -527,8 +546,17 @@ class MolScore:
         Merge results_df with batch_df. Only used for the first step/batch.
         """
         logger.debug("    Merging results to batch df")
+        # Store original index
         original_index = self.batch_df.index
-        self.batch_df = self.batch_df.merge(self.results_df, how="left", sort=False).infer_objects()
+        # Drop overlapping columns before merge (except mol_id)
+        columns_to_drop = [
+            col for col in self.results_df.columns
+            if col in self.batch_df.columns and col != "mol_id"
+        ]
+        self.results_df.drop(columns=columns_to_drop, axis=1, inplace=True)
+        # Merge into batch_df
+        self.batch_df = self.batch_df.merge(self.results_df, on='mol_id', how="left", sort=False).infer_objects()
+        # Reassign original index
         self.batch_df.index = original_index
         self.batch_df.fillna(0.0, inplace=True)
 
@@ -706,7 +734,6 @@ class MolScore:
                     df[f"filtered_{self.cfg['scoring']['method']}"],
                 )
             ]
-            df.fillna(1e-6)
 
         elif self.diversity_filter == "Occurrence":
             assert (
@@ -749,9 +776,11 @@ class MolScore:
                 for b, a in zip(df[self.cfg["scoring"]["method"]], filtered_scores)
             ]
             df[f"filtered_{self.cfg['scoring']['method']}"] = filtered_scores
-            # Copy to obvious score column
-            df['Score (reshaped)'] = filtered_scores
-            df.fillna(1e-6)
+        
+        # Copy to obvious score column
+        df['Score (reshaped)'] = df[f"filtered_{self.cfg['scoring']['method']}"].copy()
+        df.fillna(1e-6)
+        
         return df
 
     def log_parameters(self, parameters: dict):
@@ -877,6 +906,8 @@ class MolScore:
         task_df = self.main_df.loc[self.main_df.task == self.cfg["task"]]
 
         # Based on budget
+        # TODO Only account for valid / unique (budget_invalid=False, budget_duplicate=False)
+        # TODO update score metrics to account for this.
         if self.budget and (len(task_df) >= self.budget):
             self.finished = True
             return
@@ -1290,6 +1321,7 @@ class MolScoreBenchmark:
         custom_tasks: list = [],
         include: list = [],
         exclude: list = [],
+        diversity_filter: str = None,
         **kwargs,
     ):
         """
@@ -1307,6 +1339,7 @@ class MolScoreBenchmark:
         :param custom_tasks: List of custom tasks to run
         :param include: List of tasks to only include
         :param exclude: List of tasks to exclude
+        :param diversity_filter: Diversity filter to use, will replace any defined in configs
         """
         self.model_name = model_name
         self.model_parameters = model_parameters
@@ -1324,6 +1357,7 @@ class MolScoreBenchmark:
         self.score_paths = []
         self.score_invalids = score_invalids
         self.next = 0
+        self.diversity_filter = diversity_filter
 
         # Process configs and tasks to run
         if self.benchmark:
@@ -1350,8 +1384,8 @@ class MolScoreBenchmark:
         if self.include:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.include) or (name.strip(".json") in self.include):
+                name = Path(config).stem
+                if (name in self.include) or (name in self.include):
                     continue
                 else:
                     exclude.append(config)
@@ -1361,8 +1395,8 @@ class MolScoreBenchmark:
         if self.exclude:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.exclude) or (name.strip(".json") in self.exclude):
+                name = Path(config).stem
+                if (name in self.exclude) or (name in self.exclude):
                     exclude.append(config)
             for config in exclude:
                 self.configs.remove(config)
@@ -1409,6 +1443,7 @@ class MolScoreBenchmark:
             replay_size=self.replay_size,
             replay_purge=self.replay_purge,
             score_invalids=self.score_invalids,
+            diversity_filter=self.diversity_filter,
         )
         try:
             with MS as scoring_function:
@@ -1580,8 +1615,8 @@ class MolScoreCurriculum(MolScore):
         if self.include:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.include) or (name.strip(".json") in self.include):
+                name = Path(config).stem
+                if (name in self.include) or (name in self.include):
                     continue
                 else:
                     exclude.append(config)
@@ -1591,8 +1626,8 @@ class MolScoreCurriculum(MolScore):
         if self.exclude:
             exclude = []
             for config in self.configs:
-                name = os.path.basename(config)
-                if (name in self.exclude) or (name.strip(".json") in self.exclude):
+                name = Path(config).stem
+                if (name in self.exclude) or (name in self.exclude):
                     exclude.append(config)
             for config in exclude:
                 self.configs.remove(config)

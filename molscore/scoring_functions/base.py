@@ -1,6 +1,6 @@
 # This file contains templates for
 
-import atexit
+import weakref
 import logging
 import os
 import signal
@@ -104,7 +104,7 @@ class BaseServerSF:
 
         # Launch server
         self._launch_server()
-        atexit.register(self._kill_server)
+        weakref.finalize(self, self._kill_server)
 
     def _check_env(self):
         cmd = f"{self.engine} info --envs"
