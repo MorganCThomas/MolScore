@@ -19,7 +19,8 @@
                 "generator": "obabel",
                 "n_jobs": 8,
                 "timeout": 10,
-                "save_files": false
+                "save_files": true,
+                "use_charges_in_fp": true
             }
         }
     ],
