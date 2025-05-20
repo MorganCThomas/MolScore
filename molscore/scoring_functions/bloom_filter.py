@@ -49,7 +49,7 @@ class BloomFilter:
         self.canonize = canonize
         self.fpr = fpr
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        self.pool = Pool(self.n_jobs)
         self.filter = None
 
         parameters_provided = sum(
@@ -77,7 +77,7 @@ class BloomFilter:
             smiles_list = read_smiles(os.path.abspath(self.smiles_path))
             # Canonize
             if self.canonize:
-                smiles_list = [s for s in self.mapper(canonize_smiles, smiles_list)]
+                smiles_list = self.pool.submit(canonize_smiles, smiles_list)
             # Set up bloom filter parameters based on False Positive Rate
             M_bits = -(len(smiles_list) * np.log(self.fpr)) / (np.log(2) ** 2)
             self.filter = molbloom.CustomFilter(M_bits, len(smiles_list), self.prefix)

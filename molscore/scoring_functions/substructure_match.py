@@ -36,7 +36,7 @@ class SubstructureMatch:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        self.pool = Pool(self.n_jobs)
         self.smarts = smarts
         assert method in ["any", "all"]
         self.method = method
@@ -95,6 +95,6 @@ class SubstructureMatch:
             )
         results = [
                 {"smiles": smi, f"{self.prefix}_substruct_match": match}
-                for smi, match in self.mapper(match_substructure_p, smiles)
+                for smi, match in self.pool.map(match_substructure_p, smiles)
             ]
         return results

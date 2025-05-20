@@ -43,7 +43,7 @@ class SKLearnClassifier:
         self.fp = fp
         self.nBits = int(nBits)
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs)
+        self.pool = Pool(self.n_jobs)
 
         # Load in model and assign to attribute
         if model_path.endswith(".joblib"):
@@ -72,7 +72,7 @@ class SKLearnClassifier:
         )
         [
             (valid.append(i), fps.append(fp.reshape(1, -1)))
-            for i, fp in enumerate(self.mapper(pcalculate_fp, smiles))
+            for i, fp in enumerate(self.pool.map(pcalculate_fp, smiles))
             if fp is not None
         ]
 
@@ -132,7 +132,7 @@ class SKLearnRegressor(SKLearnClassifier):
         )
         [
             (valid.append(i), fps.append(fp.reshape(1, -1)))
-            for i, fp in enumerate(self.mapper(pcalculate_fp, smiles))
+            for i, fp in enumerate(self.pool.map(pcalculate_fp, smiles))
             if fp is not None
         ]
 
@@ -188,15 +188,14 @@ class EnsembleSKLearnModel(SKLearnModel):
         fps = []
         predictions = []
         averages = []
-        with Pool(self.n_jobs) as pool:
-            pcalculate_fp = partial(
-                Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
-            )
-            [
-                (valid.append(i), fps.append(fp))
-                for i, fp in enumerate(pool.imap(pcalculate_fp, smiles))
-                if fp is not None
-            ]
+        pcalculate_fp = partial(
+            Fingerprints.get, name=self.fp, nBits=self.nBits, asarray=True
+        )
+        [
+            (valid.append(i), fps.append(fp))
+            for i, fp in enumerate(self.pool.map(pcalculate_fp, smiles))
+            if fp is not None
+        ]
 
         # Predicting the probabilies and appending them to a list.
         for m in self.models:

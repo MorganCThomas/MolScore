@@ -1,6 +1,5 @@
 import logging
 import os
-import atexit
 from functools import partial
 from typing import Union
 
@@ -65,7 +64,7 @@ class MolecularSimilarity:
         self.nBits = bits
         self.n_jobs = n_jobs
         self.timeout = timeout
-        self.mapper = Pool(n_jobs, return_map=True)
+        self.pool = Pool(n_jobs)
 
         # If file path provided, load smiles.
         if isinstance(ref_smiles, str):
@@ -157,7 +156,7 @@ class MolecularSimilarity:
                 prefix=self.prefix,
             )
         
-        results = [result for result in self.mapper(calculate_sim_p, smiles)]
+        results = self.pool.submit(calculate_sim_p, smiles)
         return results
 
     def __call__(self, smiles: list, **kwargs):
@@ -180,7 +179,6 @@ class MolecularSimilarity:
 
         return results
 
-
 class LevenshteinSimilarity(MolecularSimilarity):
     """
     Score structures based on the normalized Levenshtein similarity of provided SMILES string(s) to reference structure
@@ -188,6 +186,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
 
     return_metrics = ["Sim"]
 
+#    @profile
     def __init__(
         self,
         prefix: str,
@@ -213,7 +212,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
         self.thresh = thresh
         self.method = method
         self.n_jobs = n_jobs
-        self.mapper = Pool(n_jobs, return_map=True)
+        self.pool = Pool(n_jobs)
         self.timeout = timeout
 
         # If file path provided, load smiles.
@@ -272,6 +271,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
 
         return result
 
+#    @profile
     def _score(self, smiles: list, **kwargs):
         """
         Calculate scores for Tanimoto given a list of SMILES.
@@ -286,7 +286,7 @@ class LevenshteinSimilarity(MolecularSimilarity):
                     method=self.method,
                     prefix=self.prefix,
                 )
-        results = [result for result in self.mapper(calculate_sim_p, smiles)]
+        results = self.pool.submit(calculate_sim_p, smiles)
         return results
 
 

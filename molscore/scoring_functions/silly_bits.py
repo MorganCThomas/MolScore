@@ -39,12 +39,12 @@ class SillyBits:
         self.count_dict = defaultdict(int)
         self.radius = radius
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        self.pool = Pool(self.n_jobs)
         # Load reference dataset
         reference_mols = read_smiles(reference_smiles)
         # Convert to mols from reference dataset and count fp bits
         logger.info("Pre-processing SillyBits reference dataset")
-        bit_counts = [bits for bits in self.mapper(self.count_bits, reference_mols)]
+        bit_counts = self.pool.submit(self.count_bits, reference_mols)
         for count_dict in bit_counts:
             for k, v in count_dict.items():
                 self.count_dict[k] += v
@@ -73,7 +73,7 @@ class SillyBits:
     def __call__(self, smiles, **kwargs):
         results = []
         pfunc = partial(self._score, count_dict=self.count_dict)
-        scores = [s for s in self.mapper(pfunc, smiles)]
+        scores = self.pool.submit(pfunc, smiles)
         for smi, score in zip(smiles, scores):
             if score is not None:
                 results.append({"smiles": smi, f"{self.prefix}_silly_ratio": score[0]})

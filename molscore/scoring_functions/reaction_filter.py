@@ -66,7 +66,7 @@ class DecoratedReactionFilter:
         scaffold: str,
         custom_reactions: list = None,
         libinvent_reactions: bool = True,
-        n_jobs: int = 1,
+    #    n_jobs: int = 1,
         **kwargs,
     ):
         """
@@ -74,11 +74,10 @@ class DecoratedReactionFilter:
         :param scaffold: Assumes de novo molecule generation is decorative from this scaffold without attachment points e.g., (benzene=c1ccccc1)
         :param custom_reactions: Provide a custom list of SMIRKS
         :param libinvent_reactions: Run pre-defined reaction filters from LibINVENT
-        :param n_jobs: Number of parallel jobs to run
         """
         self.prefix = prefix.replace(" ", "_")
-        self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        #self.n_jobs = n_jobs
+        #self.pool = Pool(self.n_jobs)
         self.reaction_smirks = []
         self.scaffold = get_mol(scaffold)
         assert self.scaffold, f"Error parsing scaffold {scaffold}"
@@ -161,7 +160,7 @@ class DecoratedReactionFilter:
     def __call__(self, smiles, **kwargs):
         """Score a list of SMILES strings"""
         results = []
-        scores = [score for score in self.mapper(self._score_smiles, smiles)]
+        scores = [s for s in map(self._score_smiles, smiles)] # Not currently parallelized
         for smi, score in zip(smiles, scores):
             results.append({"smiles": smi, f"{self.prefix}_score": score})
         return results
@@ -173,18 +172,17 @@ class SelectiveDecoratedReactionFilter(DecoratedReactionFilter):
         prefix: str,
         scaffold: str,
         allowed_reactions: dict = {},
-        n_jobs: int = 1,
+    #    n_jobs: int = 1,
         **kwargs,
     ):
         """
         :param prefix: Name given to scoring function
         :param scaffold: Assumes de novo molecule generation is decorative from this scaffold with labeled attachment points
         :param allowed_reactions: A dictionary mapping attachment points to a list of allowed reactions e.g., {0: list(reaction)}}
-        :param n_jobs: Number of parallel jobs to run
         """
         self.prefix = prefix.replace(" ", "_")
-        self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        #self.n_jobs = n_jobs
+        #self.pool = Pool(self.n_jobs)
         self.reaction_smirks = []
         self.scaffold = get_mol(scaffold)
         assert self.scaffold, f"Error parsing scaffold {scaffold}"
