@@ -4,6 +4,7 @@ from functools import partial
 from typing import Union
 
 import numpy as np
+from rdkit.DataStructs import cDataStructs
 from Levenshtein import distance as levenshtein
 
 from molscore.scoring_functions.utils import (
@@ -90,6 +91,15 @@ class MolecularSimilarity:
             Fingerprints.get(mol, self.fp, self.nBits, asarray=False)
             for mol in self.ref_mols
         ]
+        
+        # Check compatibility
+        _test_fp = self.ref_fps[0]
+        if isinstance(_test_fp, cDataStructs.SparseBitVect):
+            assert self.similarity_measure not in ["AllBit", "OnBit"], \
+                f"{self.fp} with {self.nBits} is not compatible with {self.similarity_measure} similarity"
+        if isinstance(_test_fp, (cDataStructs.UIntSparseIntVect, cDataStructs.IntSparseIntVect)):
+            assert self.similarity_measure in ["Dice", "Tanimoto"], \
+                f"{self.fp} with {self.nBits} is only compatible with Dice and Tanimoto similarity"
     
     @staticmethod
     def calculate_sim(
@@ -114,27 +124,26 @@ class MolecularSimilarity:
         :param method: 'mean' or 'max'
         :return: (SMILES, Tanimoto coefficient)
         """
+        agg = getattr(np, method)
         similarity_measure = SimilarityMeasures.get(similarity_measure, bulk=True)
 
         mol = get_mol(smi)
+        sim = 0.0
+        sim_vec = []
+        thresh_vec = []
         if mol is not None:
             fp = Fingerprints.get(mol, fp, nBits, asarray=False)
             sim_vec = similarity_measure(fp, ref_fps)
             if thresh:
-                sim_vec = [sim >= thresh for sim in sim_vec]
-
-            if method == "mean":
-                sim = float(np.mean(sim_vec))
-            elif method == "max":
-                sim = float(np.max(sim_vec))
+                thresh_vec = [sim >= thresh for sim in sim_vec]
+                sim = float(agg(thresh_vec))
             else:
-                sim = 0.0
-        else:
-            sim = 0.0
-            sim_vec = []
+                sim = float(agg(sim_vec))
 
         result = {"smiles": smi, f"{prefix}_Sim": sim}
         result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
+        if thresh_vec:
+            result.update({f"{prefix}_Cmpd{i+1}_SimThresh": sim for i, sim in enumerate(thresh_vec)})
 
         return result
 
@@ -186,7 +195,6 @@ class LevenshteinSimilarity(MolecularSimilarity):
 
     return_metrics = ["Sim"]
 
-#    @profile
     def __init__(
         self,
         prefix: str,
@@ -247,31 +255,27 @@ class LevenshteinSimilarity(MolecularSimilarity):
         :param method: 'mean' or 'max'
         :return: (SMILES, Normalized Levenshtein similarity)
         """
+        agg = getattr(np, method)
+        sim = 0.0
         sim_vec = []
+        thresh_vec = []
         if smi:
             for ref in ref_smiles:
                 sim = max(0, 1 - (levenshtein(smi, ref) / len(ref)))
                 sim_vec.append(sim)
-
             if thresh:
-                sim_vec = [sim >= thresh for sim in sim_vec]
-
-            if method == "mean":
-                sim = float(np.mean(sim_vec))
-            elif method == "max":
-                sim = float(np.max(sim_vec))
+                thresh_vec = [sim >= thresh for sim in sim_vec]
+                sim = float(agg(thresh_vec))
             else:
-                raise ValueError(f"Method {method} not recognised")
-        else:
-            sim = 0.0
-            sim_vec = []
+                sim = float(agg(sim_vec))
 
         result = {"smiles": smi, f"{prefix}_Sim": sim}
         result.update({f"{prefix}_Cmpd{i+1}_Sim": sim for i, sim in enumerate(sim_vec)})
+        if thresh_vec:
+            result.update({f"{prefix}_Cmpd{i+1}_SimThresh": sim for i, sim in enumerate(thresh_vec)})
 
         return result
 
-#    @profile
     def _score(self, smiles: list, **kwargs):
         """
         Calculate scores for Tanimoto given a list of SMILES.

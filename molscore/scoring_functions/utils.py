@@ -7,7 +7,6 @@ import signal
 import subprocess
 import threading
 import time
-import atexit
 import weakref
 from functools import partial
 from pathlib import Path
@@ -566,7 +565,7 @@ class Fingerprints:
                     mol, radius=2, nBits=nBits
                 )
             else:
-                return rdMolDescriptors.GetMorganFingerprint(mol, radius=2)
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=False)
 
     @staticmethod
     def ECFP4c(mol, nBits, asarray):
@@ -587,7 +586,7 @@ class Fingerprints:
             assert nBits, "Number of bits must be specified to return np.array"
             np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                    mol, radius=2, nBits=nBits, useFeatures=True
+                    mol, radius=2, nBits=nBits, useFeatures=True, useCounts=False
                 )
             )
         else:
@@ -597,7 +596,7 @@ class Fingerprints:
                 )
             else:
                 return rdMolDescriptors.GetMorganFingerprint(
-                    mol, radius=2, useFeatures=True
+                    mol, radius=2, useFeatures=True, useCounts=False
                 )
 
     @staticmethod
@@ -614,7 +613,7 @@ class Fingerprints:
             return nfp.reshape(-1)
         else:
             return rdMolDescriptors.GetMorganFingerprint(
-                mol, radius=2, useCounts=True, useFeatures=True
+                mol, radius=2, useCounts=True, useFeatures=True,
             )
 
     @staticmethod
@@ -632,7 +631,7 @@ class Fingerprints:
                     mol, radius=3, nBits=nBits
                 )
             else:
-                return rdMolDescriptors.GetMorganFingerprint(mol, radius=3)
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=False)
 
     @staticmethod
     def ECFP6c(mol, nBits, asarray):
@@ -663,7 +662,7 @@ class Fingerprints:
                 )
             else:
                 return rdMolDescriptors.GetMorganFingerprint(
-                    mol, radius=3, useFeatures=True
+                    mol, radius=3, useFeatures=True, useCounts=False
                 )
 
     @staticmethod
