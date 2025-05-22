@@ -230,7 +230,7 @@ except Exception as e:
     logger.warning(f"POSTServer: currently unavailable due to the following: {e}")
 
 try:
-    from molscore.scoring_functions.hsr import HSR
+    from molscore.scoring_functions.hsr_sim import HSR
 
     all_scoring_functions.append(HSR)
 except Exception as e:

@@ -667,11 +667,14 @@ class ScoreMetrics:
             [
                 task.startswith(name)
                 for name in [
-                    "Test_1",
-                    "Test_2",
-                    "Test_3",
-                    "Test_4",]
-                ]
+                    '1_ABAHIW', '2_ABAKIZ', '3_ABADOX', '4_ABABIP', '5_GASQOK', '6_ABEKIE',
+                    '7_NIWPUE01', '8_ABEKIF', '9_APUFEX', '10_ABEHAU', '11_TITTUO', '12_EGEYOG',
+                    '13_ABOBUP', '14_XIDTOW', '15_ACNCOB10', '16_TACXUQ', '17_ACAZFE', '18_NIVHEJ',
+                    '19_ADUPAS', '20_DAJLAC', '21_OFOWIS', '22_CATSUL', '23_HESMUQ01', '24_GUDQOL',
+                    '25_ABEVAG', '26_AKOQOH', '27_ADARUT', '28_AFECIA', '29_ACOVUL', '30_AFIXEV',
+                    '31_ABAYAF', '32_RULJAM' 
+                    ]
+            ]
             ):
             top1, top10 = self.top_avg(
                 scores=tdf,
@@ -713,7 +716,7 @@ class ScoreMetrics:
     def run_metrics(
         self,
         endpoints=[],
-        thresholds=[], 
+        thresholds=None, 
         target_smiles=[],
         include=["Valid", "Unique"],
         chemistry_filter_basic=False,
@@ -729,6 +732,7 @@ class ScoreMetrics:
         :param chemistry_filter_target: bool, whether to filter by target chemistry
         :param extrapolate: bool, whether to extrapolate metrics to the budget if fewer molecules exist due to invalid or non-uniqueness
         """
+        
 
         # Setup parallelisation for internal async processes
         mp = get_multiprocessing_context()
@@ -845,6 +849,8 @@ class ScoreMetrics:
                     
                 # Yield (Check a corresponding threshold has been provided)
                 try:
+                    if thresholds is None:
+                        thresholds = []
                     threshold = thresholds[i]
                 except IndexError:
                     threshold = False
@@ -1046,7 +1052,9 @@ class ScoreMetrics:
         :param chemistry_filter_target: bool, whether to filter by target chemistry
         :param extrapolate: bool, whether to extrapolate metrics to the budget if fewer molecules exist due to invalid or non-uniqueness
         """
-        
+        if 'smiles' not in self.scores.columns and chemistry_filter_basic:
+           chemistry_filter_basic = False
+           
         metrics = {}
         
         for endpoint in endpoints:

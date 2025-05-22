@@ -3,7 +3,7 @@ from unittest.mock import patch
 from rdkit import Chem
 from openbabel import pybel
 import numpy as np
-from molscore.scoring_functions.hsr import HSR
+from molscore.scoring_functions.hsr_sim import HSR
 from molscore.tests import test_files
 import os
 from hsr import pre_processing as pp

@@ -1,4 +1,4 @@
-name: molscore_mamba
+name: molscore
 channels:
   - anaconda
   - conda-forge
