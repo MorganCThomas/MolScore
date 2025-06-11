@@ -8,7 +8,7 @@ from typing import Union
 import pytest
 from rdkit.Chem import AllChem as Chem
 
-from molscore import MockGenerator, MolScore
+from molscore import MolScore
 
 if len(sys.argv) == 1:
     print(

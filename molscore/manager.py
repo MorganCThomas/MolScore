@@ -43,7 +43,7 @@ PRESETS = {
         ),
         "LibINVENT_Exp1": resources.files("molscore.configs.LibINVENT"),
         "LinkINVENT_Exp3": resources.files("molscore.configs.LinkINVENT"),
-        "3D_Benchmark": resources.files("molscore.configs.3D_Benchmark"),    
+        "3D_Benchmark": resources.files("molscore.configs.3D_Benchmark"),  
     }
 
 
@@ -1535,6 +1535,7 @@ class MolScoreBenchmark:
             metrics["task"] = task_name
             self.results.append(metrics)
         self._write_results(overwrite=overwrite)
+        return self.results
     
     def _write_results(self, overwrite=False):
         if not os.path.exists(os.path.join(self.output_dir, "results.csv")) or overwrite:
