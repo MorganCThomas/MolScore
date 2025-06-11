@@ -104,7 +104,8 @@ class Model:
             del self.kwargs[a]
         
         self.add_msa()
-        
+        self.add_affinity()
+
 
     def add_msa(self):
         for i, seq_data in enumerate(self.config["sequences"]):
@@ -124,7 +125,16 @@ class Model:
                     )
                     # Update config
                     self.config["sequences"][i]["protein"]["msa"] = str(msa_dir / f"{msa_id}.csv")
-                    
+
+         
+    def add_affinity(self):
+        # For now we just replace
+        self.config["properties"] = [{
+                "affinity": {
+                    "binder": "Z"
+                }
+            }]
+        
 
     def add_smiles(self, smiles: str, out_path: str):
         config = deepcopy(self.config)
@@ -174,7 +184,8 @@ def compute():
             results.append(dict(smiles=smi, confidence_score=0.0))
             continue
         else:
-            # Load all sample data
+            result = {"smiles": smi}
+            # Load confidence data
             pred_data = []
             for pred_path in sorted(glob(str(pred_dir / "confidence*.json"))):
                 with open(pred_path, "r") as f:
@@ -192,9 +203,22 @@ def compute():
                 pred_data.update({f"pair_chain_iptm_{i}-{j}": pair_chains_iptm[i][j] for i in pair_chains_iptm for j in pair_chains_iptm[i]})
                 # Assume the protein is the first and ligand is the last chain
                 pred_data["pair_chain_iptm_protein-ligand"] = pair_chains_iptm["0"][str(len(pair_chains_iptm["0"]) - 1)]
-                results.append(dict(smiles=smi, **pred_data))
-            else:
-                results.append(dict(smiles=smi, confidence_score=0.0))
+                result.update(**pred_data)
+                
+            affin_data = []
+            for affin_path in sorted(glob(str(pred_dir / "affinity*.json"))):
+                with open(affin_path, "r") as f:
+                    affin_data.append(json.load(f))
+                    
+            if affin_data:
+                # Get max score based on probability of scoring
+                max_idx = np.argmax([data["affinity_probability_binary"] for data in affin_data])
+                affin_data = affin_data[max_idx]
+                affin_data.update({"batch_variant": f"{fname}-{int(max_idx)}"})  # JSON serializable int
+                result.update(**affin_data)
+            
+            results.append(result)
+            
     return jsonify(results)
 
 
