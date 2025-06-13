@@ -19,7 +19,7 @@ class Boltz(BaseServerSF):
 
     return_metrics = [
         "confidence_score",
-        "pair_chain_iptm_protein-ligand"
+        "pair_chain_iptm_protein-ligand",
         "affinity_pred_value",
         "affinity_probability_binary"
         ]
