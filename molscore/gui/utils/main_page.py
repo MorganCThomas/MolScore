@@ -6,7 +6,7 @@ from streamlit_plotly_events import plotly_events
 from molscore.gui.utils import utils
 
 
-def single_plot(main_df, SS, dock_path=None):
+def single_plot(main_df, SS, dock_path=None, fold_path=None):
     """The streamlit monitors main page"""
 
     # ----- Show central plot -----

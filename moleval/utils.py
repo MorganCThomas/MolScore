@@ -584,7 +584,7 @@ def butina_picker(
 
     if return_cs:
         cs_subset = [[mols[i] for i in c] for c in cs]
-        return subset, size, cs_subset
+        return subset, size, cs_subset, cs
     else:
         return subset, size
 

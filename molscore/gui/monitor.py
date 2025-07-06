@@ -18,10 +18,12 @@ if "input_latest" not in SS.keys():
     SS.input_latest = []
 if "dock_path" not in SS.keys():
     SS.dock_path = None
+if "fold_path" not in SS.keys():
+    SS.fold_path = None
 if "pymol" not in SS:
     SS.pymol = None
 if "exclude_params" not in SS:
-    SS.exclude_params = ["run", "dock_path"]
+    SS.exclude_params = ["run", "dock_path", "fold_path"],
 if "rename_map" not in SS:
     SS.rename_map = {}
 
@@ -90,9 +92,10 @@ def main():
 
         # Check any dock path
         SS.dock_path = any([utils.check_dock_paths(d) for d in SS.input_dirs])
+        SS.fold_path = any([utils.check_fold_paths(d) for d in SS.input_dirs])
 
     # Setup PyMol
-    if (SS.pymol is None) and (SS.dock_path):
+    if (SS.pymol is None) and ((SS.dock_path) or (SS.fold_path)):
         if "PYMOL_PATH" in os.environ:
             SS.pymol = PyMol(pymol_path=os.environ["PYMOL_PATH"])
         else:
@@ -135,6 +138,7 @@ def main():
         ):
             add_run(input_dir, SS=SS)
             SS.dock_path = any([utils.check_dock_paths(d) for d in SS.input_dirs])
+            SS.fold_path = any([utils.check_fold_paths(d) for d in SS.input_dirs])
 
         # Option to rename runs
         st.sidebar.header("Rename runs:")
@@ -158,7 +162,7 @@ def main():
 
         # ----- Main page -----
         if nav == "Main":
-            single_plot(main_df=SS.main_df, SS=SS, dock_path=SS.dock_path)
+            single_plot(main_df=SS.main_df, SS=SS, dock_path=SS.dock_path, fold_path=SS.fold_path)
 
         # ----- Multi-plot -----
         if nav == "Multi-plot":
@@ -166,11 +170,11 @@ def main():
 
         # ----- MPO Graph -----
         if nav == "MPO":
-            mpo_plot(main_df=SS.main_df, SS=SS, dock_path=SS.dock_path)
+            mpo_plot(main_df=SS.main_df, SS=SS, dock_path=SS.dock_path, fold_path=SS.fold_path)
 
         # ----- Scaffold memory page ----
         if nav == "Scaffold memory":
-            scaffold_plot(main_df=SS.main_df, SS=SS, dock_path=SS.dock_path)
+            scaffold_plot(main_df=SS.main_df, SS=SS, dock_path=SS.dock_path, fold_path=SS.fold_path)
 
     # ----- Exit -----
     exit = st.sidebar.button("Exit")

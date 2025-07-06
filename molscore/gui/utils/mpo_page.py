@@ -94,7 +94,7 @@ def calculate_aggregate(df, x_variables, x_orders, x_weights, agg_method):
     )
 
 
-def mpo_plot(main_df, SS, dock_path=False):
+def mpo_plot(main_df, SS, dock_path=False, fold_path=False):
     """Show parallel plots of Top-K molecules"""
 
     # ----- MPO @ step -----
@@ -204,8 +204,21 @@ def mpo_plot(main_df, SS, dock_path=False):
                 out_file = os.path.abspath(f"{out_file}.sdf")
                 st.write(out_file)
                 if st.button(label="Save", key="export_topk_sdf"):
-                    file_paths, mol_names = utils.find_sdfs(selection, main_df)
+                    file_paths, mol_names = utils.find_structure_files(selection, main_df)
                     utils.save_sdf(
                         mol_paths=file_paths, mol_names=mol_names, out_file=out_file
+                    )
+                    st.write("Saved!")
+                    
+        if fold_path:
+            with st.expander(label="Export top-K molecules"):
+                # User input
+                out_zip = st.text_input(label="File name", key="topk_cif_output")
+                out_zip = os.path.abspath(f"{out_zip}.zip")
+                st.write(out_zip)
+                if st.button(label="Save", key="export_topk_cif"):
+                    file_paths, names = utils.find_structure_files(selection, main_df)
+                    utils.save_cif(
+                        in_paths=file_paths, names=names, out_file=out_zip
                     )
                     st.write("Saved!")

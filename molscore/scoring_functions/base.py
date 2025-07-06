@@ -60,6 +60,7 @@ class BaseServerSF:
         env_path: str = None,
         server_grace: int = 60,
         server_kwargs: dict = {},
+        server_args: list = [],
         **kwargs,
     ):
         """
@@ -86,6 +87,7 @@ class BaseServerSF:
 
         # Setup any parameters that need to be passed to the server
         self.server_kwargs = server_kwargs
+        self.server_args = server_args  # Flags to pass to the server
 
         # Check/create Environment
         if not self._check_env():
@@ -132,7 +134,8 @@ class BaseServerSF:
         while self._check_port(port):
             port += 1
         kwargs = " ".join([f"--{k} {v}" for k, v in self.server_kwargs.items()])
-        self.server_cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} {kwargs}"
+        args = " ".join([f"--{arg}" for arg in self.server_args])
+        self.server_cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} {kwargs} {args}"
         self.server_url = f"http://localhost:{port}"
         logger.info(f"Launching server: {self.server_cmd}")
         try:
@@ -171,9 +174,8 @@ class BaseServerSF:
             self.server_subprocess = None
             logger.info("Server killed")
 
-    def send_smiles_to_server(self, smiles):
-        payload = {"smiles": smiles}
-        #logger.debug(f"Sending payload to server: {payload}")
+    def send_smiles_to_server(self, smiles, directory, file_names):
+        payload = {"smiles": smiles, "directory": directory, "file_names": file_names}
         try:
             response = requests.post(self.server_url + "/", json=payload)
         except requests.exceptions.ConnectionError as e:
@@ -193,7 +195,7 @@ class BaseServerSF:
                 {f"{self.prefix}_{k}" if k != "smiles" else k: v for k, v in r.items()}
                 for r in results
             ]
-            #logger.debug(f"Result from server: {results}")
+            # logger.debug(f"Result from server: {results}")
         else:
             results = [{"smiles": smi} for smi in smiles]
             _ = [
@@ -203,6 +205,5 @@ class BaseServerSF:
             logger.error(f"Error {response.status_code}: {response.text}")
         return results
 
-    def __call__(self, smiles: list, **kwargs):
-        results = self.send_smiles_to_server(smiles)
-        return results
+    def __call__(self, smiles: list, directory, file_names: list, **kwargs) -> list:
+        return self.send_smiles_to_server(smiles, directory, file_names)
