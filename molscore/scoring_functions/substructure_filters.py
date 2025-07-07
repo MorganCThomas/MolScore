@@ -581,7 +581,7 @@ class SubstructureFilters:
         """
         self.prefix = prefix.replace(" ", "_")
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        self.pool = Pool(self.n_jobs)
         self.smarts = []
 
         if az_filters:
@@ -640,6 +640,6 @@ class SubstructureFilters:
                     f"{self.prefix}_substruct_filt": match,
                     f"{self.prefix}_substruct": subs,
                 }
-                for smi, match, subs in self.mapper(match_substructure_p, smiles)
+                for smi, match, subs in self.pool.map(match_substructure_p, smiles)
             ]
         return results

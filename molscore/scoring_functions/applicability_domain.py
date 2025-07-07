@@ -52,7 +52,7 @@ class ApplicabilityDomain:
         self.qed = qed
         self.physchem = physchem
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        self.pool = Pool(self.n_jobs)
 
         # If file path provided, load smiles.
         if isinstance(ref_smiles, str):
@@ -66,11 +66,11 @@ class ApplicabilityDomain:
 
         # Calculate features
         logger.info("Computing reference features")
-        mols = [m for m in self.mapper(get_mol, self.ref_smiles) if m is not None]
+        mols = [m for m in self.pool.map(get_mol, self.ref_smiles) if m is not None]
         pfunc = partial(
             self.compute_features, fp=self.fp, qed=self.qed, physchem=self.physchem
         )
-        self.ref_features = np.asarray([f for f in self.mapper(pfunc, mols)])
+        self.ref_features = np.asarray(self.pool.submit(pfunc, mols))
 
         # Compound bounds
         self.ref_max = np.max(self.ref_features, axis=0)
@@ -192,7 +192,7 @@ class ApplicabilityDomain:
             qed=self.qed,
             physchem=self.physchem,
         )
-        results = [r for r in self.mapper(pfunc, smiles)]
+        results = self.pool.submit(pfunc, smiles)
         return results
 
     def __call__(self, smiles: list, **kwargs):

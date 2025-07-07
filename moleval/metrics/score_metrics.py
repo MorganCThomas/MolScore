@@ -62,6 +62,7 @@ class ScoreMetrics:
         scores: pd.DataFrame = None,
         reference_smiles: list = [],
         budget: int = None,
+        oracle_budget: int = None,
         valid=True,
         unique=True,
         n_jobs=1,
@@ -72,7 +73,8 @@ class ScoreMetrics:
         to plot metrics and select chemistry examples.
         :param scores: pd.DataFrame, the scores dataframe returned from MolScore
         :param reference_smiles: list, a list of reference SMILES to compare against as 'Target' property chemistry
-        :param budget: int, the budget of the experiment
+        :param budget: int, the molecule budget of the experiment
+        :param oracle_budget; int, the oracle budget of the experiment
         :param valid: bool, whether to truncate to only valid smiles
         :param unique: bool, whether to truncate to only unique smiles
         :param n_jobs: int, number of jobs to run in parallel
@@ -83,8 +85,12 @@ class ScoreMetrics:
         self.n_jobs = check_env_jobs(n_jobs)
         self.total = len(scores)
         self.budget = budget if budget else self.total
+        self.oracle_budget = oracle_budget
+        self.extrapolate_budget = self.budget
+        if self.oracle_budget:
+            self.extrapolate_budget = min(self.budget, self.oracle_budget)
         self.scores = self._preprocess_scores(
-            scores.copy(deep=True), valid=valid, unique=unique, budget=budget,
+            scores.copy(deep=True), valid=valid, unique=unique, budget=budget, oracle_budget=self.oracle_budget
         )
         self.benchmark = benchmark
         
@@ -109,14 +115,16 @@ class ScoreMetrics:
         self._rascorer = None
 
     def _reinitialize(
-        self, scores, budget: int = None, benchmark: str = None, n_jobs: int = None
+        self, scores, budget: int = None, oracle_budget: int = None, benchmark: str = None, n_jobs: int = None
     ):
         # Re-initialize without recomputing reference smiles
         self.total = len(scores)
         if budget:
             self.budget = budget
+        if oracle_budget:
+            self.oracle_budget = budget
         if not self.budget:
-            self.total
+            self.budget = self.total
         if benchmark:
             self.benchmark = benchmark
         if n_jobs:
@@ -125,7 +133,7 @@ class ScoreMetrics:
                 target=self.reference_smiles, n_jobs=self.n_jobs
             )
         self.scores = self._preprocess_scores(
-            scores.copy(deep=True), valid=True, unique=True, budget=self.budget
+            scores.copy(deep=True), valid=True, unique=True, budget=self.budget, oracle_budget=self.oracle_budget
         )
         self._bcf_scores = None
         self._tcf_scores = None
@@ -179,7 +187,7 @@ class ScoreMetrics:
         else:
             return self.scores
 
-    def _preprocess_scores(self, scores, valid=True, unique=True, budget=None):
+    def _preprocess_scores(self, scores, valid=True, unique=True, budget=None, oracle_budget=None):
         # Truncate scores df to budget
         if budget:
             scores = scores.iloc[:budget]
@@ -218,6 +226,10 @@ class ScoreMetrics:
                 self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
         else:
             self.unique_ratio = np.NaN
+            
+        # Truncate valid & unique scores to oracle budget
+        if oracle_budget:
+            scores = scores.iloc[:budget]
             
         # Add scaffold column if not present
         if "smiles" in scores.columns:
@@ -626,7 +638,7 @@ class ScoreMetrics:
             # Calculate top AUC
             top1, top10, top100 = self.top_auc(
                 scores=tdf,
-                budget=self.budget,
+                budget=self.extrapolate_budget,
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
                 window=100,
@@ -802,7 +814,7 @@ class ScoreMetrics:
                             self.top_auc,
                             (
                                 filtered_scores,
-                                self.budget,
+                                self.extrapolate_budget,
                                 top_ns,
                                 endpoint,
                                 100,
@@ -824,7 +836,7 @@ class ScoreMetrics:
                             self.top_auc,
                             (
                                 filtered_scores,
-                                self.budget,
+                                self.extrapolate_budget,
                                 top_ns,
                                 endpoint,
                                 100,
@@ -853,7 +865,7 @@ class ScoreMetrics:
                                 self.tyield,
                                 (
                                     filtered_scores,
-                                    self.budget,
+                                    self.extrapolate_budget,
                                     endpoint,
                                     threshold,
                                     False, # Scaffold
@@ -870,7 +882,7 @@ class ScoreMetrics:
                                 self.tyield,
                                 (
                                     filtered_scores,
-                                    self.budget,
+                                    self.extrapolate_budget,
                                     endpoint,
                                     threshold,
                                     True, # Scaffold
@@ -887,7 +899,7 @@ class ScoreMetrics:
                                 self.tyield_auc,
                                 (
                                     filtered_scores,
-                                    self.budget,
+                                    self.extrapolate_budget,
                                     endpoint,
                                     threshold,
                                     100,
@@ -907,7 +919,7 @@ class ScoreMetrics:
                                 self.tyield_auc,
                                 (
                                     filtered_scores,
-                                    self.budget,
+                                    self.extrapolate_budget,
                                     endpoint,
                                     threshold,
                                     100,
@@ -946,14 +958,14 @@ class ScoreMetrics:
                     )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                            prefix + "Rediscovery Rate": rediscovered_smiles / self.extrapolate_budget,
                             prefix + "Rediscovered Ratio": rediscovered_smiles
                             / len(target_smiles),
                         }
                     )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                            prefix + "Rediscovery Rate": rediscovered_smiles / self.extrapolate_budget,
                             prefix + "Rediscovered Ratio": rediscovered_smiles
                             / len(target_smiles),
                         }
@@ -962,7 +974,7 @@ class ScoreMetrics:
                         metrics.update(
                             {
                                 prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
-                                / self.budget,
+                                / self.extrapolate_budget,
                                 prefix
                                 + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
                                 / len(target_scaffolds),
@@ -1000,10 +1012,10 @@ class ScoreMetrics:
         # ----- Further property related
         # MCF filters
         if any([(m in include) and (m not in metrics) for m in ["B-CF", "T-CF", "B&T-CF"]]):
-            metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
+            metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.extrapolate_budget
             if chemistry_filter_target and self.has_reference_smiles:
-                metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.budget
-                metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.budget
+                metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.extrapolate_budget
+                metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.extrapolate_budget
 
         # Predicted synthesizability (RAScore > 0.5?)
         if ("Predicted Synthesizability" in include) and ("Predicted Synthesizability" not in metrics):

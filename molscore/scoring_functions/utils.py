@@ -7,7 +7,7 @@ import signal
 import subprocess
 import threading
 import time
-import atexit
+import weakref
 from functools import partial
 from pathlib import Path
 from typing import Callable, Sequence, Union
@@ -51,31 +51,65 @@ def check_path(path):
 
 
 # ----- Multiprocessing related -----
-def Pool(n_jobs, return_map=True, **kwargs):
-    if platform.system() == "Linux":
-        context = multiprocessing.get_context("fork")
-    else:
-        context = multiprocessing.get_context("spawn")
-
-    # Extract from environment as default, overriding configs
-    if "MOLSCORE_NJOBS" in os.environ.keys():
-        pool = context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
-        atexit.register(pool.terminate)
-        return pool.imap if return_map else pool
+class Pool:
+    def __init__(self, n_jobs: Union[int, float] = None, **kwargs):
+        """
+        Create a potentially multiprocessing job pool or with the given number of jobs.
+        Note: If MOLSCORE_NJOBS is set in the environment, this will override the n_jobs parameter.
+        :param n_jobs: Number of jobs to run in parallel, None or 1 means no multiprocessing. Float is fraction of CPUs i.e., 1.0 is all. -1 is also all CPUs.
+        :param kwargs: Additional arguments to pass to the multiprocessing.pool
+        """
+        self.n_jobs = self._resolve_n_jobs(n_jobs=n_jobs)
+        self.kwargs = kwargs
+        self._context = self._get_context()
+        # Create the pool
+        if self.n_jobs is not None:
+            self._mp_pool = self._context.Pool(self.n_jobs, **self.kwargs)
+        else:
+            self._mp_pool = None
+        # Register cleanup
+        weakref.finalize(self, self._cleanup)
+        
+    def _get_context(self):
+        if platform.system() == "Linux":
+            context = multiprocessing.get_context("fork")
+        else:
+            context = multiprocessing.get_context("spawn")
+        return context
     
-    # Transform float into fraction of CPUs
-    if isinstance(n_jobs, float):
+    def _resolve_n_jobs(self, n_jobs = None):
         cpu_count = os.cpu_count()
-        n_jobs = int(cpu_count * n_jobs)
+        # Extract from environment as default, overriding configs
+        if "MOLSCORE_NJOBS" in os.environ.keys():
+            return int(os.environ["MOLSCORE_NJOBS"])
+        # Transform float into fraction of CPUs
+        if isinstance(n_jobs, float):
+            assert 0.0 <= n_jobs <= 1, "Fraction of CPUs must be between 0.0 and 1.0"
+            n_jobs = int(cpu_count * n_jobs)
+            if n_jobs > 1:
+                return n_jobs
+        # Resolve int
+        if isinstance(n_jobs, int):
+            if n_jobs == -1:
+                return cpu_count
+            if n_jobs > 1:
+                return n_jobs
+        # No multiprocessing
+        return None
     
-    # Return pool or None
-    if isinstance(n_jobs, int) and (n_jobs > 1):
-        pool = context.Pool(n_jobs, *kwargs)
-        atexit.register(pool.terminate)
-        return pool.imap if return_map else pool
-    else:
-        return map if return_map else pool
+    def map(self, func, iterable):
+        if self._mp_pool is None:
+            return map(func, iterable)
+        else:
+            return self._mp_pool.imap(func, iterable)
+        
+    def submit(self, func, iterable):
+        return list(self.map(func, iterable))
     
+    def _cleanup(self):
+        if self._mp_pool:
+            self._mp_pool.terminate()
+
 
 def test_func():
     mol = Chem.MolFromSmiles(
@@ -529,7 +563,7 @@ class Fingerprints:
                     mol, radius=2, nBits=nBits
                 )
             else:
-                return rdMolDescriptors.GetMorganFingerprint(mol, radius=2)
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=False)
 
     @staticmethod
     def ECFP4c(mol, nBits, asarray):
@@ -550,7 +584,7 @@ class Fingerprints:
             assert nBits, "Number of bits must be specified to return np.array"
             np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                    mol, radius=2, nBits=nBits, useFeatures=True
+                    mol, radius=2, nBits=nBits, useFeatures=True, useCounts=False
                 )
             )
         else:
@@ -560,7 +594,7 @@ class Fingerprints:
                 )
             else:
                 return rdMolDescriptors.GetMorganFingerprint(
-                    mol, radius=2, useFeatures=True
+                    mol, radius=2, useFeatures=True, useCounts=False
                 )
 
     @staticmethod
@@ -577,7 +611,7 @@ class Fingerprints:
             return nfp.reshape(-1)
         else:
             return rdMolDescriptors.GetMorganFingerprint(
-                mol, radius=2, useCounts=True, useFeatures=True
+                mol, radius=2, useCounts=True, useFeatures=True,
             )
 
     @staticmethod
@@ -595,7 +629,7 @@ class Fingerprints:
                     mol, radius=3, nBits=nBits
                 )
             else:
-                return rdMolDescriptors.GetMorganFingerprint(mol, radius=3)
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=False)
 
     @staticmethod
     def ECFP6c(mol, nBits, asarray):
@@ -626,7 +660,7 @@ class Fingerprints:
                 )
             else:
                 return rdMolDescriptors.GetMorganFingerprint(
-                    mol, radius=3, useFeatures=True
+                    mol, radius=3, useFeatures=True, useCounts=False
                 )
 
     @staticmethod
