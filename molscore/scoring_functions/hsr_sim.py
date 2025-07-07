@@ -1,13 +1,18 @@
 import logging
+import multiprocessing.pool
 import os
 from typing import Union
 from openbabel import pybel as pb
 import numpy as np
 from functools import partial
-import multiprocessing
-from multiprocessing import Pool
+import time
+import atexit
+import multiprocessing as mp
+import platform
 from rdkit import Chem
 import importlib
+import contextlib, signal, functools
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from hsr import pre_processing as pp
 from hsr import fingerprint as fp
 from hsr import similarity as sim
@@ -30,6 +35,101 @@ P_Q_FEATURES = {
     'protons' : extract_proton_number,
     'formal_charges' : extract_formal_charge
     }
+
+def _worker(smiles, result_q):
+    """Child process: build molecule, run CCDC, put result (or None) back."""
+    try:
+        from ccdc.conformer import ConformerGenerator
+        from ccdc.molecule import Molecule
+        cg = ConformerGenerator()
+        cg.settings.max_conformers = 1
+        mol = Molecule.from_string(smiles)
+        hit = cg.generate(mol).hits[0] 
+        result_q.put(hit.molecule.to_string("sdf"))
+    except Exception as err:
+        # Any error -> return None
+        result_q.put(None)
+
+def generate_ccdc_sdf(smiles: str, timeout: int = 10):
+    """
+    Run CCDC conformer generation in a **separate process**.
+
+    Returns an SDF string or None if it errors / exceeds *timeout* seconds.
+    The child is force-killed after *timeout* + 1 s.
+    """
+    ctx = multiprocessing.get_context("fork")        
+    q   = ctx.Queue()
+    p   = ctx.Process(target=_worker, args=(smiles,q))
+    p.start()
+    p.join(timeout + 1)
+
+    if p.is_alive():
+        p.kill()           
+        p.join()
+
+    return q.get() if not q.empty() else None
+
+def _coords_to_ndarray_ccdc(ccdc_mol, use_charges: bool):
+    """CCDC → numpy array (identical to class method)."""
+    if not ccdc_mol.atoms:         
+        return None
+    rows = []
+    for a in ccdc_mol.atoms:
+        row = [a.coordinates[0], a.coordinates[1], a.coordinates[2],
+               np.sqrt(a.atomic_number)]
+        if use_charges:
+            row.append(a.formal_charge)
+        rows.append(row)
+    arr = np.asarray(rows, dtype=float)
+    arr -= arr.mean(axis=0)
+    return arr
+
+def _ccdc_score_one(obj, ref_fp, use_charges, prefix, mode, timeout):
+    """
+    *obj* comes from ThreadPool.
+      mode == "smiles" → obj is a SMILES string
+      mode == "entry"  → obj is either a refcode (str) or a CCDC Molecule
+    """
+    try:
+        from ccdc.molecule import Molecule
+
+        # ────────────── obtain a 3-D CCDC molecule ──────────────
+        if mode == "smiles":
+            sdf = generate_ccdc_sdf(obj, timeout)
+            if sdf is None:
+                raise TimeoutError
+            mol3d = Molecule.from_string(sdf)
+
+        else:                          # mode == "entry"
+            if isinstance(obj, Molecule):
+                mol3d = component_of_interest(obj)
+            else:                      # assume refcode string
+                mol3d = component_of_interest(
+                           import_ccdc()[0].EntryReader("CSD").entry(obj).molecule)
+            if mol3d is None:
+                raise ValueError("no suitable component")
+
+        # ────────────── fingerprint & similarity ────────────────
+        arr   = _coords_to_ndarray_ccdc(mol3d, use_charges)
+        if arr is None:
+            return {"molecule": obj,
+                "3d_mol": 0.0,
+                f"{prefix}_HSR_score": 0.0}
+            
+        fp_   = fp.generate_fingerprint_from_data(arr)
+        score = sim.compute_similarity_score(ref_fp, fp_) or 0.0
+        if np.isnan(score):
+            score = 0.0
+
+        return {"molecule": obj,
+                "3d_mol": mol3d.to_string("sdf"),
+                f"{prefix}_HSR_score": score}
+
+    except Exception:
+        return {"molecule": obj,
+                "3d_mol": 0.0,
+                f"{prefix}_HSR_score": 0.0}
+
 
 def component_of_interest(molecule):
     components = molecule.components
@@ -126,9 +226,12 @@ class HSR:
         
         self.io = self.conformer = self.ccdcMolecule = None
 
-        
-        if self.generator == 'ccdc':
+        if generator.startswith("ccdc"):
+            self.generator = "ccdc"
+            self.ccdc_mode = "smiles" if "_smiles" in generator else "entry"
             self.io, self.conformer, self.ccdcMolecule = import_ccdc()
+        else:
+            self.ccdc_mode = None 
         
         # Resolve absolute or relative paths
         if isinstance(ref_molecule, str):
@@ -286,11 +389,10 @@ class HSR:
                 mol_3d.localopt()
                 mol_sdf = mol_3d.write("sdf")
             elif self.generator == "ccdc":
-                conformer_generator = self.conformer.ConformerGenerator()
-                mol = self.ccdcMolecule.from_string(smile)
-                conf = conformer_generator.generate(mol)
-                mol_3d = conf.hits[0].molecule
-                mol_sdf = mol_3d.to_string("sdf")
+                mol_sdf = generate_ccdc_sdf(smile, timeout=self.timeout)
+                if mol_sdf is None:
+                    raise TimeoutError("CCDC conformer generation timed-out")
+                mol_3d = self.ccdcMolecule.from_string(mol_sdf)
             elif self.generator == "rdkit":
                 mol = Chem.MolFromSmiles(smile)
                 mol = Chem.AddHs(mol)
@@ -397,52 +499,47 @@ class HSR:
         os.makedirs(directory, exist_ok=True)
         
         # Check if CCDC is available
-        ccdc_available = self.ccdcMolecule is not None
-        # Check if all molecules are CCDC **only if CCDC is available**
-        all_ccdc = ccdc_available and all(isinstance(mol, self.ccdcMolecule) for mol in molecules)
-                
+        serial_mode = self.generator.startswith("ccdc")
         results = []
         
-        if all_ccdc:
-            logger.info("Processing CCDC molecules sequentially")
-            for mol in molecules:
-                results.append(self.score_mol(mol))
-        else:    
-            # Prepare function for parallelization
-            pfunc = partial(self.score_mol,)
-            
-            # Score individual smiles
-            n_processes = min(self.n_jobs, len(molecules), os.cpu_count())
-            
-            with Pool(n_processes) as pool:
-                # Submit tasks with apply_async and set a timeout for each scoring
-                async_results = []
-                for mol in molecules:
-                    async_result = pool.apply_async(pfunc, args=(mol,))
-                    async_results.append(async_result)
+        if serial_mode:
+            max_thr = min(self.n_jobs, len(molecules)) or 1
+            results = []
 
-                # Collect results, applying timeout and handling it gracefully
-                for i, async_result in enumerate(async_results):
+            with ThreadPoolExecutor(max_workers=max_thr) as tp:
+                futures = {tp.submit(_ccdc_score_one,
+                                    smi,
+                                    self.ref_mol_fp,
+                                    self.use_charges,
+                                    self.prefix,
+                                    self.ccdc_mode,
+                                    self.timeout)
+                        : smi for smi in molecules}
+
+                for fut in as_completed(futures):
                     try:
-                        # Try to get the result with a timeout equal to the specified time limit
-                        result = async_result.get(timeout=self.timeout)
+                        results.append(fut.result())
+                    except Exception:        # includes our TimeoutError → score 0
+                        smi = futures[fut]
+                        results.append({"molecule": smi,
+                                        f"{self.prefix}_HSR_score": 0.0})
+            
+        else:    
+            ctx = mp.get_context("fork" if platform.system() == "Linux" else "spawn")
+            
+            with ctx.Pool(self.n_jobs) as pool: 
+                async_results = [pool.apply_async(self.score_mol, (mol,))
+                                for mol in molecules]
+
+                for mol, ar in zip(molecules, async_results):
+                    try:
+                        results.append(ar.get(timeout=self.timeout))
                     except multiprocessing.TimeoutError:
-                        # Handle the timeout scenario by using default values
-                        # logger.error(f"Timeout occurred for molecule: {molecules[i]}")
-                        result = {
-                            "molecule": molecules[i],
-                            f'3d_mol': 0.0,
-                            f'{self.prefix}_HSR_score': 0.0,
-                        }
-                    except Exception as e:
-                        # Handle any other exception
-                        logger.error(f"Error processing molecule {molecules[i]}: {e}")
-                        result = {
-                            "molecule": molecules[i],
-                            f'3d_mol': 0.0,
-                            f'{self.prefix}_HSR_score': 0.0,
-                        }
-                    results.append(result)
+                        results.append({"molecule": mol,
+                                        "3d_mol": 0.0,
+                                        f"{self.prefix}_HSR_score": 0.0})
+                
+                
 
         # Save mols
         # Check if in results there is the key '3d_mol' (we are not using ndarray, 
