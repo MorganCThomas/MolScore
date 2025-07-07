@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "ABAHIW",
                 "ref_molecule": "3DOpt/targets/1_ABAHIW.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true

@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "DAJLAC",
                 "ref_molecule": "3DOpt/targets/20_DAJLAC.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true

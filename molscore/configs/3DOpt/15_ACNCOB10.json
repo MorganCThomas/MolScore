@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "ACNCOB10",
                 "ref_molecule": "3DOpt/targets/15_ACNCOB10.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true

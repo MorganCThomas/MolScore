@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "AFIXEV",
                 "ref_molecule": "3DOpt/targets/30_AFIXEV.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true

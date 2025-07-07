@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "ABAKIZ",
                 "ref_molecule": "3DOpt/targets/2_ABAKIZ.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true

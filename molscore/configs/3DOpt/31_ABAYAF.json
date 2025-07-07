@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "ABAYAF",
                 "ref_molecule": "3DOpt/targets/31_ABAYAF.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true,

@@ -15,8 +15,8 @@
             "run": true,
             "parameters": {
                 "prefix": "ABADOX",
-                "ref_molecule": "3D_Benchmark/targets/3_ABADOX.txt",
-                "generator": "obabel",
+                "ref_molecule": "3DOpt/targets/3_ABADOX.txt",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true

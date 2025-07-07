@@ -16,7 +16,7 @@
             "parameters": {
                 "prefix": "ACAZFE",
                 "ref_molecule": "3DOpt/targets/17_ACAZFE.txt",
-                "generator": "obabel",
+                "generator": "rdkit",
                 "n_jobs": 8,
                 "timeout": 10,
                 "save_files": true
