@@ -1,0 +1,41 @@
+{
+    "task": "10_ABEHAU",
+    "output_dir": "./",
+    "starting_population": [
+        "molscore.configs.3DOpt",
+        "starting_populations/10_ABEHAU_init_pop.txt"
+    ],
+    "load_from_previous": false,
+    "logging": false,
+    "monitor_app": false,
+    "termination_exit": false,
+    "scoring_functions": [
+        {
+            "name": "HSR",
+            "run": true,
+            "parameters": {
+                "prefix": "ABEHAU",
+                "ref_molecule": "3DOpt/targets/10_ABEHAU.txt",
+                "generator": "obabel",
+                "n_jobs": 8,
+                "timeout": 10,
+                "save_files": true
+            }
+        }
+    ],
+    "scoring": {
+        "metrics": [
+            {
+                "name": "ABEHAU_HSR_score",
+                "filter": false,
+                "weight": 1.0,
+                "modifier": "raw",
+                "parameters": {}
+            }
+        ],
+        "method": "single"
+    },
+    "diversity_filter": {
+        "run": false
+    }
+}

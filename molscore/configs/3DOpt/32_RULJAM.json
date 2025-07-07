@@ -1,0 +1,42 @@
+{
+    "task": "32_RULJAM",
+    "output_dir": "./",
+    "starting_population": [
+        "molscore.configs.3DOpt",
+        "starting_populations/32_RULJAM_init_pop.txt"
+    ],
+    "load_from_previous": false,
+    "logging": false,
+    "monitor_app": false,
+    "termination_exit": false,
+    "scoring_functions": [
+        {
+            "name": "HSR",
+            "run": true,
+            "parameters": {
+                "prefix": "RULJAM",
+                "ref_molecule": "3DOpt/targets/32_RULJAM.txt",
+                "generator": "obabel",
+                "n_jobs": 8,
+                "timeout": 10,
+                "save_files": true,
+                "use_charges_in_fp": true
+            }
+        }
+    ],
+    "scoring": {
+        "metrics": [
+            {
+                "name": "RULJAM_HSR_score",
+                "filter": false,
+                "weight": 1.0,
+                "modifier": "raw",
+                "parameters": {}
+            }
+        ],
+        "method": "single"
+    },
+    "diversity_filter": {
+        "run": false
+    }
+}
