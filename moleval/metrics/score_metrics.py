@@ -501,7 +501,7 @@ class ScoreMetrics:
             rediscovered_scaffolds = len(target.intersection(query))
         return rediscovered_smiles, rediscovered_scaffolds
     
-    def molopt_score(self, endpoint):
+    def molopt_score(self, endpoint, chemistry_filter=False):
         metrics = self.run_metrics(
             endpoints=[endpoint],
             include=[
@@ -511,7 +511,8 @@ class ScoreMetrics:
                 "Top-1 AUC",
                 "Top-10 AUC",
                 "Top-100 AUC",
-            ]
+            ],
+            chemistry_filter_basic=chemistry_filter
         )
         return metrics
 
@@ -697,8 +698,10 @@ class ScoreMetrics:
 
     def run_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
-        if self.benchmark.startswith("MolOpt"):
+        if self.benchmark == "MolOpt":
             benchmark_metrics.update(self.molopt_score(endpoint=endpoint))
+        elif self.benchmark in ["MolOpt_chem", "MolOpt-CF", "MolOpt-DF"]:
+            benchmark_metrics.update(self.molopt_score(endpoint=endpoint, chemistry_filter=True))
         elif self.benchmark.startswith("MolExp"):
             benchmark_metrics.update(self.molexp_score())
         elif self.benchmark in ["GuacaMol", "GuacaMol_Scaffold"]:
