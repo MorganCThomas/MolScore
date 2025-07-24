@@ -7,7 +7,7 @@ channels:
   - nvidia
   - bioconda
 dependencies:
-  - python>=3.8,<3.10
+  - python=3.10
   - rdkit>=2019.03.2
   - ipython
   - prolif
