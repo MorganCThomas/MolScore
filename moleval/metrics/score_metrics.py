@@ -746,10 +746,10 @@ class ScoreMetrics:
         metrics = {}
         
         # Function to check include
-        def check_top_N(patt):
+        def check_top_N(patt, prefix):
             patt = re.compile(patt)
             metric_names = [patt.search(m) for m in include if patt.search(m)]
-            metric_names = [m for m in metric_names if f"{m.string} {endpoint}" not in metrics]
+            metric_names = [m for m in metric_names if f"{prefix}{m.string} {endpoint}" not in metrics]
             top_ns = [int(m.groups()[0]) for m in metric_names]
             return (bool(metric_names), top_ns)
         
@@ -781,7 +781,7 @@ class ScoreMetrics:
             # ----- Endpoint related
             for i, endpoint in enumerate(endpoints):
                 # Top-{N} Avg score
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -792,7 +792,7 @@ class ScoreMetrics:
                     )
                 
                 # Top-{N} Avg (Div)
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg (Div)")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg (Div)", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -810,7 +810,7 @@ class ScoreMetrics:
                     )
                     
                 # Top-{N} AUC
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -832,7 +832,7 @@ class ScoreMetrics:
                     )
                     
                 # Top-{N} AUC (Div)
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC (Div)")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC (Div)", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -1347,9 +1347,6 @@ class ScoreMetrics:
         tdf = self.scores
         # Chemisry Filters
         if bad_only:
-            import pdb
-
-            pdb.set_trace()
             bad_idxs = [
                 i
                 for i in range(len(tdf))
