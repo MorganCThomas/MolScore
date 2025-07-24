@@ -42,21 +42,27 @@ except Exception as e:
 
 try:
     from molscore.scoring_functions.similarity import (
-        MolecularSimilarity,
         LevenshteinSimilarity,
+        MolecularSimilarity,
         TanimotoSimilarity,
     )
 
-    all_scoring_functions.extend([MolecularSimilarity, TanimotoSimilarity, LevenshteinSimilarity])
+    all_scoring_functions.extend(
+        [MolecularSimilarity, TanimotoSimilarity, LevenshteinSimilarity]
+    )
 except Exception as e:
-    logger.warning(f"MolecularSimilarity: currently unavailable due to the following: {e}")
+    logger.warning(
+        f"MolecularSimilarity: currently unavailable due to the following: {e}"
+    )
 
 try:
     from molscore.scoring_functions.applicability_domain import ApplicabilityDomain
 
     all_scoring_functions.append(ApplicabilityDomain)
 except Exception as e:
-    logger.warning(f"ApplicabilityDomain: currently unavailable due to the following: {e}")
+    logger.warning(
+        f"ApplicabilityDomain: currently unavailable due to the following: {e}"
+    )
 
 try:
     from molscore.scoring_functions.chemistry_filters import ChemistryFilter
@@ -70,14 +76,18 @@ try:
 
     all_scoring_functions.append(SubstructureFilters)
 except Exception as e:
-    logger.warning(f"SubstructureFilters: currently unavailable due to the following: {e}")
+    logger.warning(
+        f"SubstructureFilters: currently unavailable due to the following: {e}"
+    )
 
 try:
     from molscore.scoring_functions.substructure_match import SubstructureMatch
 
     all_scoring_functions.append(SubstructureMatch)
 except Exception as e:
-    logger.warning(f"SubstructureMatch: currently unavailable due to the following: {e}")
+    logger.warning(
+        f"SubstructureMatch: currently unavailable due to the following: {e}"
+    )
 
 try:
     from molscore.scoring_functions.bloom_filter import BloomFilter
@@ -106,7 +116,7 @@ except Exception as e:
     logger.warning(f"RAScore: currently unavailable due to the following: {e}")
 
 try:
-    from molscore.scoring_functions.aizynthfinder import AiZynthFinder
+    from molscore.scoring_functions.aizynth import AiZynthFinder
 
     all_scoring_functions.append(AiZynthFinder)
 except Exception as e:
@@ -145,7 +155,7 @@ except Exception as e:
 
 try:
     from molscore.scoring_functions.admet_ai import ADMETAI
-    
+
     all_scoring_functions.append(ADMETAI)
 except Exception as e:
     logger.warning(f"ADMETAI: currently unavailable due to the following: {e}")
@@ -163,7 +173,9 @@ try:
 
     all_scoring_functions.extend([ROCS, GlideDockFromROCS, OEDock])
 except Exception as e:
-    logger.warning(f"OpenEye functions: currently unavailable due to the following: {e}")
+    logger.warning(
+        f"OpenEye functions: currently unavailable due to the following: {e}"
+    )
 
 try:
     from molscore.scoring_functions.glide import GlideDock

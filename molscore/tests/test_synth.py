@@ -2,7 +2,7 @@ import json
 import os
 import unittest
 
-from molscore.scoring_functions.aizynthfinder import AiZynthFinder
+from molscore.scoring_functions.aizynth import AiZynthFinder
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.tests import BaseTests, MockGenerator
 
