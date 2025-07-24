@@ -6,8 +6,8 @@
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
 ## Overview
 
-[Paper](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w) | 
-[Tutorials](tutorials) | 
+[Paper](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w) |
+[Tutorials](tutorials) |
 [Examples](https://github.com/MorganCThomas/MolScore_examples) |
 [Demo](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/molscore_demo.gif)
 
@@ -19,6 +19,12 @@ MolScore contains code to score *de novo* compounds in the context of generative
 Contributions and/or ideas for added functionality are welcomed!
 
 ## Installation
+
+Create a conda environment:
+
+    micromamba env create --name molscore --file environment.yml
+
+
 Install MolScore with PyPI (recommended):
 
     pip install molscore --upgrade
@@ -28,7 +34,6 @@ or directly from GitHub:
     git clone https://github.com/MorganCThomas/MolScore.git
     cd MolScore ; pip install -e .
 
-> Note: I recommend mamba for environment handling
 
 ## Scoring
 
@@ -58,9 +63,9 @@ A GUI exists to help write the config file, which can be run with the following 
 <details>
   <summary><strong>Scoring functionality</strong></summary>
   &nbsp; <!-- This adds a non-breaking space for some spacing -->
-  
+
   **Scoring functions**
-  - **Descriptors**: RDKit, Maximum consecutive rotatable bonds, Penalized LogP, LinkerDescriptors (Fragment linking), 
+  - **Descriptors**: RDKit, Maximum consecutive rotatable bonds, Penalized LogP, LinkerDescriptors (Fragment linking),
     - [MolSkill](https://doi.org/10.1038/s41467-023-42242-1): Extracting medicinal chemistry intuition via preference machine learning as available on Nature Communications.
   - **Synthesizability**: [RAscore](https://pubs.rsc.org/en/content/articlelanding/2021/sc/d0sc05401a), [AiZynthFinder](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-020-00472-1), SAscore, ReactionFilters (Scaffold decoration)
   - **2D Similarity**: Fingerprint similarity (any RDKit fingerprint and similarity measure), substructure match/filter, [Applicability domain](https://chemrxiv.org/engage/chemrxiv/article-details/625fc258bdc9c240d1dc12bb)
@@ -149,7 +154,7 @@ metrics = MetricEngine.calculate(
   **Intrinsice metrics (generated molecules only)**
   - Validity, Uniqueness, Scaffold uniqueness, Internal diversity (1 & 2), Scaffold diversity
   - [Sphere exclusion diversity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00516-0): Measure of chemical space coverage at a specific Tanimoto similarity threshold. I.e., A score 0.5 indicates 50% of the sample size sufficiently describes the chemical space, therefore the higher the metric the more diverse the sample. Also see [here](https://pubs.acs.org/doi/10.1021/acs.jcim.4c00519)
-  - [Solow Polasky diversity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9) 
+  - [Solow Polasky diversity](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-021-00561-9)
   - [Functional group diversity](https://pubs.acs.org/doi/10.1021/acs.jcim.0c01328)
   - [Ring system diversity](https://pubs.acs.org/doi/10.1021/acs.jcim.0c01328)
   - [Filters](https://www.frontiersin.org/journals/pharmacology/articles/10.3389/fphar.2020.565644/full): Passing of a set of drug-like filters (MolWt, Rotatable bonds, LogP etc.), Medicinal Chemistry substructures and PAINS substructures.
