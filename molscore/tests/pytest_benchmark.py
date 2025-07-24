@@ -121,6 +121,7 @@ def _test_preset_benchmark(
     smiles_generator,
     test_out_dir,
     budget=20,
+    oracle_budget=True
     ):
     """Helper function to test a preset benchmark with parameterization."""
     # Skip if benchmark doesn't exist
@@ -132,6 +133,7 @@ def _test_preset_benchmark(
             model_name="test",
             output_dir=test_out_dir,
             budget=budget,  # Parameterized budget
+            oracle_budget=oracle_budget,
             benchmark=benchmark_name
         )
     except Exception as e:
@@ -143,9 +145,14 @@ def _test_preset_benchmark(
     for task_context in msb:
         try:
             with task_context as scoring_function:
-                smiles = smiles_generator.sample(BATCH_SIZE)
-                scores = scoring_function.score(smiles=smiles)
-                assert scores is not None, f"Scoring failed for {benchmark_name}"
+                while not scoring_function.finished:
+                    smiles = smiles_generator.sample(BATCH_SIZE)
+                    scores = scoring_function.score(smiles=smiles)
+                    assert scores is not None, f"Scoring failed for {benchmark_name}"
+                if not oracle_budget:
+                    assert len(scoring_function.main_df) >= budget, f"Budget mismatch for {benchmark_name}"
+                else:
+                    assert len(scoring_function.exists_map) >= budget, f"Oracle budget mismatch for {benchmark_name}"
         except Exception as e:
             msg = str(e)
             if msg.startswith("__call__() missing 1 required positional argument:"):

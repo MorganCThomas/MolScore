@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Optional, Union, List
 from contextlib import contextmanager
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -105,10 +106,11 @@ class MolScore:
         add_run_dir: bool = True,
         run_name: str = None,
         budget: int = None,
-        oracle_budget: int = None,
+        oracle_budget: bool = True,
         termination_threshold: int = None,
-        termination_patience: int = None,
-        termination_exit: bool = False,
+        termination_early_stop: bool = None,
+        termination_patience: int = 10,
+        termination_exit: bool = None,
         score_invalids: bool = False,
         replay_size: int = None,
         replay_purge: bool = True,
@@ -122,9 +124,10 @@ class MolScore:
         :param add_run_dir: Adds a run directory within the output directory
         :param run_name: Override the run name with a custom name, otherwise taken from 'task' in the config
         :param budget: Maximum number of molecules for MolScore before molscore.finished is True
-        :param oracle_budget: Maximum number of unique molecules actually passed to oracles before molscore.finished is True
+        :param oracle_budget: Whether the budget corresponds to molecules submitted to oracles (True) or total molecules (False)
         :param termination_threshold: Threshold for early stopping based on the score
-        :param termination_patience: Number of steps with no improvement, or that a termination_threshold has been reached for
+        :param termination_early_stop: Whether to stop the optimization if the score stops improving for patience steps
+        :param termination_patience: Number of patience steps for mode collapse, no improvement, or a termination_threshold
         :param termination_exit: Exit on termination of objective
         :param score_invalids: Whether to force scoring of invalid molecules
         :param replay_size: Maximum size of the replay buffer
@@ -150,11 +153,9 @@ class MolScore:
         self.budget = budget
         self.oracle_budget = oracle_budget
         self.termination_threshold = termination_threshold
+        self.termination_early_stop = termination_early_stop
         self.termination_patience = termination_patience
-        reset_termination_criteria = not any(
-            [budget, oracle_budget, termination_threshold, termination_patience]
-        )
-        self.termination_counter = 0
+        self.termination_counter = defaultdict(int)
         self.termination_exit = termination_exit
         self.score_invalids = score_invalids
         self.replay_size = replay_size
@@ -249,7 +250,13 @@ class MolScore:
         # Set scoring function / transformation / aggregation / diversity filter
         self._set_objective(
             reset_diversity_filter=True,
-            reset_termination_criteria=reset_termination_criteria,
+            budget=budget,
+            oracle_budget=oracle_budget,
+            termination_threshold=termination_threshold,
+            termination_early_stop=termination_early_stop,
+            termination_patience=termination_patience,
+            termination_exit=termination_exit,
+            #reset_termination_criteria=reset_termination_criteria,
         )
 
         # Load from previous
@@ -312,7 +319,12 @@ class MolScore:
         self,
         task_config: str = None,
         reset_diversity_filter: bool = True,
-        reset_termination_criteria: bool = False,
+        budget: int = None,
+        oracle_budget: bool = None,
+        termination_threshold: int = None,
+        termination_early_stop: bool = None,
+        termination_patience: int = None,
+        termination_exit: bool = None,
         reset_replay_buffer: bool = False,
     ):
         """
@@ -400,18 +412,21 @@ class MolScore:
                 pass
 
         # Set / reset budget termination criteria
-        if reset_termination_criteria:
-            if self.cfg.get("budget", None):
-                self.budget = self.cfg.get("budget", None)
-            if self.cfg.get("oracle_budget", None):
-                self.oracle_budget = self.cfg.get("oracle_budget", None)
-            if self.cfg.get("termination_threshold", None):
-                self.termination_threshold = self.cfg.get("termination_threshold", None)
-            if self.cfg.get("termination_patience", None):
-                self.termination_patience = self.cfg.get("termination_patience", None)
-            if self.cfg.get("termination_exit", None):
-                self.termination_exit = self.cfg.get("termination_exit", False)
-            self.termination_counter = 0
+        # For each parameter, if not specified at class level, but in the config, set it.
+        if (budget is None) and self.cfg.get("budget", None):
+            self.budget = self.cfg.get("budget", None)
+        if (oracle_budget is None) and self.cfg.get("oracle_budget", None):
+            self.oracle_budget = self.cfg.get("oracle_budget", True)
+        if (termination_threshold is None) and self.cfg.get("termination_threshold", None):
+            self.termination_threshold = self.cfg.get("termination_threshold", None)
+        if (termination_early_stop is None) and self.cfg.get("termination_early_stop", None):
+            self.termination_early_stop = self.cfg.get("termination_early_stop", None)
+        if (termination_patience is None) and self.cfg.get("termination_patience", None):
+            self.termination_patience = self.cfg.get("termination_patience", None)
+        if (termination_exit is None) and self.cfg.get("termination_exit", None):
+            self.termination_exit = self.cfg.get("termination_exit", False)
+        self.termination_counter = defaultdict(int)
+        self.finished = False
 
         # Reset replay buffer
         if reset_replay_buffer:
@@ -585,7 +600,8 @@ class MolScore:
             dup_idxs = [idx for idx in dup_idxs if idx < self.current_idx]  
             
             # Get main data and merge with results
-            exists_df = self.main_df.loc[dup_idxs, results_columns]
+            existing_columns = [col for col in results_columns if col in self.main_df.columns]
+            exists_df = self.main_df.loc[dup_idxs, existing_columns]
             self.results_df = pd.concat(
                 [self.results_df, exists_df],
                 axis=0,
@@ -809,7 +825,7 @@ class MolScore:
                 temp.to_csv(os.path.join(self.save_dir, "scores.csv"))  # save main csv
             else:
                 self.main_df.to_csv(
-                    os.path.join(self.save_dir, "scores.csv")
+                    os.path.join(self.save_dir, "scores.csv"),
                 )  # save main csv
             
             # Delete iterations dir to help cleanup
@@ -910,19 +926,21 @@ class MolScore:
         Check if the current task is finished based on budget or termination criteria
         """
         task_df = self.main_df.loc[self.main_df.task == self.cfg["task"]]
-
-        # Based on molecule budget
-        if self.budget and (len(task_df) >= self.budget):
-            self.finished = True
-            return
         
         # Based on oracle budget (i.e., valid and unique)
-        if self.oracle_budget and (len(task_df.loc[task_df.valid & task_df.unique]) >= self.oracle_budget):
-            self.finished = True
-            return
+        if self.oracle_budget:
+            if self.budget and (len(self.exists_map) >= self.budget):
+                self.finished = True
+            else:
+                if len(task_df.loc[(task_df.step == self.step) & task_df.valid & task_df.unique]) == 0:
+                    self.termination_counter["unique_patience"] += 1
+        # Based on molecule budget
+        else:
+            if self.budget and (len(task_df) >= self.budget):
+                self.finished = True
 
         # Based on patience
-        if self.termination_patience and not self.termination_threshold:
+        if self.termination_early_stop:
             if (
                 self.batch_df[self.cfg["scoring"]["method"]].mean()
                 < task_df[self.cfg["scoring"]["method"]]
@@ -930,7 +948,7 @@ class MolScore:
                 .mean()
                 .iloc[-1]
             ):
-                self.termination_counter += 1
+                self.termination_counter["score_patience"] += 1
 
         # Based on a threshold
         if self.termination_threshold:
@@ -939,16 +957,14 @@ class MolScore:
                 >= self.termination_threshold
             ):
                 if self.termination_patience:
-                    self.termination_counter += 1
+                    self.termination_counter["threshold_patience"] += 1
                 else:
                     self.finished = True
-                    return
 
         # Check our patience value
         if self.termination_patience:
-            if self.termination_counter >= self.termination_patience:
+            if any(p >= self.termination_patience for p in self.termination_counter.values()):
                 self.finished = True
-                return
 
         if self.termination_exit and self.finished:
             sys.exit(1)
@@ -1267,7 +1283,7 @@ class MolScore:
         thresholds: list = None,
         chemistry_filter_basic=True,
         budget=None,
-        oracle_budget=None,
+        oracle_budget: bool = True,
         n_jobs=1,
         reference_smiles=None,
         include=['Valid', 'Unique'],
@@ -1281,7 +1297,7 @@ class MolScore:
         :param thresholds: List of thresholds to compute metrics for
         :param chemistry_filter_basic: Whether to apply basic chemistry filters
         :param budget: Molecule budget to compute metrics for
-        :param oracle_budget: Oracle budget to compute metrics for
+        :param oracle_budget: If the budget is the oracle budget (i.e., valid and unique)
         :param n_jobs: Number of jobs to use for parallelisation
         :param reference_smiles: List of target smiles to compute metrics in reference to
         :param include: List of metrics to run
@@ -1323,7 +1339,7 @@ class MolScoreBenchmark:
         model_name: str,
         output_dir: os.PathLike,
         budget: int = None,
-        oracle_budget: int = None,
+        oracle_budget: bool = True,
         replay_size: int = None,
         replay_purge: bool = True,
         score_invalids=False,
@@ -1342,7 +1358,7 @@ class MolScoreBenchmark:
         :param model_name: Name of model to run
         :param output_dir: Directory to save results to
         :param budget: Molecule budget to run MolScore task for
-        :param oracle_budget: Oracle budget to run MolScore task for
+        :param oracle_budget: If the budget is for the oracle (i.e., only valid and unique)
         :param replay_size: Size of replay buffer to store top scoring molecules
         :param replay_purge: Whether to purge replay buffer based on diversity filter
         :param score_invalids: Whether to force scoring of invalid molecules
@@ -1375,8 +1391,7 @@ class MolScoreBenchmark:
         self.diversity_filter = diversity_filter
         
         # Confirm budget
-        assert self.budget or self.oracle_budget, "Must specify a budget or oracle_budget"
-        assert not (self.budget and self.oracle_budget), "Must specify either budget or oracle_budget, not both"
+        assert self.budget, "Must specify a budget or oracle_budget"
 
         # Process configs and tasks to run
         if self.benchmark:
@@ -1558,8 +1573,9 @@ class MolScoreCurriculum(MolScore):
         run_name: str = None,
         model_parameters: dict = {},
         budget: int = None,
-        oracle_budget: int = None,
+        oracle_budget: bool = True,
         termination_threshold: float = None,
+        termination_early_stop: bool = None,
         termination_patience: int = None,
         replay_size: int = None,
         replay_purge: bool = True,
@@ -1580,8 +1596,9 @@ class MolScoreCurriculum(MolScore):
         :param run_name: Name of Curriculum run if specified
         :param model_parameters: Parameters of the model for record
         :param budget: Molecule budget to run each MolScore task for
-        :param oracle_budget: Oracle budget to run each MolScore task for
+        :param oracle_budget: If the budget is the oracle budget (i.e., valid and unique)
         :param termination_threshold: Threshold to terminate MolScore task
+        :param termination_early_stop: Whether to stop early if the score is not improving
         :param termination_patience: Number of steps to wait before terminating MolScore task
         :param replay_size: Size of replay buffer to store top scoring molecules
         :param replay_purge: Whether to purge replay buffer based on diversity filter
@@ -1598,14 +1615,11 @@ class MolScoreCurriculum(MolScore):
         self.budget = budget
         self.oracle_budget = oracle_budget
         self.termination_threshold = termination_threshold
+        self.termination_early_stop = termination_early_stop
         self.termination_patience = termination_patience
         self.replay_size = replay_size
         self.replay_purge = replay_purge
         self.reset_replay_buffer = reset_replay_buffer
-        # If any termination criteria is set here, this is propogated to all tasks
-        self.reset_from_config = not any(
-            [budget, oracle_budget, termination_threshold, termination_patience]
-        )
         self.output_dir = output_dir
         self.benchmark = benchmark
         self.custom_benchmark = custom_benchmark
@@ -1614,9 +1628,6 @@ class MolScoreCurriculum(MolScore):
         self.exclude = exclude
         self.configs = []
         self.score_invalids = score_invalids
-        
-        # Confirm budget
-        assert not (self.budget and self.oracle_budget), "Must specify either budget or oracle_budget, not both"
 
         # Process configs and tasks to run
         if self.benchmark:
@@ -1682,6 +1693,7 @@ class MolScoreCurriculum(MolScore):
             budget=self.budget,
             oracle_budget=self.oracle_budget,
             termination_threshold=self.termination_threshold,
+            termination_early_stop=self.termination_early_stop,
             termination_patience=self.termination_patience,
             termination_exit=False,
             replay_size=self.replay_size,
@@ -1697,11 +1709,13 @@ class MolScoreCurriculum(MolScore):
                 logger.info("Moving on to the next task ...")
                 self._set_objective(
                     task_config=self.configs.pop(0),
-                    reset_termination_criteria=self.reset_from_config,
+                    budget=self.budget,
+                    oracle_budget=self.oracle_budget,
+                    termination_threshold=self.termination_threshold,
+                    termination_early_stop=self.termination_early_stop,
+                    termination_patience=self.termination_patience,
                     reset_replay_buffer=self.reset_replay_buffer,
                 )
-                self.finished = False
-                self.termination_counter = 0
         return output
 
     def __call__(self, *args, **kwargs):

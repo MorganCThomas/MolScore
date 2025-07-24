@@ -26,7 +26,7 @@ Description:
   This is mostly to check that it runs, or which errors are thrown (some should be expected).
 
 Examples:
-  pytest pytest_configs.py GuacaMol:Albuterol_similarity path/to/my_config.json
+  pytest pytest_configs.py --configs GuacaMol:Albuterol_similarity path/to/my_config.json
 
   This will run the MolScore for Albuterol_similarity from the GuacaMol benchmark, and my_config.
             """
@@ -124,12 +124,12 @@ def test_v2_api(
             
 @pytest.mark.parametrize("recalculate", [True, False])
 @pytest.mark.parametrize("budget", [None, 50])
-@pytest.mark.parametrize("oracle_budget", [None, 50])
+@pytest.mark.parametrize("oracle_budget", [True, False])
 def test_v2_termination(
     configs: Union[str, os.PathLike],
     recalculate: bool,
     budget: int,
-    oracle_budget: int,
+    oracle_budget: bool,
     smiles_generator,
     test_out_dir
 ):
@@ -154,15 +154,13 @@ def test_v2_termination(
                 _ = scoring_function.score(smiles, recalculate=recalculate)
                 
                 # Termination tests
-                if (budget and oracle_budget) or oracle_budget:
+                if (budget and oracle_budget):
                     # Smiles_generator generates 0.2 of invalid / duplicates
-                    if int(molecule_count * 0.8) >= oracle_budget:
+                    if int(molecule_count * 0.8) >= budget:
                         assert scoring_function.finished, "Scoring function should be finished"
-                    if scoring_function.finished:
-                        assert molecule_count >= oracle_budget, "Molecule count should be greater due to invalid and duplicates"
                 
                 elif budget:
-                    if molecule_count >= budget:
+                    if molecule_count == budget:
                         assert scoring_function.finished, "Scoring function should be finished"
                 
                 else:
