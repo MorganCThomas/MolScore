@@ -964,6 +964,7 @@ class MolScore:
         # Check our patience value
         if self.termination_patience:
             if any(p >= self.termination_patience for p in self.termination_counter.values()):
+                logger.warning(f"    Termination criteria met, patience of {self.termination_patience} reached: {self.termination_counter}")
                 self.finished = True
 
         if self.termination_exit and self.finished:
