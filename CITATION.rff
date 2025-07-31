@@ -10,7 +10,7 @@ authors:
 - family-names: "De Graaf"
   given-names: "Chris"
 title: "MolScore: A scoring and evaluation framework for de novo drug design"
-doi: 10.26434/chemrxiv-2023-c4867-v2
-journal: ChemRxiv
+doi: https://doi.org/10.1186/s13321-024-00861-w
+journal: Journal of Cheminformatics
 type: article
-year: 2023
+year: 2024
