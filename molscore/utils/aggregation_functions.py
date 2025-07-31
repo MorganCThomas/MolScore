@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import gmean as geometricmean
 
 from molscore.scoring_functions.utils import Fingerprints
-from molscore.utils.utils import ParetoFrontRank
+from molscore.utils.pareto_utils import ParetoFrontRank
 
 
 def single(x: np.ndarray, **kwargs):
