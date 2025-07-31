@@ -161,7 +161,6 @@ class MolScore:
         self.replay_size = replay_size
         self.replay_purge = replay_purge
         self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
-        self.replay_buffer = utils.ReplayBuffer(size=replay_size, purge=replay_purge)
         self.finished = False
         self.init_time = time.time()
         self.results_df = None # TODO make empty df ... 
@@ -256,7 +255,6 @@ class MolScore:
             termination_early_stop=termination_early_stop,
             termination_patience=termination_patience,
             termination_exit=termination_exit,
-            #reset_termination_criteria=reset_termination_criteria,
         )
 
         # Load from previous
