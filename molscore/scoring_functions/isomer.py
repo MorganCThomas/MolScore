@@ -5,6 +5,7 @@ from rdkit.Chem import Descriptors
 from scipy.stats import gmean
 
 from molscore.utils.transformation_functions import gauss
+from molscore.scoring_functions.utils import get_mol
 
 
 class Isomer:
@@ -46,7 +47,7 @@ class Isomer:
         :param smi:
         :return:
         """
-        mol = Chem.MolFromSmiles(smi)
+        mol = get_mol(smi)
         if mol:
             query_formula = Descriptors.rdMolDescriptors.CalcMolFormula(mol)
             query_elements = self.formula2elements(query_formula)
