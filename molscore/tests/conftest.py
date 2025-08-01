@@ -13,12 +13,12 @@ def ref_smiles():
 
 @pytest.fixture
 def in_smiles():
-    mg = MockGenerator(seed_no=321, augment_invalids=True, augment_duplicates=False)
+    mg = MockGenerator(seed_no=321, augment_invalids=True, augment_duplicates=False, augment_none=True)
     return mg.sample(10)
 
 @pytest.fixture
 def smiles_generator():
-    return MockGenerator(seed_no=231, augment_invalids=True, augment_duplicates=True)
+    return MockGenerator(seed_no=231, augment_invalids=True, augment_duplicates=True, augment_none=True)
 
 def pytest_addoption(parser):
     parser.addoption(

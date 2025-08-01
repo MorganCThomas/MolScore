@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 import weakref
+import warnings
 from functools import partial
 from pathlib import Path
 from typing import Callable, Sequence, Union
@@ -459,7 +460,8 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     elif isinstance(mol, Chem.rdchem.Mol):
         pass
     else:
-        raise TypeError("Molecule is not a string (SMILES) or rdkit.mol")
+        warnings.warn("Molecule is not a string (SMILES) or rdkit.mol, returning None")
+        return None
 
     if not mol:
         mol = None
