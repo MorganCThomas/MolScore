@@ -11,6 +11,4 @@ if sys.version_info[1] < 9:
 else:
     from importlib import resources
     
-from molscore.utils import mock_generator
-
-MockGenerator = mock_generator.MockGenerator
+from moleval.mock_generator import MockGenerator
