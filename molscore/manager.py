@@ -30,6 +30,7 @@ PRESETS = {
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
         "MolOpt_chem": resources.files("molscore.configs.MolOpt"), # Runs additional chemistry analysis
+        "DiverseHits": resources.files("molscore.configs.DiverseHits"), # Runs diversity filter and diversity analysis
         "MolExp": resources.files("molscore.configs.MolExp"),
         "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
         "MolExpL": resources.files("molscore.configs.MolExpL"),

@@ -1,0 +1,97 @@
+{
+  "task": "GSK3",
+  "output_dir": "./",
+  "load_from_previous": false,
+  "logging": false,
+  "monitor_app": false,
+  "starting_population": null,
+  "termination_exit": false,
+  "scoring_functions": [
+    {
+      "name": "LegacyQSAR",
+      "run": true,
+      "parameters": {
+        "prefix": "GSK3",
+        "model": "diversehits_GSK3",
+        "env_engine": "mamba"
+      }
+    },
+    {
+      "name": "MolecularDescriptors",
+      "run": true,
+      "parameters": {
+        "prefix": "desc",
+        "n_jobs": 1
+      }
+    },
+    {
+      "name": "SillyBits",
+      "run": true,
+      "parameters": {
+        "prefix": "ChEMBLbits",
+        "preset": "DiverseHits",
+        "reference_smiles": null,
+        "radius": 2,
+        "n_jobs": 1
+      }
+    }
+  ],
+  "scoring": {
+    "metrics": [
+      {
+        "name": "GSK3_pred_proba",
+        "filter": false,
+        "weight": 1.0,
+        "modifier": "raw",
+        "parameters": {}
+      },
+      {
+        "name": "desc_MolWt",
+        "filter": true,
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 761.0,
+          "lower": 157.0
+        }
+      },
+      {
+        "name": "desc_CLogP",
+        "filter": true,
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "range",
+          "upper": 8.3,
+          "lower": -2.0
+        }
+      },
+      {
+        "name": "ChEMBLbits_silly_ratio",
+        "filter": true,
+        "weight": 1.0,
+        "modifier": "step",
+        "parameters": {
+          "objective": "minimize",
+          "upper": 0.08,
+          "lower": 0.0
+        }
+      }
+    ],
+    "method": "single"
+  },
+  "diversity_filter": {
+    "run": true,
+    "name": "CompoundSimilarity",
+    "parameters": {
+      "nbmax": 1,
+      "minscore": 0.5,
+      "minsimilarity": 0.7,
+      "radius": 2,
+      "useFeatures": false,
+      "bits": 2048,
+      "outputmode": "binary"
+    }
+  }
+}

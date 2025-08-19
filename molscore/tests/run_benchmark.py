@@ -11,7 +11,7 @@ def main(benchmark):
         os.path.dirname(os.path.abspath(__file__)), "test_out"
     )
     MSB = MolScoreBenchmark(
-        model_name="test", output_dir=output_directory, budget=10, benchmark=benchmark, score_invalids=True, diversity_filter="unique"
+        model_name="test", output_dir=output_directory, budget=10, benchmark=benchmark, score_invalids=True, diversity_filter=None
     )
     with MSB as benchmark:
         mg = MockGenerator(augment_invalids=True, augment_duplicates=True)
@@ -27,19 +27,7 @@ if __name__ == "__main__":
         "benchmark",
         type=str,
         default="GuacaMol",
-        choices=[
-            "GuacaMol",
-            "MolOpt",
-            "MolExp",
-            "MolExpL",
-            "MolExp_baseline",
-            "MolExpL_baseline",
-            "MolOpt-CF",
-            "MolOpt-DF",
-            "5HT2A_PhysChem",
-            "5HT2A_Selectivity",
-            "5HT2A_Docking",
-        ],
+        choices=MolScoreBenchmark.presets.keys(),
     )
     args = parser.parse_args()
 

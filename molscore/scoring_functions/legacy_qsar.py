@@ -20,12 +20,12 @@ class LegacyQSAR(BaseServerSF):
     # Directory of env-name, and resource path to relevant dir, model name & server name
     model_dictionary = {
         "libinvent_DRD2": (
-            "lib-invent",
-            resources.files("molscore.data.models.libinvent"),
-            "drd2.pkl",
-            "legacy_qsar_server.py",
-            "ECFP6",
-            2048,
+            "lib-invent", # env-name
+            resources.files("molscore.data.models.libinvent"), # resource path
+            "drd2.pkl", # model name
+            "legacy_qsar_server.py", # server name
+            "ECFP6", # fp
+            2048, # nBits
         ),
         "molopt_DRD2": (
             "ms_molopt",
@@ -75,13 +75,38 @@ class LegacyQSAR(BaseServerSF):
             "ECFP4",
             2048,
         ),
+        "diversehits_DRD2": (
+            "diversehits",
+            resources.files("molscore.data.models.diversehits"),
+            "drd2.pkl",
+            "legacy_qsar_server.py",
+            "ECFP4",
+            2048,
+        ),
+        "diversehits_GSK3": (
+            "diversehits",
+            resources.files("molscore.data.models.diversehits"),
+            "gsk3.pkl",
+            "legacy_qsar_server.py",
+            "ECFP4",
+            2048,
+        ),
+        "diversehits_JNK3": (
+            "diversehits",
+            resources.files("molscore.data.models.diversehits"),
+            "jnk3.pkl",
+            "legacy_qsar_server.py",
+            "ECFP4",
+            2048,
+        )
     }
 
-    def __init__(self, prefix: str, model: str, env_engine: str = "mamba", **kwargs):
+    def __init__(self, prefix: str, model: str, env_engine: str = "mamba", server_grace: int = 60, **kwargs):
         """
         :param prefix: Prefix to identify scoring function instance (e.g., DRD2)
         :param env_envine: Environment engine [conda, mamba]
-        :param model: Which legacy model to implement [libinvent_DRD2, molopt_DRD2, molopt_DRD2_current, molopt_GSK3B, molopt_GSK3B_current, molopt_JNK3, molopt_JNK3_current]
+        :param model: Which legacy model to implement [libinvent_DRD2, molopt_DRD2, molopt_DRD2_current, molopt_GSK3B, molopt_GSK3B_current, molopt_JNK3, molopt_JNK3_current, diversehits_DRD2, diversehits_GSK3, diversehits_JNK3]
+        :pararm server_grace: Grace period for server to start before timing out
         """
         # Get model resources
         env_name, res, model_name, server_name, fp, nBits = self.model_dictionary[model]
@@ -100,6 +125,6 @@ class LegacyQSAR(BaseServerSF):
             env_name=env_name,
             env_path=env_path,
             server_path=server_path,
-            server_grace=60,
+            server_grace=server_grace,
             server_kwargs={"model_path": model_path, "fp": fp, "nBits": nBits},
         )
