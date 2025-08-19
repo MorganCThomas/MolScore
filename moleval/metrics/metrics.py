@@ -8,6 +8,7 @@ import multiprocessing
 from collections import Counter
 import numpy as np
 import rdkit
+from functools import partial
 from scipy.spatial.distance import cosine as cos_distance
 from scipy.stats import wasserstein_distance
 from scipy import linalg
@@ -20,7 +21,7 @@ except (ImportError, TypeError) as e:
     print(f"Molbloom incompatible, skipping purchasability score: {e}")
     _has_molbloom = False
 
-from moleval.utils import disable_rdkit_log, enable_rdkit_log
+from moleval.utils import disable_rdkit_log, enable_rdkit_log, Fingerprints
 from moleval.metrics.fcd_torch import FCD as FCDMetric
 from moleval.metrics.metrics_utils import mapper
 from moleval.metrics.metrics_utils import SillyWalks
@@ -535,7 +536,7 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
         return 1 - np.mean(agg)
 
 
-def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
+def se_diversity(gen, k=None, n_jobs=1, fp_type='ECFP4', fp_bits=1024,
                  dist_threshold=0.65, normalize=True, force=False):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
@@ -551,6 +552,9 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     :param normalize:
     :return:
     """
+    if len(gen) == 0:
+        warnings.warn("Can't compute SEDiv on an empty input")
+        return 0.0 if normalize else 0
     assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray) or isinstance(gen[0], str)
 
     if k is not None:
@@ -570,11 +574,14 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
         else: 
             gen = gen[idxs]
 
+    fp_type = fp_type + "_arr"
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
-        gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
+        gen_fps = mapper(n_jobs)(partial(Fingerprints.get_fp, name=fp_type, nBits=fp_bits), gen)
+        gen_fps = np.vstack(gen_fps)
     elif isinstance(gen[0], str):
         gen_mols = mapper(n_jobs)(get_mol, gen)
-        gen_fps = fingerprints(gen_mols, fp_type=fp_type, n_jobs=n_jobs)
+        gen_fps = mapper(n_jobs)(partial(Fingerprints.get_fp, name=fp_type, nBits=fp_bits), gen_mols)
+        gen_fps = np.vstack(gen_fps)
     else:
         gen_fps = gen
 

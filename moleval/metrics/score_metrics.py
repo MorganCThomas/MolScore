@@ -498,6 +498,24 @@ class ScoreMetrics:
             rediscovered_scaffolds = len(target.intersection(query))
         return rediscovered_smiles, rediscovered_scaffolds
     
+    @staticmethod
+    def diverse_hits(
+        scores, endpoint, threshold=0.5, prefix="", queue=None
+    ):
+        hits = scores.loc[scores[endpoint] >= threshold].smiles.tolist()
+        if len(hits) == 0:
+            n_diverse = 0
+        else:
+            n_diverse = se_diversity(hits, k=None, fp_type='ECFP4', fp_bits=2048, normalize=False)
+        
+        output = (prefix + f"Diverse Hits {endpoint}", n_diverse)
+        
+        if queue:
+            queue.put(output)
+        else:
+            return dict([output])
+        
+    
     def molopt_score(self, endpoint, chemistry_filter=False):
         metrics = self.run_metrics(
             endpoints=[endpoint],
@@ -656,6 +674,17 @@ class ScoreMetrics:
         }
         return metrics
     
+    def diverse_hits_score(self, endpoint, chemistry_filter=False):
+        metrics = self.run_metrics(
+            endpoints=[endpoint],
+            thresholds=[0.5],
+            include=[
+                "DivHits",
+            ],
+            chemistry_filter_basic=chemistry_filter
+        )
+        return metrics
+    
     # TODO: Replace 3D_benhmark with the name of the benchmark
     def bennchmark_3d_score(self, endpoint): 
         # Calculate Score
@@ -699,6 +728,8 @@ class ScoreMetrics:
             benchmark_metrics.update(self.molopt_score(endpoint=endpoint))
         elif self.benchmark in ["MolOpt_chem", "MolOpt-CF", "MolOpt-DF"]:
             benchmark_metrics.update(self.molopt_score(endpoint=endpoint, chemistry_filter=True))
+        elif self.benchmark == "DiverseHits":
+            benchmark_metrics.update(self.diverse_hits_score(endpoint=endpoint))
         elif self.benchmark.startswith("MolExp"):
             benchmark_metrics.update(self.molexp_score())
         elif self.benchmark in ["GuacaMol", "GuacaMol_Scaffold"]:
@@ -847,7 +878,7 @@ class ScoreMetrics:
                         )
                     )
                     
-                # Yield (Check a corresponding threshold has been provided)
+                # (Check a corresponding threshold has been provided)
                 try:
                     if thresholds is None:
                         thresholds = []
@@ -856,8 +887,26 @@ class ScoreMetrics:
                     threshold = False
                     if any(m.startswith("Yield") for m in include):
                         print(f"No threshold was given for {endpoint}")
-            
+                
                 if threshold:
+                    # Diverse Hits
+                    patt = "DivHits"
+                    if ("DivHits") in include and (f"{prefix}{patt} {endpoint}" not in metrics):
+                        process_list.append(
+                            (
+                                self.diverse_hits,
+                                (
+                                    filtered_scores,
+                                    endpoint,
+                                    threshold,
+                                    prefix,
+                                    queue,
+                                ),
+                                False,
+                            )
+                        )
+                    
+                    # Yield
                     patt = f"Yield"
                     if (patt in include) and (f"{patt} {endpoint}" not in metrics):
                         process_list.append(
