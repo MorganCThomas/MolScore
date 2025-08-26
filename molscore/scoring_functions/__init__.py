@@ -235,3 +235,10 @@ try:
     all_scoring_functions.append(HSR)
 except Exception as e:
     logger.warning(f"HSR: currently unavailable due to the following: {e}")
+    
+try:
+    from molscore.scoring_functions.boltz import Boltz
+    
+    all_scoring_functions.append(Boltz)
+except Exception as e:
+    logger.warning(f"Boltz: currently unavailable due to the following: {e}")

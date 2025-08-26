@@ -61,6 +61,23 @@ class MolScore:
         }
     
     @staticmethod
+    def parse_config(task_config: Union[str, os.PathLike]) -> bool:
+        """
+        Check if the task config is valid, i.e., exists and is a valid JSON file.
+        :param task_config: Path to the task config file or a preset name
+        :return: True if valid, False otherwise
+        """
+        if task_config.endswith(".json"):
+            return task_config
+        else:
+            assert ":" in task_config, "Preset task must be in format 'category:task'"
+            cat, task = task_config.split(":", maxsplit=1)
+            assert cat in MolScore.presets.keys(), f"Preset category {cat} not found"
+            task_config = MolScore.presets[cat] / f"{task}.json"
+            assert task_config.exists(), f"Preset task {task} not found in {cat}"
+            return task_config
+    
+    @staticmethod
     def load_config(task_config: os.PathLike, diversity_filter: str = None) -> dict:
         assert os.path.exists(
             task_config
@@ -134,16 +151,9 @@ class MolScore:
         :param replay_purge: Whether to purge the replay buffer, i.e., only allow molecules that pass the diversity filter
         :param diversity_filter: Name a diversity filter to add/overide the one in the config
         """
-        # Load in configuration file (json)
-        if task_config.endswith(".json"):
-            self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
-        else:
-            assert ":" in task_config, "Preset task must be in format 'category:task'"
-            cat, task = task_config.split(":", maxsplit=1)
-            assert cat in self.presets.keys(), f"Preset category {cat} not found"
-            task_config = self.presets[cat] / f"{task}.json"
-            assert task_config.exists(), f"Preset task {task} not found in {cat}"
-            self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
+        # Load in configuration file
+        task_config = self.parse_config(task_config)
+        self.cfg = self.load_config(task_config, diversity_filter=diversity_filter)
 
         # Here are attributes used
         self.model_name = model_name.replace(" ", "_")

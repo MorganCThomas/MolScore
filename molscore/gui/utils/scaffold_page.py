@@ -11,7 +11,7 @@ from streamlit_plotly_events import plotly_events
 from molscore.gui.utils import utils
 
 
-def scaffold_plot(main_df, SS, dock_path=None):
+def scaffold_plot(main_df, SS, dock_path=None, fold_path=None):
     # ----- If multiple input dirs, select one -----
     if len(SS.input_dirs) > 1:
         input_dir = st.selectbox(
