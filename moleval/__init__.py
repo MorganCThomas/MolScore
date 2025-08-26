@@ -1,3 +1,8 @@
+__all__ = [
+    "MockGenerator",
+    "resources",
+]
+
 # Import lib resources depending on python version
 import sys
 
@@ -6,4 +11,6 @@ if sys.version_info[1] < 9:
 else:
     from importlib import resources
     
-from molscore.utils import MockGenerator
+from molscore.utils import mock_generator
+
+MockGenerator = mock_generator.MockGenerator
