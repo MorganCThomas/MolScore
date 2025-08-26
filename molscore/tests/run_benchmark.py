@@ -27,20 +27,7 @@ if __name__ == "__main__":
         "benchmark",
         type=str,
         default="GuacaMol",
-        choices=[
-            "GuacaMol",
-            "MolOpt",
-            "MolOpt_chem",
-            "MolExp",
-            "MolExpL",
-            "MolExp_baseline",
-            "MolExpL_baseline",
-            "MolOpt-CF",
-            "MolOpt-DF",
-            "5HT2A_PhysChem",
-            "5HT2A_Selectivity",
-            "5HT2A_Docking",
-        ],
+        choices=MolScoreBenchmark.presets.keys(),
     )
     args = parser.parse_args()
 

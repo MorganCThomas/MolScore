@@ -110,7 +110,7 @@ class Fingerprints:
     """
 
     @classmethod
-    def get_fp(cls, name, mol, nBits):
+    def get_fp(cls, mol, name, nBits):
         """
         Get fp by str instead of method
         :param name: Name of FP e.g., ECFP4
