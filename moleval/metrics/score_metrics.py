@@ -512,6 +512,20 @@ class ScoreMetrics:
             chemistry_filter_basic=chemistry_filter
         )
         return metrics
+    
+    def molopt_chem_score(self, endpoint):
+
+        
+        metric_names = [m.format(i) for m in ["Top-{} Avg", "Top-{} Avg (Div)", "Top-{} AUC", "Top-{} AUC (Div)"] for i in [1, 10, 100]]
+        metric_names.extend([
+            "Diversity (SEDiv@1k)",
+        ])
+        metrics = self.run_metrics(
+            endpoints=[endpoint],
+            include=metric_names,
+            chemistry_filter_basic=True
+        )
+        return metrics
 
     def guacamol_score(self, endpoint):
         # Calculate Score
@@ -698,7 +712,7 @@ class ScoreMetrics:
         if self.benchmark == "MolOpt":
             benchmark_metrics.update(self.molopt_score(endpoint=endpoint))
         elif self.benchmark in ["MolOpt_chem", "MolOpt-CF", "MolOpt-DF"]:
-            benchmark_metrics.update(self.molopt_score(endpoint=endpoint, chemistry_filter=True))
+            benchmark_metrics.update(self.molopt_chem_score(endpoint=endpoint))
         elif self.benchmark.startswith("MolExp"):
             benchmark_metrics.update(self.molexp_score())
         elif self.benchmark in ["GuacaMol", "GuacaMol_Scaffold"]:
@@ -745,7 +759,7 @@ class ScoreMetrics:
         # Function to check include
         def check_top_N(patt, prefix):
             patt = re.compile(patt)
-            metric_names = [patt.search(m) for m in include if patt.search(m)]
+            metric_names = [patt.fullmatch(m) for m in include if patt.fullmatch(m)]
             metric_names = [m for m in metric_names if f"{prefix}{m.string} {endpoint}" not in metrics]
             top_ns = [int(m.groups()[0]) for m in metric_names]
             return (bool(metric_names), top_ns)
@@ -789,7 +803,7 @@ class ScoreMetrics:
                     )
                 
                 # Top-{N} Avg (Div)
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg (Div)", prefix=prefix)
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg \(Div\)", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -829,7 +843,7 @@ class ScoreMetrics:
                     )
                     
                 # Top-{N} AUC (Div)
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC (Div)", prefix=prefix)
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC \(Div\)", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -843,7 +857,8 @@ class ScoreMetrics:
                                 extrapolate,
                                 True,
                                 False,
-                            )
+                            ),
+                            False,
                         )
                     )
                     
@@ -1004,7 +1019,8 @@ class ScoreMetrics:
                     )
 
             # ----- Property related
-            if ("Diversity (SEDiv@1k)" in include) and ("Diversity (SEDiv@1k)" not in metrics) and (len(gen_smiles) >= 1000):
+            gen_smiles = filtered_scores.smiles.tolist()
+            if ("Diversity (SEDiv@1k)" in include) and (prefix + "Diversity (SEDiv@1k)" not in metrics) and (len(gen_smiles) >= 1000):
                 metrics[prefix + "Diversity (SEDiv@1k)"] = se_diversity(
                     gen_smiles, k=1000, n_jobs=self.n_jobs
                 )
