@@ -23,7 +23,6 @@ from rdkit.Chem import (
     rdmolops,
 )
 from rdkit.ML.Cluster import Butina
-from torch import cuda
 from tqdm import tqdm
 
 from moleval.metrics.metrics_utils import get_mol, mol_passes_filters
@@ -41,13 +40,6 @@ disable_rdkit_log()
 
 def enable_rdkit_log():
     rdBase.EnableLog("rdApp.*")
-
-
-# ----- Cuda
-
-
-def cuda_available():
-    return cuda.is_available()
 
 
 # ----- Multiprocessing
