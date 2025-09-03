@@ -23,14 +23,15 @@ from molscore import resources, utils
 from molscore.gui import monitor_path
 
 logger = logging.getLogger("molscore")
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
 
 PRESETS = {
         "GuacaMol": resources.files("molscore.configs.GuacaMol"),
         "GuacaMol_Scaffold": resources.files("molscore.configs.GuacaMol_Scaffold"),
         "MolOpt": resources.files("molscore.configs.MolOpt"),
         "MolOpt_chem": resources.files("molscore.configs.MolOpt"), # Runs additional chemistry analysis
-        "DiverseHits": resources.files("molscore.configs.DiverseHits"), # Runs diversity filter and diversity analysis
+        "DiverseHits": resources.files("molscore.configs.DiverseHits"),
         "MolExp": resources.files("molscore.configs.MolExp"),
         "MolExp_baseline": resources.files("molscore.configs.MolExp_baseline"),
         "MolExpL": resources.files("molscore.configs.MolExpL"),
@@ -222,37 +223,28 @@ class MolScore:
             os.makedirs(self.save_dir, exist_ok=True)
             os.makedirs(os.path.join(self.save_dir, "iterations"))
 
-        # Setup log file
+        # Setup logging handlers
+        verbose_logging = self.cfg.get("logging", False)
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s: %(message)s")
+        # Add fh
         self.fh = logging.FileHandler(os.path.join(self.save_dir, "log.txt"))
-        self.fh.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        if verbose_logging:
+            self.fh.setLevel(logging.DEBUG)
+        else:
+            self.fh.setLevel(logging.INFO)
         self.fh.setFormatter(formatter)
         logger.addHandler(self.fh)
+        # Add ch
         ch = logging.StreamHandler()
-        try:
-            if self.cfg["logging"]:
-                ch.setLevel(logging.INFO)
-            else:
-                ch.setLevel(logging.WARNING)
-            logger.addHandler(ch)
-        except KeyError:
+        if verbose_logging:
+            ch.setLevel(logging.INFO)
+        else:
             ch.setLevel(logging.WARNING)
-            logger.addHandler(ch)
-            logger.info(
-                "Verbose logging unspecified, defaulting to non-verbose... so how are seeing this?"
-            )
-            pass
+        logger.addHandler(ch)
 
         # Setup monitor app
-        try:
-            if self.cfg["monitor_app"]:
-                self.monitor_app = True
-                self.monitor_app_path = monitor_path
-        except KeyError:
-            logger.info("Run monitor option unspecified, defaulting to False")
-            self.monitor_app = False
-            # For backwards compatibility, default too false
-            pass
+        self.monitor_app = self.cfg.get("monitor_app", False)
+        self.monitor_app_path = monitor_path
 
         # Load modifiers/tranformations
         self.modifier_functions = utils.all_score_modifiers
@@ -311,7 +303,8 @@ class MolScore:
                 self.replay_buffer.load(
                     os.path.join(self.save_dir, "replay_buffer.csv")
                 )
-        logger.info("MolScore initiated")
+                
+        logger.debug("MolScore initiated")
         
     def __enter__(self):
         return self
@@ -444,7 +437,7 @@ class MolScore:
         # Add warning in case of possible neverending optimization
         if self.termination_threshold and not self.budget:
             logger.warning(
-                "Termination threshold set but no budget specified, this may result in never-ending optimization if threshold is not reached."
+                "Termination threshold set with no budget specified, this may result in never-ending optimization if threshold is not reached."
             )
 
     def parse(
@@ -850,7 +843,12 @@ class MolScore:
         if len(self.replay_buffer) > 0:
             self.replay_buffer.save(os.path.join(self.save_dir, "replay_buffer.csv"))
 
-        self.fh.close()
+        # Close logger
+        try:
+            logger.removeHandler(self.fh)
+            self.fh.close()
+        except Exception:
+            pass
 
     def _write_temp_state(self, step):
         try:
@@ -921,7 +919,7 @@ class MolScore:
         Kill streamlit monitor.
         """
         if (self.monitor_app is None) or (not self.monitor_app):
-            logger.info("No monitor to kill")
+            logger.debug("No monitor to kill")
         else:
             try:
                 os.killpg(os.getpgid(self.monitor_app.pid), signal.SIGTERM)
@@ -940,6 +938,7 @@ class MolScore:
         if self.oracle_budget:
             if self.budget and (len(self.exists_map) >= self.budget):
                 self.finished = True
+                logger.info(f"MOLSCORE FINISHED: Oracle budget of {self.budget} unique valid molecules reached with {len(self.exists_map)}")
             else:
                 if len(task_df.loc[(task_df.step == self.step) & task_df.valid & task_df.unique]) == 0:
                     self.termination_counter["unique_patience"] += 1
@@ -947,6 +946,7 @@ class MolScore:
         else:
             if self.budget and (len(task_df) >= self.budget):
                 self.finished = True
+                logger.info(f"MOLSCORE FINISHED: Budget of {self.budget} molecules reached with {len(task_df)}")
 
         # Based on patience
         if self.termination_early_stop:
@@ -969,14 +969,16 @@ class MolScore:
                     self.termination_counter["threshold_patience"] += 1
                 else:
                     self.finished = True
+                    logger.info(f"MOLSCORE FINISHED: Termination threshold of {self.termination_threshold} reached with {self.batch_df[self.cfg['scoring']['method']].mean():.4f}")
 
         # Check our patience value
         if self.termination_patience:
             if any(p >= self.termination_patience for p in self.termination_counter.values()):
-                logger.warning(f"    Termination criteria met, patience of {self.termination_patience} reached: {self.termination_counter}")
                 self.finished = True
+                logger.info(f"MOLSCORE FINISHED: Termination criteria met, patience of {self.termination_patience} reached with {dict(self.termination_counter)}")
 
         if self.termination_exit and self.finished:
+            logger.warning("MOLSCORE EXITING: Termination exit set to True, exiting program")
             sys.exit(1)
 
     def _score_only(
@@ -996,7 +998,7 @@ class MolScore:
         else:
             self.step += 1
         _batch_size = [len(v) for v in molecular_inputs.values()][0]
-        logger.info(f"   Scoring: {_batch_size} molecular inputs")
+        logger.debug(f"   Scoring: {_batch_size} molecular inputs")
         
         # Pass inputs to scoring function
         _process_batch_idxs = list(range(_batch_size))
@@ -1006,7 +1008,7 @@ class MolScore:
             file_names=file_names,
             **molecular_inputs,
         )
-        logger.info(
+        logger.debug(
             f"    Score returned for {len(self.results_df)} mols in {time.time() - batch_start:.02f}s"
         )
         
@@ -1106,8 +1108,8 @@ class MolScore:
             self.step = step
         else:
             self.step += 1
-        logger.info(f"STEP {self.step}")
-        logger.info(f"    Received: {_batch_size} molecular inputs")
+        logger.debug(f"STEP {self.step}")
+        logger.debug(f"    Received: {_batch_size} molecular inputs")
 
         # ----- Parse smiles and initiate batch df -----
         # NOTE parse() set's self.batch_df["mol_ids"] as user provided, running idx, or canonical smiles
@@ -1164,7 +1166,7 @@ class MolScore:
         
         # If nothing to process then instead submit at least 1 (scoring function should handle invalid)       
         if len(_process_batch_idxs) == 0:
-            logger.info("    No smiles to score so submitting first input")
+            logger.debug("    No smiles to score so submitting first input")
             _process_batch_idxs = [0]
             _process_mol_ids = [self.batch_df.iloc[0]["mol_id"]]
 
@@ -1174,7 +1176,7 @@ class MolScore:
             k: [m for i, m in enumerate(v) if i in _process_batch_idxs]
             for k, v in molecular_inputs.items()
         }
-        logger.info(f"    Scoring: {len(_process_batch_idxs)} molecular inputs")
+        logger.debug(f"    Scoring: {len(_process_batch_idxs)} molecular inputs")
 
         # ----- Run scoring function -----
         scoring_start = time.time()
@@ -1202,7 +1204,7 @@ class MolScore:
         )
         if self.diversity_filter is not None:
             self.batch_df = self.run_diversity_filter(self.batch_df)
-            logger.info(
+            logger.debug(
                 f'    Passed diversity filter: {self.batch_df["passes_diversity_filter"].sum()} molecular inputs'
             )
             
@@ -1246,7 +1248,7 @@ class MolScore:
         if not flt:
             scores = np.array(scores, dtype=np.float32)
         logger.debug(f"    Returning: {len(scores)} scores")
-        logger.info(f"    MolScore elapsed time: {time.time() - batch_start:.02f}s")
+        logger.debug(f"    MolScore elapsed time: {time.time() - batch_start:.02f}s")
 
         # ----- Write out DF and RB memory intermittently -----
         if self.step % 5 == 0:
@@ -1262,9 +1264,13 @@ class MolScore:
                 )
 
         # ----- Clean up class -----
+        elapsed_time = time.time() - batch_start
         self.evaluate_finished()
         self.batch_df = None
         self.results_df = None
+        logger.info(
+            f"STEP {self.step} | {self.current_idx} | {_batch_size} received | {len(_process_batch_idxs)} scored | {len(scores)} returned | Finished={self.finished} | {elapsed_time:.02f}s"
+        )
 
         return scores
 
@@ -1716,7 +1722,7 @@ class MolScoreCurriculum(MolScore):
         if self.finished:
             # Move on to the next task if available
             if self.configs:
-                logger.info("Moving on to the next task ...")
+                logger.debug("Moving on to the next task ...")
                 self._set_objective(
                     task_config=self.configs.pop(0),
                     budget=self.budget,
