@@ -128,7 +128,7 @@ class MolScore:
         oracle_budget: bool = True,
         termination_threshold: int = None,
         termination_early_stop: bool = None,
-        termination_patience: int = None,
+        termination_patience: int = 10,
         termination_exit: bool = None,
         score_invalids: bool = False,
         replay_size: int = None,
@@ -942,6 +942,9 @@ class MolScore:
             else:
                 if len(task_df.loc[(task_df.step == self.step) & task_df.valid & task_df.unique]) == 0:
                     self.termination_counter["unique_patience"] += 1
+                else:
+                    # Reset counter if we have a new unique valid molecule
+                    self.termination_counter["unique_patience"] = 0
         # Based on molecule budget
         else:
             if self.budget and (len(task_df) >= self.budget):
