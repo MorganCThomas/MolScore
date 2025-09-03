@@ -128,7 +128,7 @@ class MolScore:
         oracle_budget: bool = True,
         termination_threshold: int = None,
         termination_early_stop: bool = None,
-        termination_patience: int = 10,
+        termination_patience: int = None,
         termination_exit: bool = None,
         score_invalids: bool = False,
         replay_size: int = None,
