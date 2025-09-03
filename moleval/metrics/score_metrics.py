@@ -314,6 +314,7 @@ class ScoreMetrics:
         """Return the area under the curve of the top n molecules"""
         # Filter by chemistry
         tdf = scores
+        max_index = 0 if pd.isna(tdf.index.max()) else tdf.index.max()
         cumsum = [0] * len(top_n)
         prev = [0] * len(top_n)
         called = 0
@@ -321,7 +322,7 @@ class ScoreMetrics:
         auc_values = [[0] for _ in range(len(top_n))]
         buffer = ChemistryBuffer(buffer_size=max(top_n))
         # Per log freq
-        for idx in range(window, min(tdf.index.max(), budget), window):
+        for idx in range(window, min(max_index, budget), window):
             if diverse:
                 # Buffer keeps a memory so only need the latest window
                 buffer.update_from_score_metrics(
@@ -348,16 +349,17 @@ class ScoreMetrics:
         # Final cumsum
         if diverse:
             buffer.update_from_score_metrics(
-                df=tdf[(tdf.index >= called) & (tdf.index <= tdf.index.max())], endpoint=endpoint            )
+                df=tdf[(tdf.index >= called) & (tdf.index <= max_index)], endpoint=endpoint
+                )
             for i, n in enumerate(top_n):
                 n_now = buffer.top_n(n)
                 # Compute AUC
-                cumsum[i] += (tdf.index.max() - called) * ((n_now + prev[i]) / 2)
-                indices[i].append(tdf.index.max())
+                cumsum[i] += (max_index - called) * ((n_now + prev[i]) / 2)
+                indices[i].append(max_index)
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
-                if extrapolate and (tdf.index.max() < budget):
-                    cumsum[i] += (budget - tdf.index.max()) * n_now
+                if extrapolate and (max_index < budget):
+                    cumsum[i] += (budget - max_index) * n_now
                     indices[i].append(budget)
                     auc_values[i].append(n_now)
         else:
@@ -365,12 +367,12 @@ class ScoreMetrics:
             for i, n in enumerate(top_n):
                 n_now = temp_result.iloc[:n][endpoint].mean()
                 # Compute AUC
-                cumsum[i] += (tdf.index.max() - called) * ((n_now + prev[i]) / 2)
-                indices[i].append(tdf.index.max())
+                cumsum[i] += (max_index - called) * ((n_now + prev[i]) / 2)
+                indices[i].append(max_index)
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
-                if extrapolate and (tdf.index.max() < budget):
-                    cumsum[i] += (budget - tdf.index.max()) * n_now
+                if extrapolate and (max_index < budget):
+                    cumsum[i] += (budget - max_index) * n_now
                     indices[i].append(budget)
                     auc_values[i].append(n_now)
 
@@ -438,14 +440,14 @@ class ScoreMetrics:
         """Return the AUC of the thresholded yield"""
         # Filter by chemistry
         tdf = scores
-
+        max_index = 0 if pd.isna(tdf.index.max()) else tdf.index.max()
         cumsum = 0
         prev = 0
         called = 0
         indices = []
         yields = []
         # Per log freq
-        for idx in range(window, min(tdf.index.max(), budget), window):
+        for idx in range(window, min(max_index, budget), window):
             temp_result = tdf.loc[:idx]
             # Get number of hits
             temp_hits = temp_result.loc[temp_result[endpoint] >= threshold]
@@ -461,13 +463,13 @@ class ScoreMetrics:
         hits = tdf.loc[tdf[endpoint] >= threshold]
         if scaffold:
             hits = hits.scaffold.dropna().unique()
-        tyield = len(hits) / tdf.index.max()
-        cumsum += (tdf.index.max() - called) * (tyield + prev) / 2
-        indices.append(tdf.index.max())
+        tyield = len(hits) / max_index
+        cumsum += (max_index - called) * (tyield + prev) / 2
+        indices.append(max_index)
         yields.append(tyield)
         # If finished early, extrapolate
-        if extrapolate and tdf.index.max() < budget:
-            cumsum += (budget - tdf.index.max()) * tyield
+        if extrapolate and max_index < budget:
+            cumsum += (budget - max_index) * tyield
             indices.append(budget)
             yields.append(tyield)
         if return_trajectory:
