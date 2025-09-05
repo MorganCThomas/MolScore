@@ -19,12 +19,6 @@ MolScore contains code to score *de novo* compounds in the context of generative
 Contributions and/or ideas for added functionality are welcomed!
 
 ## Installation
-
-Create a conda environment:
-
-    micromamba env create --name molscore --file environment.yml
-
-
 Install MolScore with PyPI (recommended):
 
     pip install molscore --upgrade
@@ -33,7 +27,6 @@ or directly from GitHub:
 
     git clone https://github.com/MorganCThomas/MolScore.git
     cd MolScore ; pip install -e .
-
 
 ## Scoring
 

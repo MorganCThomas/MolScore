@@ -51,6 +51,5 @@ setup(
         "molbloom",
         "func_timeout",
         "flask",
-        "aizynthfinder",
     ],
 )

@@ -1,0 +1,12 @@
+name: ms_aizynth
+channels:
+  - conda-forge
+  - rdkit
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - Flask
+    - git+https://github.com/MolecularAI/aizynthfinder@master

@@ -2,6 +2,7 @@ import os
 import multiprocessing
 import platform
 import atexit
+import gzip
 from typing import Union
 
 import numpy as np
@@ -11,6 +12,52 @@ from rdkit.Chem import rdMolDescriptors, rdmolops
 from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 
 
+# --- I/O ---
+def read_smiles(file_path):
+    """Read a smiles file separated by \n"""
+    if any(["gz" in ext for ext in os.path.basename(file_path).split(".")[1:]]):
+        with gzip.open(file_path) as f:
+            smiles = f.read().splitlines()
+            smiles = [smi.decode("utf-8") for smi in smiles]
+    else:
+        with open(file_path, "rt") as f:
+            smiles = f.read().splitlines()
+    return smiles
+
+
+def write_smiles(smiles, file_path):
+    """Save smiles to a file path seperated by \n"""
+    if (not os.path.exists(os.path.dirname(file_path))) and (
+        os.path.dirname(file_path) != ""
+    ):
+        os.makedirs(os.path.dirname(file_path))
+    if any(["gz" in ext for ext in os.path.basename(file_path).split(".")[1:]]):
+        with gzip.open(file_path, "wb") as f:
+            _ = [f.write((smi + "\n").encode("utf-8")) for smi in smiles]
+    else:
+        with open(file_path, "wt") as f:
+            _ = [f.write(smi + "\n") for smi in smiles]
+    return
+
+def read_mol(mol_path: os.PathLike, i=0):
+    if mol_path.endswith(".mol2") or mol_path.endswith(".mol"):
+        mol = Chem.MolFromMolFile(mol_path, sanitize=False, strictParsing=False)
+
+    elif mol_path.endswith(".sdf"):
+        suppl = Chem.ForwardSDMolSupplier(mol_path, sanitize=False)
+        for i, mol in enumerate(suppl):
+            if i == i:
+                break
+
+    elif mol_path.endswith(".pdb"):
+        mol = Chem.MolFromPDBFile(mol_path, sanitize=False)
+
+    else:
+        raise TypeError(f"Cannot read molecule, unknown input file type: {mol_path}")
+
+    return mol
+
+# --- Multiprocessing ---
 def Pool(n_jobs, return_map=True, **kwargs):
     if platform.system() == "Linux":
         context = multiprocessing.get_context("fork")
@@ -36,7 +83,7 @@ def Pool(n_jobs, return_map=True, **kwargs):
     else:
         return map if return_map else pool
 
-
+# --- Chem ---
 def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     """
     Get RDkit mol
@@ -54,26 +101,6 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
         mol = None
 
     return mol
-
-
-def read_mol(mol_path: os.PathLike, i=0):
-    if mol_path.endswith(".mol2") or mol_path.endswith(".mol"):
-        mol = Chem.MolFromMolFile(mol_path, sanitize=False, strictParsing=False)
-
-    elif mol_path.endswith(".sdf"):
-        suppl = Chem.ForwardSDMolSupplier(mol_path, sanitize=False)
-        for i, mol in enumerate(suppl):
-            if i == i:
-                break
-
-    elif mol_path.endswith(".pdb"):
-        mol = Chem.MolFromPDBFile(mol_path, sanitize=False)
-
-    else:
-        raise TypeError(f"Cannot read molecule, unknown input file type: {mol_path}")
-
-    return mol
-
 
 class Fingerprints:
     """

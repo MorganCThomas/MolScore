@@ -14,7 +14,7 @@ class TestAiZynthFinder(BaseTests.TestScoringFunction):
         os.makedirs(cls.output_directory, exist_ok=True)
         # Instantiate
         cls.obj = AiZynthFinder
-        cls.inst = AiZynthFinder(n_jobs=5)
+        cls.inst = AiZynthFinder()
         # Call
         mg = MockGenerator(seed_no=123, augment_invalids=True)
         cls.input = mg.sample(10)

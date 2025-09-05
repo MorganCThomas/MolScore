@@ -3,7 +3,6 @@
 **.ipynb_checkpoints
 .idea
 .vscode
-.cache
 build
 dist
 **.egg-info
