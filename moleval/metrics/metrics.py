@@ -576,10 +576,18 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='ECFP4', fp_bits=1024,
 
     fp_type = fp_type + "_arr"
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
+        # Remove None, tolerate up to 5
+        gen_mols = [mol for mol in gen if mol is not None]
+        assert len(gen) - len(gen_mols) <= 5, "At least 5 invalid molecules found, please provide only valid mols to for SEDiv"
+        # Calculate fingerprints
         gen_fps = mapper(n_jobs)(partial(Fingerprints.get_fp, name=fp_type, nBits=fp_bits), gen)
         gen_fps = np.vstack(gen_fps)
     elif isinstance(gen[0], str):
         gen_mols = mapper(n_jobs)(get_mol, gen)
+        # Remove None, tolerate up to 5
+        gen_mols = [mol for mol in gen_mols if mol is not None]
+        assert len(gen) - len(gen_mols) <= 5, "At least 5 invalid molecules found, please provide only valid mols to for SEDiv"
+        # Calculate fingerprints
         gen_fps = mapper(n_jobs)(partial(Fingerprints.get_fp, name=fp_type, nBits=fp_bits), gen_mols)
         gen_fps = np.vstack(gen_fps)
     else:
