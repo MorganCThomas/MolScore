@@ -1,10 +1,15 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# include commit hash in local version; add date if dirty
+local_scheme = "node-and-date"
+write_to = "molscore/_version.py"
+write_to_template = "__version__ = \"{version}\"\n"
 
 [project]
 name = "MolScore"
-version = "2.0"
 authors = [
   { name="Morgan Thomas", email="morganthomas263@gmail.com" },
 ]
@@ -16,7 +21,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dynamic = ["dependencies"]
+dynamic = ["version", "dependencies"]
 
 [project.urls]
 Homepage = "https://github.com/MorganCThomas/MolScore"

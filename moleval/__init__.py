@@ -1,3 +1,5 @@
+from molscore._version import __version__
+
 __all__ = [
     "MockGenerator",
     "resources",
