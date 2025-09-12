@@ -19,7 +19,7 @@ from rdkit.Chem import AllChem as Chem
 import molscore.scaffold_memory as scaffold_memory
 import molscore.scoring_functions as scoring_functions
 from moleval.metrics.score_metrics import ScoreMetrics
-from molscore import resources, utils
+from molscore import resources, utils, __version__
 from molscore.gui import monitor_path
 
 logger = logging.getLogger("molscore")
@@ -248,6 +248,12 @@ class MolScore:
 
         # Load modifiers/tranformations
         self.modifier_functions = utils.all_score_modifiers
+        
+        # Write version
+        with open(
+            os.path.join(self.save_dir, "_version.txt"), "wt"
+        ) as f:
+            f.write(__version__)
 
         # Set scoring function / transformation / aggregation / diversity filter
         self._set_objective(
