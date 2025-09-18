@@ -251,7 +251,7 @@ class MolScore:
         
         # Write version
         with open(
-            os.path.join(self.save_dir, "_version.txt"), "wt"
+            os.path.join(self.save_dir, "_molscore_version.txt"), "wt"
         ) as f:
             f.write(__version__)
 
