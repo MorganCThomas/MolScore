@@ -186,7 +186,7 @@ class ScoreMetrics:
 
     def _preprocess_scores(self, scores, valid=True, unique=True, budget=None, oracle_budget=None):
         # Truncate scores df to budget
-        if budget and not self.oracle_budget:
+        if budget and not oracle_budget:
             scores = scores.iloc[:budget]
         len_all = len(scores)
         
@@ -305,7 +305,7 @@ class ScoreMetrics:
         top_n=[1, 10, 100],
         endpoint=None,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         diverse=False,
         return_trajectory=False,
         prefix="",
@@ -313,8 +313,8 @@ class ScoreMetrics:
     ):
         """Return the area under the curve of the top n molecules"""
         # Filter by chemistry
-        tdf = scores
-        max_index = 0 if pd.isna(tdf.index.max()) else tdf.index.max()
+        tdf = scores.copy()
+        max_index = len(tdf)
         cumsum = [0] * len(top_n)
         prev = [0] * len(top_n)
         called = 0
@@ -326,30 +326,30 @@ class ScoreMetrics:
             if diverse:
                 # Buffer keeps a memory so only need the latest window
                 buffer.update_from_score_metrics(
-                    df=tdf.loc[idx - window : idx], endpoint=endpoint
+                    df=tdf.iloc[idx - window : idx], endpoint=endpoint
                 )
                 for i, n in enumerate(top_n):
                     n_now = buffer.top_n(n)
                     cumsum[i] += window * ((n_now + prev[i]) / 2)
                     prev[i] = n_now
                     called = idx
-                    indices[i].append(window)
+                    indices[i].append(idx)
                     auc_values[i].append(n_now)
             else:
                 # Order by endpoint up till index
-                temp_result = tdf.loc[:idx]
+                temp_result = tdf.iloc[:idx]
                 temp_result = temp_result.sort_values(by=endpoint, ascending=False)
                 for i, n in enumerate(top_n):
                     n_now = temp_result.iloc[:n][endpoint].mean()
                     cumsum[i] += window * ((n_now + prev[i]) / 2)
                     prev[i] = n_now
                     called = idx
-                    indices[i].append(window)
+                    indices[i].append(idx)
                     auc_values[i].append(n_now)
         # Final cumsum
         if diverse:
             buffer.update_from_score_metrics(
-                df=tdf[(tdf.index >= called) & (tdf.index <= max_index)], endpoint=endpoint
+                df = tdf.iloc[called:budget], endpoint=endpoint
                 )
             for i, n in enumerate(top_n):
                 n_now = buffer.top_n(n)
@@ -431,7 +431,7 @@ class ScoreMetrics:
         endpoint,
         threshold,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         scaffold=False,
         return_trajectory=False,
         prefix="",
@@ -440,7 +440,7 @@ class ScoreMetrics:
         """Return the AUC of the thresholded yield"""
         # Filter by chemistry
         tdf = scores
-        max_index = 0 if pd.isna(tdf.index.max()) else tdf.index.max()
+        max_index = len(tdf)
         cumsum = 0
         prev = 0
         called = 0
@@ -448,7 +448,7 @@ class ScoreMetrics:
         yields = []
         # Per log freq
         for idx in range(window, min(max_index, budget), window):
-            temp_result = tdf.loc[:idx]
+            temp_result = tdf.iloc[:idx]
             # Get number of hits
             temp_hits = temp_result.loc[temp_result[endpoint] >= threshold]
             if scaffold:
@@ -538,6 +538,7 @@ class ScoreMetrics:
         
         metric_names = [m.format(i) for m in ["Top-{} Avg", "Top-{} Avg (Div)", "Top-{} AUC", "Top-{} AUC (Div)"] for i in [1, 10, 100]]
         metric_names.extend([
+            "B-CF",
             "Diversity (SEDiv@1k)",
         ])
         metrics = self.run_metrics(
@@ -674,7 +675,7 @@ class ScoreMetrics:
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
                 window=100,
-                extrapolate=True,
+                extrapolate=False,
             ).values()
             top_aucs.append([top1, top10, top100])
         # Aggregate and take product
@@ -768,7 +769,7 @@ class ScoreMetrics:
         include=["Valid", "Unique"],
         chemistry_filter_basic=False,
         chemistry_filter_target=False,
-        extrapolate=True,
+        extrapolate=False,
     ):
         """Calculate metrics.
         :param endpoints: list, the endpoints in scores to calculate metrics for e.g., "Single". NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
@@ -890,6 +891,8 @@ class ScoreMetrics:
                                 extrapolate,
                                 True,
                                 False,
+                                prefix,
+                                queue,
                             ),
                             False,
                         )
@@ -1024,14 +1027,14 @@ class ScoreMetrics:
                     )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                            prefix + "Rediscovery Rate": rediscovered_smiles / len(self.scores),
                             prefix + "Rediscovered Ratio": rediscovered_smiles
                             / len(target_smiles),
                         }
                     )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                            prefix + "Rediscovery Rate": rediscovered_smiles / len(self.scores),
                             prefix + "Rediscovered Ratio": rediscovered_smiles
                             / len(target_smiles),
                         }
@@ -1040,7 +1043,7 @@ class ScoreMetrics:
                         metrics.update(
                             {
                                 prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
-                                / self.budget,
+                                / len(self.scores),
                                 prefix
                                 + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
                                 / len(target_scaffolds),
@@ -1079,10 +1082,10 @@ class ScoreMetrics:
         # ----- Further property related
         # MCF filters
         if any([(m in include) and (m not in metrics) for m in ["B-CF", "T-CF", "B&T-CF"]]):
-            metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
+            metrics["B-CF"] = len(self.filter(basic=True, target=False)) / len(self.scores)
             if chemistry_filter_target and self.has_reference_smiles:
-                metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.budget
-                metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.budget
+                metrics["T-CF"] = len(self.filter(basic=False, target=True)) / len(self.scores)
+                metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / len(self.scores)
 
         # Predicted synthesizability (RAScore > 0.5?)
         if ("Predicted Synthesizability" in include) and ("Predicted Synthesizability" not in metrics):
@@ -1108,10 +1111,10 @@ class ScoreMetrics:
         include=["Valid", "Unique"],
         chemistry_filter_basic=False,
         chemistry_filter_target=False,
-        extrapolate=True
+        extrapolate=False
         ):
         """Calculate metrics.
-        :param endpoints: list, the endpoints in scores to calculate metrics for e.g., "Single". NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
+        :param endpoints: list, the endpoints in scores to calculate metrics for e.g., "Score". NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
         :param thresholds: list, the thresholds corresponding to endpoints to calculate yield metrics for e.g., 0.8
         :param target_smiles: list, target smiles to compare against
         :param include: list, metrics to calculate besides any specified benchmark metrics, description available in ScoreMetrics.metric_descriptions
@@ -1233,7 +1236,7 @@ class ScoreMetrics:
         top_n=100,
         label=None,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         chemistry_filters_basic=False,
         chemistry_filter_target=False,
         diverse=False,
@@ -1271,7 +1274,7 @@ class ScoreMetrics:
         threshold,
         label=None,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         scaffold=False,
         chemistry_filters_basic=False,
         chemistry_filter_target=False,
