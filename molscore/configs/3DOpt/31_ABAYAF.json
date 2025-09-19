@@ -1,0 +1,42 @@
+{
+    "task": "31_ABAYAF",
+    "output_dir": "./",
+    "starting_population": [
+        "molscore.configs.3DOpt",
+        "starting_populations/31_ABAYAF_init_pop.txt"
+    ],
+    "load_from_previous": false,
+    "logging": false,
+    "monitor_app": false,
+    "termination_exit": false,
+    "scoring_functions": [
+        {
+            "name": "HSR",
+            "run": true,
+            "parameters": {
+                "prefix": "ABAYAF",
+                "ref_molecule": "3DOpt/targets/31_ABAYAF.txt",
+                "generator": "rdkit",
+                "n_jobs": 8,
+                "timeout": 10,
+                "save_files": true,
+                "use_charges_in_fp": true
+            }
+        }
+    ],
+    "scoring": {
+        "metrics": [
+            {
+                "name": "ABAYAF_HSR_score",
+                "filter": false,
+                "weight": 1.0,
+                "modifier": "raw",
+                "parameters": {}
+            }
+        ],
+        "method": "single"
+    },
+    "diversity_filter": {
+        "run": false
+    }
+}

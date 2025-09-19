@@ -1,0 +1,41 @@
+{
+    "task": "3_ABADOX",
+    "output_dir": "./",
+    "starting_population": [
+        "molscore.configs.3DOpt",
+        "starting_populations/3_ABADOX_init_pop.txt"
+    ],
+    "load_from_previous": false,
+    "logging": false,
+    "monitor_app": false,
+    "termination_exit": false,
+    "scoring_functions": [
+        {
+            "name": "HSR",
+            "run": true,
+            "parameters": {
+                "prefix": "ABADOX",
+                "ref_molecule": "3DOpt/targets/3_ABADOX.txt",
+                "generator": "rdkit",
+                "n_jobs": 8,
+                "timeout": 10,
+                "save_files": true
+            }
+        }
+    ],
+    "scoring": {
+        "metrics": [
+            {
+                "name": "ABADOX_HSR_score",
+                "filter": false,
+                "weight": 1.0,
+                "modifier": "raw",
+                "parameters": {}
+            }
+        ],
+        "method": "single"
+    },
+    "diversity_filter": {
+        "run": false
+    }
+}

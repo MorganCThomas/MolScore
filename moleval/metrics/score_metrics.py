@@ -702,8 +702,7 @@ class ScoreMetrics:
         )
         return metrics
     
-    # TODO: Replace 3D_benhmark with the name of the benchmark
-    def bennchmark_3d_score(self, endpoint): 
+    def benchmark_3DOpt_score(self, endpoint): 
         # Calculate Score
         task = self.scores.task.unique()[0]
         tdf = self.scores.copy()
@@ -727,7 +726,7 @@ class ScoreMetrics:
             ).values()
             score = np.mean([top1, top10])
         else:
-            print(f"Unknown 3D_benchmark task {task}, returning uniform specification")
+            print(f"Unknown 3DOpt task {task}, returning uniform specification")
             top1, top10= self.top_avg(
                 scores=tdf,
                 top_n=[1, 10],
@@ -735,7 +734,7 @@ class ScoreMetrics:
             ).values()
             score = np.mean([top1, top10])
         metrics = {
-            "3D_Benchmark_Score": score,
+            "3DOpt_Score": score,
         }
         return metrics
 
@@ -753,8 +752,8 @@ class ScoreMetrics:
             benchmark_metrics.update(self.guacamol_score(endpoint=endpoint))
         elif self.benchmark == "LibINVENT_Exp1":
             benchmark_metrics.update(self.libinvent_score(endpoint=endpoint))
-        elif self.benchmark == "3D_Benchmark":
-            benchmark_metrics.update(self.bennchmark_3d_score(endpoint=endpoint))
+        elif self.benchmark == "3DOpt":
+            benchmark_metrics.update(self.benchmark_3DOpt_score(endpoint=endpoint))
         else:
             print(
                 f"Benchmark specific metrics for {self.benchmark} have not been defined yet. Nothing further to add."

@@ -12,7 +12,6 @@ import warnings
 from functools import partial
 from pathlib import Path
 from typing import Callable, Sequence, Union
-
 import numpy as np
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
@@ -30,7 +29,6 @@ def check_openbabel():
         raise RuntimeError(
             "OpenBabel is required for this function, please install it using conda or mamba e.g., mamba install openbabel -c conda-forge"
         )
-
 
 def check_exe(command):
     if shutil.which(command) is None:
