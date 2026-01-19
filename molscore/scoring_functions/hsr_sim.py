@@ -8,6 +8,7 @@ from functools import partial
 import time
 import atexit
 import multiprocessing as mp
+from multiprocessing import TimeoutError as MPTimeoutError
 import platform
 from rdkit import Chem
 import importlib
@@ -57,7 +58,7 @@ def generate_ccdc_sdf(smiles: str, timeout: int = 10):
     Returns an SDF string or None if it errors / exceeds *timeout* seconds.
     The child is force-killed after *timeout* + 1 s.
     """
-    ctx = multiprocessing.get_context("fork")        
+    ctx = mp.get_context("fork")        
     q   = ctx.Queue()
     p   = ctx.Process(target=_worker, args=(smiles,q))
     p.start()
@@ -353,7 +354,7 @@ class HSR:
             ref_mol = pp.read_mol_from_file(file_path)
             if ref_mol is None:
                 raise ValueError("Invalid file format for RDKit parser.")
-            ref_mol_array = fp.generate_fingerprint_from_molecule(ref_mol, self.feature_set)
+            ref_mol_array = pp.molecule_to_ndarray(ref_mol, PROTON_FEATURES)
         
         self.ref_mol_fp = fp.generate_fingerprint_from_data(ref_mol_array)
             
@@ -412,6 +413,7 @@ class HSR:
         :param mol: SMILES string, rdkit molecule or numpy array
         :return: dict with the HSR similarity score
         """
+        result = {"molecule": mol}
         # Generate 3D coordinates
         try:
             #Check what object the molecule is:
@@ -499,7 +501,7 @@ class HSR:
         os.makedirs(directory, exist_ok=True)
         
         # Check if CCDC is available
-        serial_mode = self.generator.startswith("ccdc")
+        serial_mode = self.generator.startswith("ccdc") 
         results = []
         
         if serial_mode:
@@ -524,22 +526,53 @@ class HSR:
                         results.append({"molecule": smi,
                                         f"{self.prefix}_HSR_score": 0.0})
             
-        else:    
-            ctx = mp.get_context("fork" if platform.system() == "Linux" else "spawn")
+        # else:    
+        #     ctx = mp.get_context("fork" if platform.system() == "Linux" else "spawn")
             
-            with ctx.Pool(self.n_jobs) as pool: 
-                async_results = [pool.apply_async(self.score_mol, (mol,))
-                                for mol in molecules]
+        #     with ctx.Pool(self.n_jobs) as pool: 
+        #         async_results = [pool.apply_async(self.score_mol, (mol,))
+        #                         for mol in molecules]
 
-                for mol, ar in zip(molecules, async_results):
-                    try:
-                        results.append(ar.get(timeout=self.timeout))
-                    except multiprocessing.TimeoutError:
-                        results.append({"molecule": mol,
-                                        "3d_mol": 0.0,
-                                        f"{self.prefix}_HSR_score": 0.0})
-                
-                
+        #         for mol, ar in zip(molecules, async_results):
+        #             try:
+        #                 results.append(ar.get(timeout=self.timeout))
+        #             except multiprocessing.TimeoutError:
+        #                 results.append({"molecule": mol,
+        #                                 "3d_mol": 0.0,
+        #                                 f"{self.prefix}_HSR_score": 0.0})
+        else:
+            # --- Avoid process-pool with Pybel molecules on spawn platforms (macOS/Windows) ---
+            is_pybel_input = any(isinstance(m, pb.Molecule) for m in molecules)
+            spawn_platform = platform.system() != "Linux"   # Darwin/Windows use spawn by default in your code
+
+            if is_pybel_input and spawn_platform:
+                # Use threads (no pickling). OpenBabel work is in C++ so threads are usually fine.
+                max_thr = min(self.n_jobs, len(molecules)) or 1
+                with ThreadPoolExecutor(max_workers=max_thr) as tp:
+                    futures = {tp.submit(self.score_mol, mol): mol for mol in molecules}
+                    for fut in as_completed(futures):
+                        mol = futures[fut]
+                        try:
+                            results.append(fut.result(timeout=self.timeout))
+                        except Exception:
+                            logger.exception("Thread worker failed for %r", mol)
+                            results.append({"molecule": mol, "3d_mol": 0.0, f"{self.prefix}_HSR_score": 0.0})
+            else:
+                # Use multiprocessing for picklable inputs (SMILES/ndarray; sometimes RDKit mols too)
+                ctx = mp.get_context("fork" if platform.system() == "Linux" else "spawn")
+                with ctx.Pool(self.n_jobs) as pool:
+                    async_results = [pool.apply_async(self.score_mol, (mol,)) for mol in molecules]
+
+                    for mol, ar in zip(molecules, async_results):
+                        try:
+                            results.append(ar.get(timeout=self.timeout))
+                        except MPTimeoutError:
+                            results.append({"molecule": mol, "3d_mol": 0.0, f"{self.prefix}_HSR_score": 0.0})
+                        except Exception:
+                            logger.exception("Process worker failed for %r", mol)
+                            results.append({"molecule": mol, "3d_mol": 0.0, f"{self.prefix}_HSR_score": 0.0})
+            
+                            
 
         # Save mols
         # Check if in results there is the key '3d_mol' (we are not using ndarray, 
