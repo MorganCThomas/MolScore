@@ -521,42 +521,31 @@ class HSR:
                 for fut in as_completed(futures):
                     try:
                         results.append(fut.result())
-                    except Exception:        # includes our TimeoutError → score 0
+                    except Exception:       
                         smi = futures[fut]
                         results.append({"molecule": smi,
                                         f"{self.prefix}_HSR_score": 0.0})
-            
-        # else:    
-        #     ctx = mp.get_context("fork" if platform.system() == "Linux" else "spawn")
-            
-        #     with ctx.Pool(self.n_jobs) as pool: 
-        #         async_results = [pool.apply_async(self.score_mol, (mol,))
-        #                         for mol in molecules]
-
-        #         for mol, ar in zip(molecules, async_results):
-        #             try:
-        #                 results.append(ar.get(timeout=self.timeout))
-        #             except multiprocessing.TimeoutError:
-        #                 results.append({"molecule": mol,
-        #                                 "3d_mol": 0.0,
-        #                                 f"{self.prefix}_HSR_score": 0.0})
         else:
             # --- Avoid process-pool with Pybel molecules on spawn platforms (macOS/Windows) ---
             is_pybel_input = any(isinstance(m, pb.Molecule) for m in molecules)
-            spawn_platform = platform.system() != "Linux"   # Darwin/Windows use spawn by default in your code
+            spawn_platform = platform.system() != "Linux"   
 
-            if is_pybel_input and spawn_platform:
-                # Use threads (no pickling). OpenBabel work is in C++ so threads are usually fine.
+            if is_pybel_input:
                 max_thr = min(self.n_jobs, len(molecules)) or 1
+                results = [None] * len(molecules)
+
                 with ThreadPoolExecutor(max_workers=max_thr) as tp:
-                    futures = {tp.submit(self.score_mol, mol): mol for mol in molecules}
+                    futures = {tp.submit(self.score_mol, mol): i for i, mol in enumerate(molecules)}
+
                     for fut in as_completed(futures):
-                        mol = futures[fut]
+                        i = futures[fut]
+                        mol = molecules[i]
                         try:
-                            results.append(fut.result(timeout=self.timeout))
+                            results[i] = fut.result(timeout=self.timeout)
                         except Exception:
                             logger.exception("Thread worker failed for %r", mol)
-                            results.append({"molecule": mol, "3d_mol": 0.0, f"{self.prefix}_HSR_score": 0.0})
+                            results[i] = {"molecule": mol, "3d_mol": 0.0, f"{self.prefix}_HSR_score": 0.0}
+
             else:
                 # Use multiprocessing for picklable inputs (SMILES/ndarray; sometimes RDKit mols too)
                 ctx = mp.get_context("fork" if platform.system() == "Linux" else "spawn")
