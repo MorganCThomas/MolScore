@@ -62,6 +62,7 @@ class ScoreMetrics:
         scores: pd.DataFrame = None,
         reference_smiles: list = [],
         budget: int = None,
+        oracle_budget: bool = True,
         valid=True,
         unique=True,
         n_jobs=1,
@@ -72,7 +73,8 @@ class ScoreMetrics:
         to plot metrics and select chemistry examples.
         :param scores: pd.DataFrame, the scores dataframe returned from MolScore
         :param reference_smiles: list, a list of reference SMILES to compare against as 'Target' property chemistry
-        :param budget: int, the budget of the experiment
+        :param budget: int, the molecule budget of the experiment
+        :param oracle_budget; If the budget pertains to oracle calls (i.e., valid & unique)
         :param valid: bool, whether to truncate to only valid smiles
         :param unique: bool, whether to truncate to only unique smiles
         :param n_jobs: int, number of jobs to run in parallel
@@ -83,8 +85,9 @@ class ScoreMetrics:
         self.n_jobs = check_env_jobs(n_jobs)
         self.total = len(scores)
         self.budget = budget if budget else self.total
+        self.oracle_budget = oracle_budget
         self.scores = self._preprocess_scores(
-            scores.copy(deep=True), valid=valid, unique=unique, budget=budget
+            scores.copy(deep=True), valid=valid, unique=unique, budget=budget, oracle_budget=self.oracle_budget
         )
         self.benchmark = benchmark
         
@@ -109,14 +112,16 @@ class ScoreMetrics:
         self._rascorer = None
 
     def _reinitialize(
-        self, scores, budget: int = None, benchmark: str = None, n_jobs: int = None
+        self, scores, budget: int = None, oracle_budget: bool = None, benchmark: str = None, n_jobs: int = None
     ):
         # Re-initialize without recomputing reference smiles
         self.total = len(scores)
         if budget:
             self.budget = budget
+        if oracle_budget is not None:
+            self.oracle_budget = oracle_budget
         if not self.budget:
-            self.total
+            self.budget = self.total
         if benchmark:
             self.benchmark = benchmark
         if n_jobs:
@@ -125,7 +130,7 @@ class ScoreMetrics:
                 target=self.reference_smiles, n_jobs=self.n_jobs
             )
         self.scores = self._preprocess_scores(
-            scores.copy(deep=True), valid=True, unique=True, budget=self.budget
+            scores.copy(deep=True), valid=True, unique=True, budget=self.budget, oracle_budget=self.oracle_budget
         )
         self._bcf_scores = None
         self._tcf_scores = None
@@ -179,38 +184,49 @@ class ScoreMetrics:
         else:
             return self.scores
 
-    def _preprocess_scores(self, scores, valid=True, unique=True, budget=None):
+    def _preprocess_scores(self, scores, valid=True, unique=True, budget=None, oracle_budget=None):
         # Truncate scores df to budget
-        if budget:
+        if budget and not oracle_budget:
             scores = scores.iloc[:budget]
         len_all = len(scores)
         
         # Truncate to valid only molecules and calculate valid ratio
-        if isinstance(scores.valid.dtype, np.dtypes.ObjectDType):
-            valid_value = "true" # Back compatability
-        elif isinstance(scores.valid.dtype, np.dtypes.BoolDType):
-            valid_value = True
+        if 'valid' in scores.columns:
+            # NOTE: np.issubdtype has broader version compatibility
+            if np.issubdtype(scores.valid.dtype, np.object_):
+                valid_value = "true" # Back compatability
+            elif np.issubdtype(scores.valid.dtype, np.bool_):
+                valid_value = True
+            else:
+                raise ValueError("Valid column has un unrecognised dtype")
+            if valid:
+                scores = scores.loc[scores.valid == valid_value]
+                self.valid_ratio = len(scores) / len_all
+            else:
+                self.valid_ratio = (scores.valid == valid_value).sum() / len_all
         else:
-            raise ValueError("Valid column has un unrecognised dtype")
-        if valid:
-            scores = scores.loc[scores.valid == valid_value]
-            self.valid_ratio = len(scores) / len_all
-        else:
-            self.valid_ratio = (scores.valid == valid_value).sum() / len_all
+            self.valid_ratio = np.NaN
         len_valid = len(scores)
             
         # Truncate to unique only molecules and calculate unique ratio
-        if isinstance(scores.unique.dtype, np.dtypes.ObjectDType):
-            unique_value = "true" # Back compatability
-        elif isinstance(scores.unique.dtype, np.dtypes.BoolDType):
-            unique_value = True
+        if 'unique' in scores.columns:
+            if np.issubdtype(scores.unique.dtype, np.object_):
+                unique_value = "true" # Back compatability
+            if np.issubdtype(scores.unique.dtype, np.bool_):
+                unique_value = True
+            else:
+                raise ValueError("Unique column has un unrecognised dtype")
+            if unique:
+                scores = scores.loc[scores.unique == unique_value]
+                self.unique_ratio = len(scores) / len_valid
+            else:
+                self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
         else:
-            raise ValueError("Unique column has un unrecognised dtype")
-        if unique:
-            scores = scores.loc[scores.unique == unique_value]
-            self.unique_ratio = len(scores) / len_valid
-        else:
-            self.unique_ratio = (scores.unique == unique_value).sum() / len(scores)
+            self.unique_ratio = np.NaN
+            
+        # Truncate valid & unique scores to oracle budget
+        if budget and oracle_budget:
+            scores = scores.iloc[:budget]
             
         # Add scaffold column if not present
         if "smiles" in scores.columns:
@@ -289,7 +305,7 @@ class ScoreMetrics:
         top_n=[1, 10, 100],
         endpoint=None,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         diverse=False,
         return_trajectory=False,
         prefix="",
@@ -297,7 +313,8 @@ class ScoreMetrics:
     ):
         """Return the area under the curve of the top n molecules"""
         # Filter by chemistry
-        tdf = scores
+        tdf = scores.copy()
+        max_index = len(tdf)
         cumsum = [0] * len(top_n)
         prev = [0] * len(top_n)
         called = 0
@@ -305,44 +322,44 @@ class ScoreMetrics:
         auc_values = [[0] for _ in range(len(top_n))]
         buffer = ChemistryBuffer(buffer_size=max(top_n))
         # Per log freq
-        for idx in range(window, min(tdf.index.max(), budget), window):
+        for idx in range(window, min(max_index, budget), window):
             if diverse:
                 # Buffer keeps a memory so only need the latest window
                 buffer.update_from_score_metrics(
-                    df=tdf.loc[idx - window : idx], endpoint=endpoint
+                    df=tdf.iloc[idx - window : idx], endpoint=endpoint
                 )
                 for i, n in enumerate(top_n):
                     n_now = buffer.top_n(n)
                     cumsum[i] += window * ((n_now + prev[i]) / 2)
                     prev[i] = n_now
                     called = idx
-                    indices[i].append(window)
+                    indices[i].append(idx)
                     auc_values[i].append(n_now)
             else:
                 # Order by endpoint up till index
-                temp_result = tdf.loc[:idx]
+                temp_result = tdf.iloc[:idx]
                 temp_result = temp_result.sort_values(by=endpoint, ascending=False)
                 for i, n in enumerate(top_n):
                     n_now = temp_result.iloc[:n][endpoint].mean()
                     cumsum[i] += window * ((n_now + prev[i]) / 2)
                     prev[i] = n_now
                     called = idx
-                    indices[i].append(window)
+                    indices[i].append(idx)
                     auc_values[i].append(n_now)
         # Final cumsum
         if diverse:
             buffer.update_from_score_metrics(
-                df=tdf.loc[called : tdf.index.max()], endpoint=endpoint
-            )
+                df = tdf.iloc[called:budget], endpoint=endpoint
+                )
             for i, n in enumerate(top_n):
                 n_now = buffer.top_n(n)
                 # Compute AUC
-                cumsum[i] += (tdf.index.max() - called) * ((n_now + prev[i]) / 2)
-                indices[i].append(tdf.index.max())
+                cumsum[i] += (max_index - called) * ((n_now + prev[i]) / 2)
+                indices[i].append(max_index)
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
-                if extrapolate and (tdf.index.max() < budget):
-                    cumsum[i] += (budget - tdf.index.max()) * n_now
+                if extrapolate and (max_index < budget):
+                    cumsum[i] += (budget - max_index) * n_now
                     indices[i].append(budget)
                     auc_values[i].append(n_now)
         else:
@@ -350,12 +367,12 @@ class ScoreMetrics:
             for i, n in enumerate(top_n):
                 n_now = temp_result.iloc[:n][endpoint].mean()
                 # Compute AUC
-                cumsum[i] += (tdf.index.max() - called) * ((n_now + prev[i]) / 2)
-                indices[i].append(tdf.index.max())
+                cumsum[i] += (max_index - called) * ((n_now + prev[i]) / 2)
+                indices[i].append(max_index)
                 auc_values[i].append(n_now)
                 # If finished early, extrapolate
-                if extrapolate and (tdf.index.max() < budget):
-                    cumsum[i] += (budget - tdf.index.max()) * n_now
+                if extrapolate and (max_index < budget):
+                    cumsum[i] += (budget - max_index) * n_now
                     indices[i].append(budget)
                     auc_values[i].append(n_now)
 
@@ -414,7 +431,7 @@ class ScoreMetrics:
         endpoint,
         threshold,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         scaffold=False,
         return_trajectory=False,
         prefix="",
@@ -423,15 +440,15 @@ class ScoreMetrics:
         """Return the AUC of the thresholded yield"""
         # Filter by chemistry
         tdf = scores
-
+        max_index = len(tdf)
         cumsum = 0
         prev = 0
         called = 0
         indices = []
         yields = []
         # Per log freq
-        for idx in range(window, min(tdf.index.max(), budget), window):
-            temp_result = tdf.loc[:idx]
+        for idx in range(window, min(max_index, budget), window):
+            temp_result = tdf.iloc[:idx]
             # Get number of hits
             temp_hits = temp_result.loc[temp_result[endpoint] >= threshold]
             if scaffold:
@@ -446,13 +463,13 @@ class ScoreMetrics:
         hits = tdf.loc[tdf[endpoint] >= threshold]
         if scaffold:
             hits = hits.scaffold.dropna().unique()
-        tyield = len(hits) / tdf.index.max()
-        cumsum += (tdf.index.max() - called) * (tyield + prev) / 2
-        indices.append(tdf.index.max())
+        tyield = len(hits) / max_index
+        cumsum += (max_index - called) * (tyield + prev) / 2
+        indices.append(max_index)
         yields.append(tyield)
         # If finished early, extrapolate
-        if extrapolate and tdf.index.max() < budget:
-            cumsum += (budget - tdf.index.max()) * tyield
+        if extrapolate and max_index < budget:
+            cumsum += (budget - max_index) * tyield
             indices.append(budget)
             yields.append(tyield)
         if return_trajectory:
@@ -483,7 +500,25 @@ class ScoreMetrics:
             rediscovered_scaffolds = len(target.intersection(query))
         return rediscovered_smiles, rediscovered_scaffolds
     
-    def molopt_score(self, endpoint):
+    @staticmethod
+    def diverse_hits(
+        scores, endpoint, threshold=0.5, prefix="", queue=None
+    ):
+        hits = scores.loc[scores[endpoint] >= threshold].smiles.tolist()
+        if len(hits) == 0:
+            n_diverse = 0
+        else:
+            n_diverse = se_diversity(hits, k=None, fp_type='ECFP4', fp_bits=2048, normalize=False)
+        
+        output = (prefix + f"Diverse Hits {endpoint}", n_diverse)
+        
+        if queue:
+            queue.put(output)
+        else:
+            return dict([output])
+        
+    
+    def molopt_score(self, endpoint, chemistry_filter=False):
         metrics = self.run_metrics(
             endpoints=[endpoint],
             include=[
@@ -493,7 +528,23 @@ class ScoreMetrics:
                 "Top-1 AUC",
                 "Top-10 AUC",
                 "Top-100 AUC",
-            ]
+            ],
+            chemistry_filter_basic=chemistry_filter
+        )
+        return metrics
+    
+    def molopt_chem_score(self, endpoint):
+
+        
+        metric_names = [m.format(i) for m in ["Top-{} Avg", "Top-{} Avg (Div)", "Top-{} AUC", "Top-{} AUC (Div)"] for i in [1, 10, 100]]
+        metric_names.extend([
+            "B-CF",
+            "Diversity (SEDiv@1k)",
+        ])
+        metrics = self.run_metrics(
+            endpoints=[endpoint],
+            include=metric_names,
+            chemistry_filter_basic=True
         )
         return metrics
 
@@ -624,7 +675,7 @@ class ScoreMetrics:
                 top_n=[1, 10, 100],
                 endpoint=endpoint,
                 window=100,
-                extrapolate=True,
+                extrapolate=False,
             ).values()
             top_aucs.append([top1, top10, top100])
         # Aggregate and take product
@@ -640,16 +691,69 @@ class ScoreMetrics:
         }
         return metrics
     
+    def diverse_hits_score(self, endpoint, chemistry_filter=False):
+        metrics = self.run_metrics(
+            endpoints=[endpoint],
+            thresholds=[0.5],
+            include=[
+                "DivHits",
+            ],
+            chemistry_filter_basic=chemistry_filter
+        )
+        return metrics
+    
+    def benchmark_3DOpt_score(self, endpoint): 
+        # Calculate Score
+        task = self.scores.task.unique()[0]
+        tdf = self.scores.copy()
+        if any(
+            [
+                task.startswith(name)
+                for name in [
+                    '1_ABAHIW', '2_ABAKIZ', '3_ABADOX', '4_ABABIP', '5_GASQOK', '6_ABEKIE',
+                    '7_NIWPUE01', '8_ABEKIF', '9_APUFEX', '10_ABEHAU', '11_TITTUO', '12_EGEYOG',
+                    '13_ABOBUP', '14_XIDTOW', '15_ACNCOB10', '16_TACXUQ', '17_ACAZFE', '18_NIVHEJ',
+                    '19_ADUPAS', '20_DAJLAC', '21_OFOWIS', '22_CATSUL', '23_HESMUQ01', '24_GUDQOL',
+                    '25_ABEVAG', '26_AKOQOH', '27_ADARUT', '28_AFECIA', '29_ACOVUL', '30_AFIXEV',
+                    '31_ABAYAF', '32_RULJAM' 
+                    ]
+            ]
+            ):
+            top1, top10 = self.top_avg(
+                scores=tdf,
+                top_n=[1, 10],
+                endpoint=endpoint,
+            ).values()
+            score = np.mean([top1, top10])
+        else:
+            print(f"Unknown 3DOpt task {task}, returning uniform specification")
+            top1, top10= self.top_avg(
+                scores=tdf,
+                top_n=[1, 10],
+                endpoint=endpoint,
+            ).values()
+            score = np.mean([top1, top10])
+        metrics = {
+            "3DOpt_Score": score,
+        }
+        return metrics
+
     def run_benchmark_metrics(self, endpoint):
         benchmark_metrics = {}
-        if self.benchmark.startswith("MolOpt"):
+        if self.benchmark == "MolOpt":
             benchmark_metrics.update(self.molopt_score(endpoint=endpoint))
+        elif self.benchmark in ["MolOpt_chem", "MolOpt-CF", "MolOpt-DF"]:
+            benchmark_metrics.update(self.molopt_chem_score(endpoint=endpoint))
+        elif self.benchmark == "DiverseHits":
+            benchmark_metrics.update(self.diverse_hits_score(endpoint=endpoint))
         elif self.benchmark.startswith("MolExp"):
             benchmark_metrics.update(self.molexp_score())
         elif self.benchmark in ["GuacaMol", "GuacaMol_Scaffold"]:
             benchmark_metrics.update(self.guacamol_score(endpoint=endpoint))
         elif self.benchmark == "LibINVENT_Exp1":
             benchmark_metrics.update(self.libinvent_score(endpoint=endpoint))
+        elif self.benchmark == "3DOpt":
+            benchmark_metrics.update(self.benchmark_3DOpt_score(endpoint=endpoint))
         else:
             print(
                 f"Benchmark specific metrics for {self.benchmark} have not been defined yet. Nothing further to add."
@@ -659,12 +763,12 @@ class ScoreMetrics:
     def run_metrics(
         self,
         endpoints=[],
-        thresholds=[], 
+        thresholds=None, 
         target_smiles=[],
         include=["Valid", "Unique"],
         chemistry_filter_basic=False,
         chemistry_filter_target=False,
-        extrapolate=True,
+        extrapolate=False,
     ):
         """Calculate metrics.
         :param endpoints: list, the endpoints in scores to calculate metrics for e.g., "Single". NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
@@ -675,6 +779,7 @@ class ScoreMetrics:
         :param chemistry_filter_target: bool, whether to filter by target chemistry
         :param extrapolate: bool, whether to extrapolate metrics to the budget if fewer molecules exist due to invalid or non-uniqueness
         """
+        
 
         # Setup parallelisation for internal async processes
         mp = get_multiprocessing_context()
@@ -685,10 +790,10 @@ class ScoreMetrics:
         metrics = {}
         
         # Function to check include
-        def check_top_N(patt):
+        def check_top_N(patt, prefix):
             patt = re.compile(patt)
-            metric_names = [patt.search(m) for m in include if patt.search(m)]
-            metric_names = [m for m in metric_names if f"{m.string} {endpoint}" not in metrics]
+            metric_names = [patt.fullmatch(m) for m in include if patt.fullmatch(m)]
+            metric_names = [m for m in metric_names if f"{prefix}{m.string} {endpoint}" not in metrics]
             top_ns = [int(m.groups()[0]) for m in metric_names]
             return (bool(metric_names), top_ns)
         
@@ -720,7 +825,7 @@ class ScoreMetrics:
             # ----- Endpoint related
             for i, endpoint in enumerate(endpoints):
                 # Top-{N} Avg score
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -731,7 +836,7 @@ class ScoreMetrics:
                     )
                 
                 # Top-{N} Avg (Div)
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg (Div)")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) Avg \(Div\)", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -749,7 +854,7 @@ class ScoreMetrics:
                     )
                     
                 # Top-{N} AUC
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -771,7 +876,7 @@ class ScoreMetrics:
                     )
                     
                 # Top-{N} AUC (Div)
-                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC (Div)")
+                top_name, top_ns = check_top_N(patt=f"Top-([0-9]+) AUC \(Div\)", prefix=prefix)
                 if top_name:
                     process_list.append(
                         (
@@ -792,15 +897,35 @@ class ScoreMetrics:
                         )
                     )
                     
-                # Yield (Check a corresponding threshold has been provided)
+                # (Check a corresponding threshold has been provided)
                 try:
+                    if thresholds is None:
+                        thresholds = []
                     threshold = thresholds[i]
                 except IndexError:
                     threshold = False
                     if any(m.startswith("Yield") for m in include):
                         print(f"No threshold was given for {endpoint}")
-            
+                
                 if threshold:
+                    # Diverse Hits
+                    patt = "DivHits"
+                    if ("DivHits") in include and (f"{prefix}{patt} {endpoint}" not in metrics):
+                        process_list.append(
+                            (
+                                self.diverse_hits,
+                                (
+                                    filtered_scores,
+                                    endpoint,
+                                    threshold,
+                                    prefix,
+                                    queue,
+                                ),
+                                False,
+                            )
+                        )
+                    
+                    # Yield
                     patt = f"Yield"
                     if (patt in include) and (f"{patt} {endpoint}" not in metrics):
                         process_list.append(
@@ -901,18 +1026,36 @@ class ScoreMetrics:
                     )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate": rediscovered_smiles / self.budget,
+                            prefix + "Rediscovery Rate": rediscovered_smiles / len(self.scores),
                             prefix + "Rediscovered Ratio": rediscovered_smiles
                             / len(target_smiles),
                         }
                     )
                     metrics.update(
                         {
-                            prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
-                            / self.budget,
-                            prefix
-                            + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
-                            / len(target_scaffolds),
+                            prefix + "Rediscovery Rate": rediscovered_smiles / len(self.scores),
+                            prefix + "Rediscovered Ratio": rediscovered_smiles
+                            / len(target_smiles),
+                        }
+                    )
+                    if rediscovered_scaffolds:
+                        metrics.update(
+                            {
+                                prefix + "Rediscovery Rate Scaffold": rediscovered_scaffolds
+                                / len(self.scores),
+                                prefix
+                                + "Rediscovered Ratio Scaffold": rediscovered_scaffolds
+                                / len(target_scaffolds),
+                            }
+                        )
+                    # Fingerprint analogues
+                    gen_ans, ref_ans = FingerprintAnaloguesMetric(n_jobs=self.n_jobs)(
+                        gen=gen_smiles, ref=target_smiles
+                    )
+                    metrics.update(
+                        {
+                            prefix + "Analogue Rate": gen_ans,
+                            prefix + "Analogue Ratio": ref_ans,
                         }
                     )
                     
@@ -929,7 +1072,8 @@ class ScoreMetrics:
                     )
 
             # ----- Property related
-            if ("Diversity (SEDiv@1k)" in include) and ("Diversity (SEDiv@1k)" not in metrics) and (len(gen_smiles) >= 1000):
+            gen_smiles = filtered_scores.smiles.tolist()
+            if ("Diversity (SEDiv@1k)" in include) and (prefix + "Diversity (SEDiv@1k)" not in metrics) and (len(gen_smiles) >= 1000):
                 metrics[prefix + "Diversity (SEDiv@1k)"] = se_diversity(
                     gen_smiles, k=1000, n_jobs=self.n_jobs
                 )
@@ -937,10 +1081,10 @@ class ScoreMetrics:
         # ----- Further property related
         # MCF filters
         if any([(m in include) and (m not in metrics) for m in ["B-CF", "T-CF", "B&T-CF"]]):
-            metrics["B-CF"] = len(self.filter(basic=True, target=False)) / self.budget
+            metrics["B-CF"] = len(self.filter(basic=True, target=False)) / len(self.scores)
             if chemistry_filter_target and self.has_reference_smiles:
-                metrics["T-CF"] = len(self.filter(basic=False, target=True)) / self.budget
-                metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / self.budget
+                metrics["T-CF"] = len(self.filter(basic=False, target=True)) / len(self.scores)
+                metrics["B&T-CF"] = len(self.filter(basic=True, target=True)) / len(self.scores)
 
         # Predicted synthesizability (RAScore > 0.5?)
         if ("Predicted Synthesizability" in include) and ("Predicted Synthesizability" not in metrics):
@@ -966,10 +1110,10 @@ class ScoreMetrics:
         include=["Valid", "Unique"],
         chemistry_filter_basic=False,
         chemistry_filter_target=False,
-        extrapolate=True
+        extrapolate=False
         ):
         """Calculate metrics.
-        :param endpoints: list, the endpoints in scores to calculate metrics for e.g., "Single". NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
+        :param endpoints: list, the endpoints in scores to calculate metrics for e.g., "Score". NOTE endpoints should be normalized between 0 (bad) and 1 (good) in a standardized, comparable way
         :param thresholds: list, the thresholds corresponding to endpoints to calculate yield metrics for e.g., 0.8
         :param target_smiles: list, target smiles to compare against
         :param include: list, metrics to calculate besides any specified benchmark metrics, description available in ScoreMetrics.metric_descriptions
@@ -977,7 +1121,9 @@ class ScoreMetrics:
         :param chemistry_filter_target: bool, whether to filter by target chemistry
         :param extrapolate: bool, whether to extrapolate metrics to the budget if fewer molecules exist due to invalid or non-uniqueness
         """
-        
+        if 'smiles' not in self.scores.columns and chemistry_filter_basic:
+           chemistry_filter_basic = False
+           
         metrics = {}
         
         for endpoint in endpoints:
@@ -1089,7 +1235,7 @@ class ScoreMetrics:
         top_n=100,
         label=None,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         chemistry_filters_basic=False,
         chemistry_filter_target=False,
         diverse=False,
@@ -1127,7 +1273,7 @@ class ScoreMetrics:
         threshold,
         label=None,
         window=100,
-        extrapolate=True,
+        extrapolate=False,
         scaffold=False,
         chemistry_filters_basic=False,
         chemistry_filter_target=False,
@@ -1267,9 +1413,6 @@ class ScoreMetrics:
         tdf = self.scores
         # Chemisry Filters
         if bad_only:
-            import pdb
-
-            pdb.set_trace()
             bad_idxs = [
                 i
                 for i in range(len(tdf))

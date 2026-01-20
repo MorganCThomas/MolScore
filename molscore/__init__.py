@@ -1,4 +1,11 @@
-__version__ = "1.9.5"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("molscore")
+except PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
+
 __all__ = ["MolScore", "MolScoreBenchmark", "MolScoreCurriculum", "MockGenerator"]
 
 # Import lib resources depending on python version

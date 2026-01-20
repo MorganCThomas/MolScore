@@ -1,23 +1,26 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# include commit hash in local version; add date if dirty
+local_scheme = "node-and-date"
+#write_to = "molscore/_version.py"
+#write_to_template = "__version__ = \"{version}\"\n"
 
 [project]
 name = "MolScore"
-version = "1.9.5"
 authors = [
   { name="Morgan Thomas", email="morganthomas263@gmail.com" },
 ]
 description = "A scoring, benchmarking and evaluation framework for goal directed generative models"
 readme = "README.md"
 requires-python = ">=3.6"
-license = "MIT"
-license-files = ["LICENSE"] 
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dynamic = ["dependencies"]
+dynamic = ["version", "dependencies"]
 
 [project.urls]
 Homepage = "https://github.com/MorganCThomas/MolScore"

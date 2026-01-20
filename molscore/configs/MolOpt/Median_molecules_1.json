@@ -17,7 +17,7 @@
           "CC1(C)[C@H]2CC[C@]1(C)C(=O)C2"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",
@@ -33,7 +33,7 @@
           "CC1CCC(C(C1)O)C(C)C"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",

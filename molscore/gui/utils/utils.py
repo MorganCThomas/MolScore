@@ -30,7 +30,7 @@ def load(input_dir: os.PathLike, latest_idx: int = 0):
     scores_path = os.path.join(input_dir, "scores.csv")
 
     if os.path.exists(scores_path):
-        df = pd.read_csv(scores_path, index_col=0, dtype={"valid": object})
+        df = pd.read_csv(scores_path, index_col=0)
     
     elif os.path.exists(it_path):
         df = pd.DataFrame()
@@ -38,7 +38,7 @@ def load(input_dir: os.PathLike, latest_idx: int = 0):
         if len(it_files) > latest_idx:
             for f in it_files[latest_idx:]:
                 df = pd.concat(
-                    [df, pd.read_csv(f, index_col=0, dtype={"valid": object})], axis=0
+                    [df, pd.read_csv(f, index_col=0)], axis=0
                 )
             latest_idx = len(it_files)
 
@@ -394,27 +394,7 @@ def save_cif(in_paths, names, out_file):
 def plotly_plot(
     y, main_df, size=(1000, 500), x="step", trendline="median", trendline_only=False
 ):
-    if y == "valid":
-        if x == "index":
-            x = "idx"
-            main_df = main_df.copy()
-            main_df.idx = (main_df.idx // 100) * 100
-        tdf = (
-            main_df.groupby(["run", x])[y]
-            .agg(lambda x: (x == "true").mean())
-            .reset_index()
-        )
-        fig = px.line(
-            data_frame=tdf,
-            x=x,
-            y=y,
-            range_y=(0, 1),
-            color="run",
-            template="plotly_white",
-        )
-        fig.update_layout(xaxis_title=x, yaxis_title=y)
-
-    elif (y == "unique") or (y == "passes_diversity_filter"):
+    if y in ["valid", "unique"]:
         if x == "index":
             x = "idx"
             main_df = main_df.copy()

@@ -17,7 +17,7 @@
           "C1CN2C(=NN=C2C(F)(F)F)CN1C(=O)CC(CC3=CC(=C(C=C3F)F)F)N"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",

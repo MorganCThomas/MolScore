@@ -46,7 +46,7 @@ class MolecularDescriptors:
         self.prefix = prefix.strip().replace(" ", "_")
         self.results = None
         self.n_jobs = n_jobs
-        self.mapper = Pool(self.n_jobs, return_map=True)
+        self.pool = Pool(self.n_jobs)
 
     @staticmethod
     def calculate_descriptors(smi, prefix):
@@ -263,7 +263,7 @@ class MolecularDescriptors:
         pcalculate_descriptors = partial(
             self.calculate_descriptors, prefix=self.prefix
         )
-        results = [result for result in self.mapper(pcalculate_descriptors, smiles)]
+        results = self.pool.submit(pcalculate_descriptors, smiles)
 
         return results
 
@@ -424,7 +424,7 @@ class LinkerDescriptors(MolecularDescriptors):
         ]
 
         # Compute descriptors in parallel
-        descs = [r for r in self.mapper(self._score, additional_formats["linker"])]
+        descs = self.pool.submit(self._score, additional_formats["linker"])
         # Add prefix
         descs = [{f"{self.prefix}_{k}": v for k, v in ds.items()} for ds in descs]
 

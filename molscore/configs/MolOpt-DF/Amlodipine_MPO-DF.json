@@ -22,7 +22,7 @@
           "CCOC(=O)C1=C(COCCN)NC(C)=C(C(=O)OC)C1c1ccccc1Cl"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",

@@ -8,6 +8,7 @@ import multiprocessing
 from collections import Counter
 import numpy as np
 import rdkit
+from functools import partial
 from scipy.spatial.distance import cosine as cos_distance
 from scipy.stats import wasserstein_distance
 from scipy import linalg
@@ -20,7 +21,7 @@ except (ImportError, TypeError) as e:
     print(f"Molbloom incompatible, skipping purchasability score: {e}")
     _has_molbloom = False
 
-from moleval.utils import disable_rdkit_log, enable_rdkit_log
+from moleval.utils import disable_rdkit_log, enable_rdkit_log, Fingerprints
 from moleval.metrics.fcd_torch import FCD as FCDMetric
 from moleval.metrics.metrics_utils import mapper
 from moleval.metrics.metrics_utils import SillyWalks
@@ -179,7 +180,8 @@ class GetMetrics(object):
         Calculate metrics for a generate de novo dataset
         :param gen: List of de novo generate smiles or mols
         :param calc_valid: Return validity ratio
-        :param calc_unique: Return unique ratio
+        :param calc_unique: Return unique 
+        :param unique_k: Return unique ratio for a subset of size k
         :param se_k: Sub-sample size for sphere exclusion diversity
         :param sp_k: Sub-sample size for Solow Polasky diversity
         :param verbose: Print updates
@@ -534,8 +536,8 @@ def internal_diversity(gen, n_jobs=1, device='cpu', fp_type='morgan', p=1):
         return 1 - np.mean(agg)
 
 
-def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
-                 dist_threshold=0.65, normalize=True):
+def se_diversity(gen, k=None, n_jobs=1, fp_type='ECFP4', fp_bits=1024,
+                 dist_threshold=0.65, normalize=True, force=False):
     """
     Computes Sphere exclusion diversity i.e. fraction of diverse compounds according to a pre-defined
      Tanimoto distance on the first k molecules.
@@ -550,26 +552,44 @@ def se_diversity(gen, k=None, n_jobs=1, fp_type='morgan',
     :param normalize:
     :return:
     """
+    if len(gen) == 0:
+        warnings.warn("Can't compute SEDiv on an empty input")
+        return 0.0 if normalize else 0
     assert isinstance(gen[0], rdkit.Chem.rdchem.Mol) or isinstance(gen[0], np.ndarray) or isinstance(gen[0], str)
 
     if k is not None:
         if len(gen) < k:
             warnings.warn(
-                f"Can't compute SEDiv@{k/1000:.0f} "
+                f"Can't compute SEDiv@{k/1000:.0f}k "
                 f"gen contains only {len(gen)} molecules"
             )
-        np.random.seed(123)
-        idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+        if force and (len(gen) < k):
+            idxs = list(range(len(gen)))
+        else:
+            np.random.seed(123)
+            idxs = np.random.choice(list(range(len(gen))), k, replace=False)
+            
         if isinstance(gen[0], (rdkit.Chem.rdchem.Mol, str)): 
             gen = [gen[i] for i in idxs]
         else: 
             gen = gen[idxs]
 
+    fp_type = fp_type + "_arr"
     if isinstance(gen[0], rdkit.Chem.rdchem.Mol):
-        gen_fps = fingerprints(gen, fp_type=fp_type, n_jobs=n_jobs)
+        # Remove None, tolerate up to 5
+        gen_mols = [mol for mol in gen if mol is not None]
+        assert len(gen) - len(gen_mols) <= 5, "At least 5 invalid molecules found, please provide only valid mols to for SEDiv"
+        # Calculate fingerprints
+        gen_fps = mapper(n_jobs)(partial(Fingerprints.get_fp, name=fp_type, nBits=fp_bits), gen)
+        gen_fps = np.vstack(gen_fps)
     elif isinstance(gen[0], str):
         gen_mols = mapper(n_jobs)(get_mol, gen)
-        gen_fps = fingerprints(gen_mols, fp_type=fp_type, n_jobs=n_jobs)
+        # Remove None, tolerate up to 5
+        gen_mols = [mol for mol in gen_mols if mol is not None]
+        assert len(gen) - len(gen_mols) <= 5, "At least 5 invalid molecules found, please provide only valid mols to for SEDiv"
+        # Calculate fingerprints
+        gen_fps = mapper(n_jobs)(partial(Fingerprints.get_fp, name=fp_type, nBits=fp_bits), gen_mols)
+        gen_fps = np.vstack(gen_fps)
     else:
         gen_fps = gen
 

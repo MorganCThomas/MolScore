@@ -41,8 +41,9 @@ ms = MolScore(
     task_config='molscore/configs/QED.json',
     budget=10000
 )
-while not ms.finished:
-    scores = ms.score(SMILES)
+with ms as scoring_function:
+    while not scoring_function.finished:
+        scores = scoring_function.score(SMILES)
 ```
 
 > Note: see [tutorial](tutorials/implementing_molscore.md#single-mode) for more detail
@@ -110,9 +111,11 @@ msb = MolScoreBenchmark(
     benchmark='GuacaMol',
     budget=10000
 )
-for task in msb:
-    while not task.finished:
-        scores = task.score(SMILES)
+with msb as benchmark:
+    for task in msb:
+        with task as scoring_function:
+            while not scoring_function.finished:
+                scores = scoring_function.score(SMILES)
 ```
 
 Current benchmarks available include: [GuacaMol](https://pubs.acs.org/doi/10.1021/acs.jcim.8b00839), [GuacaMol_Scaffold](https://arxiv.org/abs/2103.03864), [MolOpt](https://arxiv.org/pdf/2206.12411), [5HT2A_PhysChem, 5HT2A_Selectivity, '5HT2A_Docking'](https://jcheminf.biomedcentral.com/articles/10.1186/s13321-024-00861-w), [LibINVENT Exp1&3](https://pubs.acs.org/doi/10.1021/acs.jcim.1c00469), [MolExp(L)](https://arxiv.org/abs/2501.19153)

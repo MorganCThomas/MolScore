@@ -36,7 +36,7 @@
       "parameters": {
         "prefix": "S6",
         "smarts": [
-          "[#6]-[#6]-[#6]-[#8]-[#6]\u223c[#6]\u223c[#6]\u223c[#6]\u223c[#6]-[#7]-c1ccc2ncsc2c1"
+          "[#6]-[#6]-[#6]-[#8]-[#6]~[#6]~[#6]~[#6]~[#6]-[#7]-c1ccc2ncsc2c1"
         ],
         "n_jobs": 1,
         "method": "any"
@@ -51,7 +51,7 @@
           "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
         ],
         "fp": "PHCO",
-        "bits": 1024,
+        "bits": null,
         "similarity_measure": "Tanimoto",
         "method": "mean",
         "n_jobs": 1

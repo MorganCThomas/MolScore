@@ -1,5 +1,6 @@
 {
   "task": "Ranolazine_MPO",
+  "starting_population": ["molscore.configs.GuacaMol", "Ranolazine.smi"],
   "output_dir": "./",
   "load_from_previous": false,
   "logging": false,
@@ -17,7 +18,7 @@
           "CC1=C(C(=CC=C1)C)NC(=O)CN2CCN(CC2)CC(COC3=CC=CC=C3OC)O"
         ],
         "fp": "AP",
-        "bits": 1024,
+        "bits": null,
         "similarity_measure": "Tanimoto",
         "method": "mean",
         "n_jobs": 1

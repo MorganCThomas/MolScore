@@ -20,12 +20,11 @@ def main(configs: list):
             score_invalids=False,
             replay_size=0,
         )
-        # Score 5 smiles 5 times
-        for i in tqdm(range(5)):
-            _ = ms(mg.sample(10), additional_keys={'add_step': i})
-        ms.write_scores()
-        ms.kill_monitor()
-        print(f"Output:\n{ms.main_df.head(10)}\n")
+        with ms as scoring_function:
+            # Score 5 smiles 5 times
+            for i in tqdm(range(5)):
+                _ = scoring_function(mg.sample(10))
+        print(f"Output:\n{ms.main_df.head(15)}\n")
     return
 
 

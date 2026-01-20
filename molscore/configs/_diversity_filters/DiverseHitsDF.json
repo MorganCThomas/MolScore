@@ -1,0 +1,13 @@
+{
+    "run":true,
+    "name":"CompoundSimilarity",
+    "parameters":{
+        "nbmax":1,
+        "minscore":0.5,
+        "minsimilarity":0.7,
+        "radius":2,
+        "useFeatures":false,
+        "bits":2048,
+        "outputmode":"binary"
+    }
+}

@@ -3,6 +3,7 @@ import inspect
 import json
 import os
 import re
+import typing
 
 import streamlit as st
 
@@ -144,19 +145,25 @@ def parseobject(obj, exceptions=[]):
     # Inspect parameter info
     sig = inspect.signature(obj).parameters
     params = {}
-    for p in sig:
-        if p in exceptions:
+    for name, p in sig.items():
+        if name in exceptions:
             continue
-        params[p] = {
-            "name": p,
-            "type": sig[p].annotation if sig[p].annotation != inspect._empty else None,
-            "default": sig[p].default if sig[p].default != inspect._empty else None,
+        params[name] = {
+            "name": name,
+            "type": p.annotation if not p.annotation is p.empty else None,
+            "default": p.default if not p.default is p.empty else None,
             "optional": True
-            if (sig[p].default is None) and (sig[p].default != inspect._empty)
+            if (p.default is None) and (not p.default is p.empty)
             else False,
             "description": None,
             "options": None,
         }
+        # Correct optional if None can be provided
+        if isinstance(p.annotation, typing._UnionGenericAlias):
+            if type(None) in p.annotation.__args__:
+                params[name]["optional"] = True
+            else:
+                params[name]["optional"] = False
 
     # Add docstring annotation for parameters
     for d in range(0, len(docs), 2):
@@ -197,69 +204,38 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
     for p, pinfo in params.items():
         label = f"{p}: {pinfo['description']}"
 
-        # Check to see if it's optional
-        if pinfo["optional"]:
+        # If a None by default -> checkbox to fill in
+        if (pinfo["optional"] and pinfo['default'] is None):
             add_optional = st.checkbox(
                 label=f"Specificy {p} [optional]",
                 value=False,
                 key=f"{key_i}: {obj.__name__}_{p}_optional",
             )
-
-        if not pinfo["optional"] or add_optional:
-            # No default
-            if pinfo["default"] is None:
-                # If no type either, print warning and use text input
-                if pinfo["type"] is None:
-                    st.write(
-                        f"WARNING: {p} is has no default or type annotation, using text_input"
+        
+        if (not pinfo["optional"] or pinfo["default"] is not None) or add_optional:
+            if pinfo["type"] is not None:
+                # Typing -> select type to provide widget
+                ptype_args = getattr(pinfo["type"], "__args__", None)
+                if ptype_args is not None:
+                    pinfo["type"] = st.selectbox(
+                        label=f"{p}: input type",
+                        options=ptype_args,
+                        index=0,
+                        key=f"{key_i}: {obj.__name__}_{p}_type",
                     )
-                    result_dict[p] = st.text_input(
-                        label=label, key=f"{key_i}: {obj.__name__}_{p}"
-                    )
-
+                if pinfo["type"] == type(None):
+                    result_dict[p] = None
                 else:
-                    # Check to see if ptype is union i.e., multiple types possible
-                    ptype_args = getattr(pinfo["type"], "__args__", None)
-                    if ptype_args is not None:
-                        pinfo["type"] = st.selectbox(
-                            label=f"{p}: input type",
-                            options=ptype_args,
-                            index=0,
-                            key=f"{key_i}: {obj.__name__}_{p}_type",
-                        )
                     result_dict[p] = type2widget(
                         pinfo["type"],
                         key=f"{key_i}: {obj.__name__}_{p}",
+                        default=pinfo["default"],
                         label=label,
                         options=pinfo["options"],
                     )
-                    if pinfo["type"] == int:
-                        result_dict[p] = int(result_dict[p])
-
             else:
-                # Use type annotation if present
-                if pinfo["type"] is not None:
-                    with st.expander(f"{p}={pinfo['default']}"):
-                        # Check to see if ptype is union i.e., multiple types possible
-                        ptype_args = getattr(pinfo["type"], "__args__", None)
-                        if ptype_args is not None:
-                            pinfo["type"] = st.selectbox(
-                                label=f"{p}: input type",
-                                options=ptype_args,
-                                index=0,
-                                key=f"{key_i}: {obj.__name__}_{p}_type",
-                            )
-                        result_dict[p] = type2widget(
-                            pinfo["type"],
-                            key=f"{key_i}: {obj.__name__}_{p}",
-                            default=pinfo["default"],
-                            label=label,
-                            options=pinfo["options"],
-                        )
-                        # if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
-
-                # Otherwise use type of default
-                else:
+                # No typing -> use default type to provide widget
+                if pinfo["default"] is not None:
                     with st.expander(f"{p}={pinfo['default']}"):
                         result_dict[p] = type2widget(
                             type(pinfo["default"]),
@@ -268,8 +244,88 @@ def object2dictionary(obj, key_i=0, exceptions=[]):
                             label=label,
                             options=pinfo["options"],
                         )
+                else:
+                    # No typing, no default -> print warning and use text input
+                    st.write(
+                        f"WARNING: {p} is has no default or type annotation, using text_input"
+                    )
+                    result_dict[p] = st.text_input(
+                        label=label, key=f"{key_i}: {obj.__name__}_{p}"
+                    )
+            
+            # ---- Remove ----
+            if False: 
+                if pinfo["default"] is None:
+                    if pinfo["type"] is None:
+                        # No default, no typing -> print warning and use text input
+                        st.write(
+                            f"WARNING: {p} is has no default or type annotation, using text_input"
+                        )
+                        result_dict[p] = st.text_input(
+                            label=label, key=f"{key_i}: {obj.__name__}_{p}"
+                        )
 
-            # If list convert correctly
+                    else:
+                        # No default, but typing -> select ptype to provide
+                        ptype_args = getattr(pinfo["type"], "__args__", None)
+                        if ptype_args is not None:
+                            pinfo["type"] = st.selectbox(
+                                label=f"{p}: input type",
+                                options=ptype_args,
+                                index=0,
+                                key=f"{key_i}: {obj.__name__}_{p}_type",
+                            )
+                        if pinfo["type"] == type(None):
+                            result_dict[p] = None
+                        else:
+                            result_dict[p] = type2widget(
+                                pinfo["type"],
+                                key=f"{key_i}: {obj.__name__}_{p}",
+                                label=label,
+                                options=pinfo["options"],
+                            )
+                        if pinfo["type"] == int:
+                            result_dict[p] = int(result_dict[p])
+
+                else:
+                    # Use type annotation if present
+                    if pinfo["type"] is not None:
+                        with st.expander(f"{p}={pinfo['default']}"):
+                            # Check to see if ptype is union i.e., multiple types possible
+                            ptype_args = getattr(pinfo["type"], "__args__", None)
+                            if ptype_args is not None:
+                                pinfo["type"] = st.selectbox(
+                                    label=f"{p}: input type",
+                                    options=ptype_args,
+                                    index=0,
+                                    key=f"{key_i}: {obj.__name__}_{p}_type",
+                                )
+                            if pinfo["type"] is type(None):
+                                result_dict[p] = None
+                            else:
+                                result_dict[p] = type2widget(
+                                    pinfo["type"],
+                                    key=f"{key_i}: {obj.__name__}_{p}",
+                                    default=pinfo["default"],
+                                    label=label,
+                                    options=pinfo["options"],
+                                )
+                            # if pinfo['type'] == int: result_dict[p] = int(result_dict[p])
+
+                    # Otherwise use type of default
+                    else:
+                        with st.expander(f"{p}={pinfo['default']}"):
+                            result_dict[p] = type2widget(
+                                type(pinfo["default"]),
+                                key=f"{key_i}: {obj.__name__}_{p}",
+                                default=pinfo["default"],
+                                label=label,
+                                options=pinfo["options"],
+                            )
+            
+            # Convert back to correct types
+            if pinfo["type"] == int:
+                    result_dict[p] = int(result_dict[p])
             if pinfo["type"] == list:
                 result_dict[p] = (
                     result_dict[p].replace(",", "").replace("\n", " ").split(" ")
@@ -521,6 +577,22 @@ config["monitor_app"] = st.checkbox(
     help="Automatically run the monitor gui as a subprocess after the first iteration is scored. This can also be run manually at any time.",
     key="monitor_app",
 )
+
+# ------ Starting population ------
+config["starting_population"] = None
+specify_starting_population = st.checkbox(
+    label="Specify a starting population",
+    value=False,
+    help="File path to the starting population. This file path will be made available to the algorithm via the MolScore.starting_population.",
+    key="starting_population_optional",
+)
+if specify_starting_population:
+    config["starting_population"] = st_file_selector(
+        label="Select a file",
+        st_placeholder=st.empty(),
+        path="./",
+        key="starting_population_path",
+    )
 
 # ------ Termination criteria ------
 st.markdown("#")  # Add spacing

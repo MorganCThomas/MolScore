@@ -27,7 +27,7 @@
           "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": null,
         "features": true,
         "counts": true,
         "method": "max",
@@ -43,7 +43,7 @@
           "C=CC(=O)Nc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(OC)cc1N(C)CCN(C)C"
         ],
         "radius": 3,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",
@@ -88,7 +88,7 @@
         "parameters": {
           "objective": "minimize",
           "mu": 0.85,
-          "sigma": 2.0
+          "sigma": 0.1
         }
       },
       {
@@ -98,7 +98,7 @@
         "parameters": {
           "objective": "maximize",
           "mu": 100.0,
-          "sigma": 2.0
+          "sigma": 10.0
         }
       },
       {
@@ -108,7 +108,7 @@
         "parameters": {
           "objective": "minimize",
           "mu": 1.0,
-          "sigma": 2.0
+          "sigma": 1.0
         }
       },
       {

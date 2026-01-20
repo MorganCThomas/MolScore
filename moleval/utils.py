@@ -23,7 +23,6 @@ from rdkit.Chem import (
     rdmolops,
 )
 from rdkit.ML.Cluster import Butina
-from torch import cuda
 from tqdm import tqdm
 
 from moleval.metrics.metrics_utils import get_mol, mol_passes_filters
@@ -41,13 +40,6 @@ disable_rdkit_log()
 
 def enable_rdkit_log():
     rdBase.EnableLog("rdApp.*")
-
-
-# ----- Cuda
-
-
-def cuda_available():
-    return cuda.is_available()
 
 
 # ----- Multiprocessing
@@ -110,7 +102,7 @@ class Fingerprints:
     """
 
     @classmethod
-    def get_fp(cls, name, mol, nBits):
+    def get_fp(cls, mol, name, nBits):
         """
         Get fp by str instead of method
         :param name: Name of FP e.g., ECFP4
@@ -583,10 +575,9 @@ def butina_picker(
         subset = [mols[i] for i in ids]
 
     if return_cs:
-        cs_subset = [[mols[i] for i in c] for c in cs]
-        return subset, size, cs_subset
+        return subset, size, ids, cs
     else:
-        return subset, size
+        return subset, size, ids
 
 
 def se_picker(
@@ -646,8 +637,7 @@ def se_picker(
         subset = [mols[i] for i in ids]
 
     if return_cs:
-        cs_subset = [[mols[i] for i in c] for c in cs]
-        return subset, size, ids, cs_subset
+        return subset, size, ids, cs
     else:
         return subset, size, ids
 
@@ -677,7 +667,7 @@ def maxmin_picker(
     ids = mmp.LazyBitVectorPick(fps, len(fps), n, seed=seed)
     subset = [mols[i] for i in ids]
 
-    return subset
+    return subset, ids
 
 
 def single_nearest_neighbour(fp, fps):

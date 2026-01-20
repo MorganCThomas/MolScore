@@ -17,7 +17,7 @@
           "CN1CC(=O)N2[C@H](Cc3c([nH]c4ccccc34)[C@H]2c2ccc3c(c2)OCO3)C1=O"
         ],
         "radius": 3,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",
@@ -33,7 +33,7 @@
           "CCCc1nn(C)c2c(=O)[nH]c(-c3cc(S(=O)(=O)N4CCN(C)CC4)ccc3OCC)nc12"
         ],
         "radius": 3,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",

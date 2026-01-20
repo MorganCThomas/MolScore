@@ -22,7 +22,7 @@
           "CCCC(C(=O)OCC)NC(C)C(=O)N1C2CCCCC2CC1C(=O)O"
         ],
         "radius": 2,
-        "bits": 1024,
+        "bits": null,
         "features": false,
         "counts": true,
         "method": "max",

@@ -17,10 +17,10 @@ def main(benchmark):
         custom_benchmark=benchmark,
         run_name="Curriculum",
     )
-    while not MSC.finished:
-        smiles = mg.sample(10)
-        MSC.score(smiles)
-    MSC.write_scores()
+    with MSC as scoring_function:
+        while not scoring_function.finished:
+            smiles = mg.sample(10)
+            scoring_function.score(smiles)
     print(f"Output:\n{MSC.main_df.head(10)}\n")
 
     # Specify a new budget of 100
@@ -31,10 +31,10 @@ def main(benchmark):
         run_name="Curriculum",
         budget=100,
     )
-    while not MSC.finished:
-        smiles = mg.sample(10)
-        MSC.score(smiles)
-    MSC.write_scores()
+    with MSC as scoring_function:
+        while not scoring_function.finished:
+            smiles = mg.sample(10)
+            scoring_function.score(smiles)
     print(f"Output:\n{MSC.main_df.head(10)}\n")
 
     # Specify a budget of 100, termination_threshold of 0.8
@@ -46,10 +46,10 @@ def main(benchmark):
         budget=100,
         termination_threshold=0.5,
     )
-    while not MSC.finished:
-        smiles = mg.sample(10)
-        MSC.score(smiles)
-    MSC.write_scores()
+    with MSC as scoring_function:
+        while not scoring_function.finished:
+            smiles = mg.sample(10)
+            scoring_function.score(smiles)
     print(f"Output:\n{MSC.main_df.head(10)}\n")
 
     # Specify a budget of 100, termination_threshold of 0.8, patience of 10
@@ -62,10 +62,10 @@ def main(benchmark):
         termination_threshold=0.5,
         termination_patience=5,
     )
-    while not MSC.finished:
-        smiles = mg.sample(10)
-        MSC.score(smiles)
-    MSC.write_scores()
+    with MSC as scoring_function:
+        while not scoring_function.finished:
+            smiles = mg.sample(10)
+            scoring_function.score(smiles)
     print(f"Output:\n{MSC.main_df.head(10)}\n")
 
 

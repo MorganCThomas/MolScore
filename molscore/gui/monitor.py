@@ -43,6 +43,9 @@ def add_run(input_dir, SS):
             # Add input_dirs
             SS.input_dirs.append(input_dir)
             SS.input_latest.append(latest_idx)
+            # Add to rename_map
+            run_name = df.run.unique()[0]
+            SS.rename_map[run_name] = run_name
             # Carry index over
             df.reset_index(inplace=True)
             df.rename(columns={"index": "idx"}, inplace=True)
@@ -139,7 +142,6 @@ def main():
 
         # Option to rename runs
         st.sidebar.header("Rename runs:")
-        #rename_map = {}
         for run in SS.main_df.run.unique():
             col1, col2 = st.sidebar.columns([0.9, 0.1])
             new_name = col1.text_input(

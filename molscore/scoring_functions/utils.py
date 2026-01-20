@@ -7,11 +7,11 @@ import signal
 import subprocess
 import threading
 import time
-import atexit
+import weakref
+import warnings
 from functools import partial
 from pathlib import Path
 from typing import Callable, Sequence, Union
-
 import numpy as np
 import rdkit.rdBase as rkrb
 import rdkit.RDLogger as rkl
@@ -29,7 +29,6 @@ def check_openbabel():
         raise RuntimeError(
             "OpenBabel is required for this function, please install it using conda or mamba e.g., mamba install openbabel -c conda-forge"
         )
-
 
 def check_exe(command):
     if shutil.which(command) is None:
@@ -53,30 +52,64 @@ def check_path(path):
 
 
 # ----- Multiprocessing related -----
-def Pool(n_jobs, return_map=True, **kwargs):
-    if platform.system() == "Linux":
-        context = multiprocessing.get_context("fork")
-    else:
-        context = multiprocessing.get_context("spawn")
-
-    # Extract from environment as default, overriding configs
-    if "MOLSCORE_NJOBS" in os.environ.keys():
-        pool = context.Pool(int(os.environ["MOLSCORE_NJOBS"]))
-        atexit.register(pool.terminate)
-        return pool.imap if return_map else pool
+class Pool:
+    def __init__(self, n_jobs: Union[int, float] = None, **kwargs):
+        """
+        Create a potentially multiprocessing job pool or with the given number of jobs.
+        Note: If MOLSCORE_NJOBS is set in the environment, this will override the n_jobs parameter.
+        :param n_jobs: Number of jobs to run in parallel, None or 1 means no multiprocessing. Float is fraction of CPUs i.e., 1.0 is all. -1 is also all CPUs.
+        :param kwargs: Additional arguments to pass to the multiprocessing.pool
+        """
+        self.n_jobs = self._resolve_n_jobs(n_jobs=n_jobs)
+        self.kwargs = kwargs
+        self._context = self._get_context()
+        # Create the pool
+        if self.n_jobs is not None:
+            self._mp_pool = self._context.Pool(self.n_jobs, **self.kwargs)
+        else:
+            self._mp_pool = None
+        # Register cleanup
+        weakref.finalize(self, self._cleanup)
+        
+    def _get_context(self):
+        if platform.system() == "Linux":
+            context = multiprocessing.get_context("fork")
+        else:
+            context = multiprocessing.get_context("spawn")
+        return context
     
-    # Transform float into fraction of CPUs
-    if isinstance(n_jobs, float):
+    def _resolve_n_jobs(self, n_jobs = None):
         cpu_count = os.cpu_count()
-        n_jobs = int(cpu_count * n_jobs)
+        # Extract from environment as default, overriding configs
+        if "MOLSCORE_NJOBS" in os.environ.keys():
+            return int(os.environ["MOLSCORE_NJOBS"])
+        # Transform float into fraction of CPUs
+        if isinstance(n_jobs, float):
+            assert 0.0 <= n_jobs <= 1, "Fraction of CPUs must be between 0.0 and 1.0"
+            n_jobs = int(cpu_count * n_jobs)
+            if n_jobs > 1:
+                return n_jobs
+        # Resolve int
+        if isinstance(n_jobs, int):
+            if n_jobs == -1:
+                return cpu_count
+            if n_jobs > 1:
+                return n_jobs
+        # No multiprocessing
+        return None
     
-    # Return pool or None
-    if isinstance(n_jobs, int) and (n_jobs > 1):
-        pool = context.Pool(n_jobs, *kwargs)
-        atexit.register(pool.terminate)
-        return pool.imap if return_map else pool
-    else:
-        return map if return_map else pool
+    def map(self, func, iterable):
+        if self._mp_pool is None:
+            return map(func, iterable)
+        else:
+            return self._mp_pool.imap(func, iterable)
+        
+    def submit(self, func, iterable):
+        return list(self.map(func, iterable))
+    
+    def _cleanup(self):
+        if self._mp_pool:
+            self._mp_pool.terminate()
 
 
 def test_func():
@@ -425,7 +458,8 @@ def get_mol(mol: Union[str, Chem.rdchem.Mol]):
     elif isinstance(mol, Chem.rdchem.Mol):
         pass
     else:
-        raise TypeError("Molecule is not a string (SMILES) or rdkit.mol")
+        warnings.warn("Molecule is not a string (SMILES) or rdkit.mol, returning None")
+        return None
 
     if not mol:
         mol = None
@@ -519,19 +553,24 @@ class Fingerprints:
     @staticmethod
     def ECFP4(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=2, nBits=nBits
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=2, nBits=nBits
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=2, nBits=nBits
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=False)
 
     @staticmethod
     def ECFP4c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(mol, radius=2, useCounts=True)
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
@@ -544,19 +583,26 @@ class Fingerprints:
     @staticmethod
     def FCFP4(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                    mol, radius=2, nBits=nBits, useFeatures=True
+                    mol, radius=2, nBits=nBits, useFeatures=True, useCounts=False
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=2, nBits=nBits, useFeatures=True
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=2, nBits=nBits, useFeatures=True
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(
+                    mol, radius=2, useFeatures=True, useCounts=False
+                )
 
     @staticmethod
     def FCFP4c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(
                 mol, radius=2, useCounts=True, useFeatures=True
             )
@@ -567,25 +613,30 @@ class Fingerprints:
             return nfp.reshape(-1)
         else:
             return rdMolDescriptors.GetMorganFingerprint(
-                mol, radius=2, useCounts=True, useFeatures=True
+                mol, radius=2, useCounts=True, useFeatures=True,
             )
 
     @staticmethod
     def ECFP6(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=3, nBits=nBits
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=3, nBits=nBits
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=3, nBits=nBits
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=False)
 
     @staticmethod
     def ECFP6c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(mol, radius=3, useCounts=True)
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
@@ -598,19 +649,26 @@ class Fingerprints:
     @staticmethod
     def FCFP6(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             np.asarray(
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(
                     mol, radius=3, nBits=nBits, useFeatures=True
                 )
             )
         else:
-            return rdMolDescriptors.GetMorganFingerprintAsBitVect(
-                mol, radius=3, nBits=nBits, useFeatures=True
-            )
+            if nBits:
+                return rdMolDescriptors.GetMorganFingerprintAsBitVect(
+                    mol, radius=3, nBits=nBits, useFeatures=True
+                )
+            else:
+                return rdMolDescriptors.GetMorganFingerprint(
+                    mol, radius=3, useFeatures=True, useCounts=False
+                )
 
     @staticmethod
     def FCFP6c(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetMorganFingerprint(
                 mol, radius=3, useCounts=True, useFeatures=True
             )
@@ -628,8 +686,10 @@ class Fingerprints:
     @staticmethod
     def Avalon(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(pyAvalonTools.GetAvalonFP(mol, nBits=nBits))
         else:
+            assert nBits, "Number of bits must be specified for Avalon FP"
             return pyAvalonTools.GetAvalonFP(mol, nBits=nBits)
 
     @staticmethod
@@ -643,6 +703,7 @@ class Fingerprints:
     @staticmethod
     def AP(mol, nBits, asarray):
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             fp = rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10)
             nfp = np.zeros((1, nBits), np.int32)
             for idx, v in fp.GetNonzeroElements().items():
@@ -654,7 +715,9 @@ class Fingerprints:
 
     @staticmethod
     def hashAP(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for hashed AP FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetHashedAtomPairFingerprintAsBitVect(mol, nBits=nBits)
             )
@@ -665,7 +728,9 @@ class Fingerprints:
 
     @staticmethod
     def hashTT(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for hashed TT FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdMolDescriptors.GetHashedTopologicalTorsionFingerprintAsBitVect(
                     mol, nBits=nBits
@@ -678,7 +743,9 @@ class Fingerprints:
 
     @staticmethod
     def RDK5(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for RDK FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdmolops.RDKFingerprint(mol, maxPath=5, fpSize=nBits, nBitsPerHash=2)
             )
@@ -687,7 +754,9 @@ class Fingerprints:
 
     @staticmethod
     def RDK6(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for RDK FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdmolops.RDKFingerprint(mol, maxPath=6, fpSize=nBits, nBitsPerHash=2)
             )
@@ -696,7 +765,9 @@ class Fingerprints:
 
     @staticmethod
     def RDK7(mol, nBits, asarray):
+        assert nBits, "Number of bits must be specified for RDK FP"
         if asarray:
+            assert nBits, "Number of bits must be specified to return np.array"
             return np.asarray(
                 rdmolops.RDKFingerprint(mol, maxPath=7, fpSize=nBits, nBitsPerHash=2)
             )
