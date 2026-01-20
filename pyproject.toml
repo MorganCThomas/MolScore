@@ -21,8 +21,67 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dynamic = ["version", "dependencies"]
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "tqdm",
+    "rdkit >= 2019.03.2",
+    "dask",
+    "dask-jobqueue",
+    "torch",
+    "levenshtein",
+    "streamlit-plotly-events == 0.0.6",
+    "streamlit >= 1.11.0",
+    "molbloom",
+    "func_timeout",
+    "flask"
+]
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/MorganCThomas/MolScore"
 Issues = "https://github.com/MorganCThomas/MolScore/issues"
+
+[project.scripts]
+molscore_config = "molscore.gui.launcher:run_config"
+molscore_monitor = "molscore.gui.launcher:run_monitor"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+# This replaces your manual find_packages() logic
+where = ["."]
+include = ["molscore*", "moleval*"]
+# This is the "Pruning" logic you need
+exclude = [
+    "datasets*",
+    "tutorials*",
+    "molscore.tests*",
+    "moleval.tests*",
+    "**/deprecated*"
+]
+
+[tool.setuptools.package-data]
+# This replaces your package_data dictionary from setup.py
+molscore = [
+    "data/sample.smi",
+    "data/sample.bloom",
+    "data/models/**/*",
+    "data/structures/**/*",
+    "configs/**/*",
+    "scoring_functions/gypsum_dl/**/*",
+    "gui/config.py",
+    "gui/monitor.py"
+]
+moleval = [
+    "metrics/mcf.csv",
+    "metrics/wehi_pains.csv",
+    "metrics/quality_filters/alert_collection.csv",
+    "metrics/quality_filters/guacamol_rules.json",
+    "metrics/NP_Score/publicnp.model.gz",
+    "metrics/SA_Score/fpscores.pkl.gz",
+    "metrics/fcd_torch/ChemNet_v0.13_pretrained.pt"
+]

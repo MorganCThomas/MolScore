@@ -1,3 +1,0 @@
-#! /bin/sh
-config="$(which config.py)"
-streamlit run $config "$@"

@@ -1,3 +1,0 @@
-#! /bin/sh
-monitor="$(which monitor.py)"
-streamlit run $monitor "$@"
