@@ -1,7 +1,7 @@
 # MolScore: A scoring, evaluation and benchmarking framework for de novo drug design
 [![PyPI version](https://badge.fury.io/py/MolScore.svg)](https://badge.fury.io/py/MolScore)
 [![PyPI Downloads](https://static.pepy.tech/badge/molscore)](https://pepy.tech/projects/molscore)
-[![DOI](https://zenodo.org/badge/311350553.svg)](https://doi.org/10.5281/zenodo.14998608)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18309432.svg)](https://doi.org/10.5281/zenodo.18309432)
 ![Python 3.6+](https://img.shields.io/badge/Python-3.6%2B-blue?logo=python)
 
 ![alt text](https://github.com/MorganCThomas/MolScore/blob/v1.0/molscore/data/images/GraphAbv2.png?raw=True)
