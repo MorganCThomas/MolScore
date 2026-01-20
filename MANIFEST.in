@@ -1,2 +1,8 @@
 global-exclude */__pycache__/*
 global-exclude *.pyc
+
+# Exclude Unnecessary and test files (setuptools-scm requires exclude here for override)
+prune datasets/
+prune tutorials/
+prune molscore/tests
+prune moleval/tests

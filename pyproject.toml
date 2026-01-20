@@ -52,10 +52,9 @@ molscore_monitor = "molscore.gui.launcher:run_monitor"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-# This replaces your manual find_packages() logic
 where = ["."]
 include = ["molscore*", "moleval*"]
-# This is the "Pruning" logic you need
+# Prevent any inclusion in the wheel
 exclude = [
     "datasets*",
     "tutorials*",
