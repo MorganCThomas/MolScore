@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 # include commit hash in local version; add date if dirty
 local_scheme = "node-and-date"
-write_to = "molscore/_version.py"
-write_to_template = "__version__ = \"{version}\"\n"
+#write_to = "molscore/_version.py"
+#write_to_template = "__version__ = \"{version}\"\n"
 
 [project]
 name = "MolScore"

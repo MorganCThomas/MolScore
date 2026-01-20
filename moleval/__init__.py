@@ -1,4 +1,10 @@
-from molscore._version import __version__
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("molscore")
+except PackageNotFoundError:
+    # package is not installed
+    __version__ = "0.0.0"
 
 __all__ = [
     "MockGenerator",
