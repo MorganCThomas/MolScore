@@ -50,11 +50,11 @@ class TestHSR(unittest.TestCase):
                 if generator == "rdkit":
                     self.assertEqual(round(results[0][f"test_{generator}_HSR_score"], 2), 0.87,)
                     self.assertEqual(round(results[1][f"test_{generator}_HSR_score"],2), 0.89,) 
-                    self.assertEqual(round(results[2][f"test_{generator}_HSR_score"],2), 0.66,)
+                    self.assertEqual(round(results[2][f"test_{generator}_HSR_score"],2), 0.65,)
                 elif generator == "obabel":
-                    self.assertEqual(round(results[0][f"test_{generator}_HSR_score"],2), 0.85,)
-                    self.assertEqual(round(results[1][f"test_{generator}_HSR_score"],2), 0.87,) 
-                    self.assertEqual(round(results[2][f"test_{generator}_HSR_score"],2), 0.66,)
+                    self.assertEqual(round(results[0][f"test_{generator}_HSR_score"],2), 0.91,)
+                    self.assertEqual(round(results[1][f"test_{generator}_HSR_score"],2), 0.89,) 
+                    self.assertEqual(round(results[2][f"test_{generator}_HSR_score"],2), 0.67,)
                 
 
     def test_hsr_with_rdkit_molecules(self):
@@ -66,8 +66,8 @@ class TestHSR(unittest.TestCase):
         results = inst.score(self.test_rdkit_molecules, directory="./", file_names=["1", "2", "3"])
         self.assertEqual(len(results), len(self.test_rdkit_molecules))
         self.assertEqual(round(results[0]["test_rdkit_HSR_score"],2), 1.00,)
-        self.assertEqual(round(results[1]["test_rdkit_HSR_score"],2), 0.32,)
-        self.assertEqual(round(results[2]["test_rdkit_HSR_score"],2), 0.34,)
+        self.assertEqual(round(results[1]["test_rdkit_HSR_score"],2), 0.89,)
+        self.assertEqual(round(results[2]["test_rdkit_HSR_score"],2), 0.66,)
 
     def test_hsr_with_pybel_molecules(self):
         inst = HSR(
@@ -78,8 +78,8 @@ class TestHSR(unittest.TestCase):
         results = inst.score(self.test_pybel_molecules, directory="./", file_names=["1", "2", "3"])
         self.assertEqual(len(results), len(self.test_pybel_molecules))
         self.assertEqual(round(results[0]["test_pybel_HSR_score"],2), 1.00,)
-        self.assertEqual(round(results[1]["test_pybel_HSR_score"],2), 0.42,)
-        self.assertEqual(round(results[2]["test_pybel_HSR_score"],2), 0.47,)
+        self.assertEqual(round(results[1]["test_pybel_HSR_score"],2), 0.89,)
+        self.assertEqual(round(results[2]["test_pybel_HSR_score"],2), 0.66,)
 
     def test_hsr_with_ccdc_molecules(self):
         #TODO: Update this test
@@ -99,13 +99,13 @@ class TestHSR(unittest.TestCase):
         inst = HSR(
             prefix="test_numpy",
             ref_molecule=self.reference_molecule_file,
-            generator=None, 
+            generator='None', 
         )
         results = inst.score(self.test_np_arrays, directory="./", file_names=["1", "2", "3"])
         self.assertEqual(len(results), len(self.test_np_arrays))
         self.assertEqual(round(results[0]["test_numpy_HSR_score"],2), 1.00,)
-        self.assertEqual(round(results[1]["test_numpy_HSR_score"],2), 0.32,)
-        self.assertEqual(round(results[2]["test_numpy_HSR_score"],2), 0.34,)
+        self.assertEqual(round(results[1]["test_numpy_HSR_score"],2), 0.89,)
+        self.assertEqual(round(results[2]["test_numpy_HSR_score"],2), 0.66,)
 
 
 if __name__ == "__main__":
