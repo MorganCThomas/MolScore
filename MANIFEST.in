@@ -1,2 +1,25 @@
-global-exclude */__pycache__/*
-global-exclude *.pyc
+# Exclude certain file types
+global-exclude *.py[cod]
+global-exclude __pycache__/*
+global-exclude .*
+global-exclude **/.*
+global-exclude .ipynb_checkpoints/*
+global-exclude **/deprecated/*
+global-exclude CITATION.rff
+global-exclude environment.yml
+global-exclude environment_notorch.yml
+global-exclude *.png
+global-exclude *.mp4
+global-exclude *.gif
+global-exclude *.ipynb
+
+# Specific files/directories to exclude
+prune tutorials
+prune datasets
+prune molscore/tests
+prune moleval/metrics/genbench3d
+prune moleval/metrics/posecheck/bin
+
+# Keep important top-level files
+include README.md
+include LICENSE
