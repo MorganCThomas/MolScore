@@ -2,7 +2,7 @@ import json
 import os
 import unittest
 
-from molscore.scoring_functions.aizynthfinder import AiZynthFinder
+from molscore.scoring_functions.aizynth import AiZynthFinder
 from molscore.scoring_functions.rascore_xgb import RAScore_XGB
 from molscore.tests import BaseTests, MockGenerator
 
@@ -14,7 +14,7 @@ class TestAiZynthFinder(BaseTests.TestScoringFunction):
         os.makedirs(cls.output_directory, exist_ok=True)
         # Instantiate
         cls.obj = AiZynthFinder
-        cls.inst = AiZynthFinder(n_jobs=5)
+        cls.inst = AiZynthFinder()
         # Call
         mg = MockGenerator(seed_no=123, augment_invalids=True)
         cls.input = mg.sample(10)
