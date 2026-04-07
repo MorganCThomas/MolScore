@@ -135,15 +135,23 @@ class BaseServerSF:
             port += 1
         kwargs = " ".join([f"--{k} {v}" for k, v in self.server_kwargs.items()])
         args = " ".join([f"--{arg}" for arg in self.server_args])
-        self.server_cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} {kwargs} {args}"
+        if self.engine == "conda":
+            self.server_cmd = f"{self.engine} run --no-capture-output -n {self.env_name} python -u {self.server_path} --port {port} {kwargs} {args}"
+        else:
+            self.server_cmd = f"{self.engine} run -n {self.env_name} python {self.server_path} --port {port} {kwargs} {args}"
         self.server_url = f"http://localhost:{port}"
         logger.info(f"Launching server: {self.server_cmd}")
         try:
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+            env["MPLBACKEND"] = "Agg"  # Force a headless backend
+
             self.server_subprocess = subprocess.Popen(
                 self.server_cmd,
                 shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE, # Put to None for debugging
+                stderr=subprocess.PIPE, # Put to None for debugging
+                env=env,
                 preexec_fn=os.setsid,
             )
             self._wait_for_server()
