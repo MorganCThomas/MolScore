@@ -723,7 +723,7 @@ class MyConformer:
                 params = AllChem.ETKDG()
 
             # The default, but just a sanity check.
-            params.enforcechiral = True
+            params.enforceChirality = True
 
             # Set a max number of times it will try to calculate the 3D
             # coordinates. Will save a little time.
