@@ -298,6 +298,7 @@ class LinkerDescriptors(MolecularDescriptors):
         :param n_jobs: Number of cores for multiprocessing
         :param kwargs:
         """
+        super().__init__(prefix=prefix, n_jobs=n_jobs, **kwargs)
         self.prefix = prefix.strip().replace(" ", "_")
         self.n_jobs = n_jobs
 
